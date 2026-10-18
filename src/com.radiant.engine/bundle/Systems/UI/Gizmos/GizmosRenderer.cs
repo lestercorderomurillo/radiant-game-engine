@@ -76,7 +76,7 @@ public class GizmosRenderer : core.System
 
         if (Enabled)
         {
-            Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: Scale);
+            Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: Renderer.WorldTransform);
             RenderGizmos();
             Renderer.EndDraw();
         }

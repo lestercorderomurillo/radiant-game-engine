@@ -28,6 +28,8 @@ new GameClient().Run(new MyScene());
 
 A scene registers systems in `SetupECS()` (then calls `base.SetupECS()`), creates entities in `SetupScene()`, and can override update/render hooks. `ECS`, `Renderer`, and `DeltaTime` are available on the scene. Optional window settings are passed as `new WindowOptions { Title = "My game", Width = 1280, Height = 720 }`.
 
+Call `Renderer.FitWorld(center, size)` to keep a world area centered and fully visible as the window resizes, with its proportions preserved. Shapes and world/screen coordinate conversions follow the fitted view automatically; use `Renderer.WorldTransform` for world-space sprites. Gameplay coordinates remain unchanged.
+
 For a sibling game repository, import the desktop build settings and reference the library:
 
 ```xml
@@ -50,6 +52,8 @@ Games with content add their own `MonoGameContentReference` and local MGCB tool 
 Shader profiles are `vs_6_0` / `ps_6_0`; pixel outputs use `SV_Target`. DesktopVK currently permits one constant buffer per effect. Keep MonoGame packages and `.config/dotnet-tools.json` on the same version.
 
 The window uses MonoGame resize events. Windows timer-resolution calls and GPU performance counters are guarded by OS checks; CPU and memory metrics work across platforms. The game loop owns and disposes the active scene and renderer. Runtime content is resolved relative to the executable, so published apps can start from any working directory.
+
+DesktopVK presentation settings are reapplied after native window initialization so the first frame uses the requested client size. This prevents an initial Vulkan swapchain from presenting only part of the scene before the first resize.
 
 ## Validation
 

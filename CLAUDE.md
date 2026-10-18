@@ -51,7 +51,7 @@ radiant/
 ├── src/com.radiant.engine/
 │   ├── core/
 │   │   ├── ECS/ (ECS, Archetype, PagedBitSet, SpatialIndex)
-│   │   ├── Rendering/ (Renderer [partial: Renderer, RendererShaders, RendererTargets, RendererShapes, RendererDrawing],
+│   │   ├── Rendering/ (Renderer [partial: Renderer, RendererShaders, RendererTargets, RendererShapes, RendererDrawing, RendererView],
 │   │   │               Shape, ShapeBatcher [internal], ShaderRegistry [internal], TextureManager [internal], FontRegistry [internal])
 │   │   ├── Interfaces/ (Component, GameObject)
 │   │   └── Scene, System, SystemGroup (framework glue at root)
@@ -438,6 +438,9 @@ Renderer.WorldToScreen(worldPos);
 Renderer.VirtualToScreenScale;
 Renderer.VirtualToScreenRect(x, y, w, h);
 
+Renderer.FitWorld(center, size); // Center a world area, preserve aspect, refit on resize
+Renderer.WorldTransform;        // Use for world-space SpriteBatch draws and gizmos
+
 Renderer.IsActive;         // True when window is focused
 Renderer.ViewportBounds;
 Renderer.HasPendingResize;
@@ -454,6 +457,10 @@ Renderer.Commit();
 ```
 
 ## Rendering Pipeline
+
+`RendererView` owns the optional fitted world view. ShapeBatcher uses its projection; WorldToScreen, ScreenToWorld, VirtualToScreenRect, and world gizmos use the same scale and offset. Without FitWorld, the original full-window virtual-coordinate mapping remains. VirtualToScreenScale remains the independent UI scale. Pac-Man owns its choice of fitted bounds.
+
+`Window.Initialize` switches off vertical synchronization and applies graphics settings after `base.Initialize`, before creating the renderer. The presentation interval change forces DesktopVK to recreate its swapchain at the actual client size; applying the same size alone can retain the startup 800×480 native extent.
 
 ### Geometry System
 

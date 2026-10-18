@@ -178,7 +178,7 @@ public partial class Renderer : IDisposable
         Shaders = new ShaderRegistry(Window.Content);
         Textures = new TextureManager(Device, Window.Content);
         Fonts = new FontRegistry(Window.Content.RootDirectory);
-        ShapeBatch = new ShapeBatcher(Device, VirtualWidth, VirtualHeight);
+        ShapeBatch = new ShapeBatcher(Device);
 
         for (int i = 0; i < SamplerStates.Length; i++)
             SamplerStates[i] = SamplerState.LinearClamp;
@@ -216,6 +216,7 @@ public partial class Renderer : IDisposable
         ScreenSizeLowerPowerOfTwo = new Vector2(ScreenLowerPowerOfTwo, ScreenLowerPowerOfTwo);
         ScreenSizeHigherPowerOfTwo = new Vector2(ScreenHigherPowerOfTwo, ScreenHigherPowerOfTwo);
         VirtualToScreenScale = new Vector2(ScreenWidth / VirtualWidth, ScreenHeight / VirtualHeight);
+        UpdateWorldView();
     }
 
     private void UpdateScaledScreenInfo()
@@ -251,9 +252,7 @@ public partial class Renderer : IDisposable
     /// </summary>
     public Vector2 ScreenToWorld(Vector2 screenPos)
     {
-        return new Vector2(
-            screenPos.X * (VirtualWidth / ScreenWidth),
-            screenPos.Y * (VirtualHeight / ScreenHeight));
+        return (screenPos - WorldOffset) / WorldScale;
     }
 
     /// <summary>
@@ -261,9 +260,7 @@ public partial class Renderer : IDisposable
     /// </summary>
     public Vector2 WorldToScreen(Vector2 worldPos)
     {
-        return new Vector2(
-            worldPos.X * VirtualToScreenScale.X,
-            worldPos.Y * VirtualToScreenScale.Y);
+        return worldPos * WorldScale + WorldOffset;
     }
 
     /// <summary>
@@ -273,12 +270,12 @@ public partial class Renderer : IDisposable
     /// </summary>
     public Rectangle VirtualToScreenRect(float x, float y, float width, float height)
     {
-        float sx = VirtualToScreenScale.X;
-        float sy = VirtualToScreenScale.Y;
-        int px = (int)MathF.Round(x * sx);
-        int py = (int)MathF.Round(y * sy);
-        int pr = (int)MathF.Round((x + width) * sx);
-        int pb = (int)MathF.Round((y + height) * sy);
+        var Start = WorldToScreen(new Vector2(x, y));
+        var End = WorldToScreen(new Vector2(x + width, y + height));
+        int px = (int)MathF.Round(Start.X);
+        int py = (int)MathF.Round(Start.Y);
+        int pr = (int)MathF.Round(End.X);
+        int pb = (int)MathF.Round(End.Y);
         return new Rectangle(px, py, pr - px, pb - py);
     }
 

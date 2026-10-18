@@ -36,7 +36,6 @@ public class Window : Game
         IsFixedTimeStep = false;
         InactiveSleepTime = TimeSpan.Zero;
 
-        GraphicsDeviceManager.SynchronizeWithVerticalRetrace = false;
         GraphicsDeviceManager.PreferredDepthStencilFormat = DepthFormat.None;
         GraphicsDeviceManager.PreferredBackBufferWidth = Options.Width;
         GraphicsDeviceManager.PreferredBackBufferHeight = Options.Height;
@@ -53,8 +52,12 @@ public class Window : Game
     {
         base.Initialize();
 
+        // The native Vulkan swapchain can be created before the window reaches
+        // its requested size. Reapply against the actual client area before drawing.
+        GraphicsDeviceManager.SynchronizeWithVerticalRetrace = false;
+        GraphicsDeviceManager.ApplyChanges();
+
         SpriteBatch = new SpriteBatch(GraphicsDevice);
-        GraphicsDevice.PresentationParameters.PresentationInterval = PresentInterval.Immediate;
         GameLoop.SpriteBatch = SpriteBatch;
 
         Window.ClientSizeChanged += OnClientSizeChanged;

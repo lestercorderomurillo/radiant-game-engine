@@ -17,8 +17,7 @@ internal class ShapeBatcher : IDisposable
     private const int MaxShapeCapacity = int.MaxValue;
 
     private readonly GraphicsDevice Device;
-    private readonly float VirtualWidth;
-    private readonly float VirtualHeight;
+    public Matrix ViewProjection { get; set; }
 
     private VertexBuffer QuadBuffer;
     private IndexBuffer IndexBuffer;
@@ -45,11 +44,9 @@ internal class ShapeBatcher : IDisposable
     private (float z, int thread)[] MergeHeap;
     private int MergeHeapSize;
 
-    public ShapeBatcher(GraphicsDevice device, float virtualWidth, float virtualHeight)
+    public ShapeBatcher(GraphicsDevice device)
     {
         Device = device;
-        VirtualWidth = virtualWidth;
-        VirtualHeight = virtualHeight;
 
         var vertices = new ShapeQuadVertex[]
         {
@@ -128,10 +125,8 @@ internal class ShapeBatcher : IDisposable
             );
             Device.Indices = IndexBuffer;
 
-            var viewProjection = Matrix.CreateOrthographicOffCenter(0, VirtualWidth, VirtualHeight, 0, 0, 1);
-
             shapeShader.CurrentTechnique = shapeShader.Techniques[technique];
-            shapeShader.Parameters["ViewProjection"]?.SetValue(viewProjection);
+            shapeShader.Parameters["ViewProjection"]?.SetValue(ViewProjection);
 
             foreach (var pass in shapeShader.CurrentTechnique.Passes)
             {
@@ -184,10 +179,8 @@ internal class ShapeBatcher : IDisposable
             );
             Device.Indices = IndexBuffer;
 
-            var viewProjection = Matrix.CreateOrthographicOffCenter(0, VirtualWidth, VirtualHeight, 0, 0, 1);
-
             shapeShader.CurrentTechnique = shapeShader.Techniques[technique];
-            shapeShader.Parameters["ViewProjection"]?.SetValue(viewProjection);
+            shapeShader.Parameters["ViewProjection"]?.SetValue(ViewProjection);
 
             var swDraw = Stopwatch.StartNew();
             foreach (var pass in shapeShader.CurrentTechnique.Passes)
