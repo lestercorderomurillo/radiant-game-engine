@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RadiantBuildContent>false</RadiantBuildContent>
+  </PropertyGroup>
+  <Import Project="../../eng/Radiant.Desktop.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/SmokeWindow.cs" Link="SmokeWindow.cs" />
+    <ProjectReference Include="../../radiant.csproj" />
+    <Compile Include="../../src/com.radiant.engine/tests/2D/*.cs" Link="Scenes/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

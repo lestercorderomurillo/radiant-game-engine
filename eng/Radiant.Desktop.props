@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <MonoGamePlatform>DesktopVK</MonoGamePlatform>
+    <MonoGameVersion>3.8.6</MonoGameVersion>
+    <AutoRestoreMGCBTool>false</AutoRestoreMGCBTool>
+    <EnableMGCBItems>false</EnableMGCBItems>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(RadiantBuildContent)' != 'false'">
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="$(MonoGameVersion)" PrivateAssets="all" />
+  </ItemGroup>
+  <!-- Restore only when building this project's content, after project references.
+       Restoring during NuGet graph evaluation races the shared tool installation. -->
+  <Target Name="RestoreRadiantContentTools" BeforeTargets="RunContentBuilder"
+          Condition="'$(RadiantBuildContent)' != 'false' And '$(DesignTimeBuild)' != 'true'"
+          Inputs="$(MSBuildProjectDirectory)/.config/dotnet-tools.json"
+          Outputs="$(IntermediateOutputPath)radiant.tools.restored">
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Touch Files="$(IntermediateOutputPath)radiant.tools.restored" AlwaysCreate="true" />
+    <ItemGroup>
+      <FileWrites Include="$(IntermediateOutputPath)radiant.tools.restored" />
+    </ItemGroup>
+  </Target>
+</Project>

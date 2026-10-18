@@ -70,7 +70,7 @@ float UVDistanceSq(float2 uv1, float2 uv2)
 }
 
 // Initialize exterior JFA: seed surface pixels, flood outward
-float4 InitializeJFAPS(PixelShaderInput input) : COLOR
+float4 InitializeJFAPS(PixelShaderInput input) : SV_Target
 {
     if (IsSurface(input.UV))
         return EncodePositionPacked(input.UV, true);
@@ -78,14 +78,14 @@ float4 InitializeJFAPS(PixelShaderInput input) : COLOR
 }
 
 // Initialize interior JFA: seed non-surface pixels, flood inward
-float4 InitializeJFAInteriorPS(PixelShaderInput input) : COLOR
+float4 InitializeJFAInteriorPS(PixelShaderInput input) : SV_Target
 {
     if (!IsSurface(input.UV))
         return EncodePositionPacked(input.UV, true);
     return float4(0.0, 0.0, 0.0, 0.0);
 }
 
-float4 JFAPassPS(PixelShaderInput input) : COLOR
+float4 JFAPassPS(PixelShaderInput input) : SV_Target
 {
     float2 texelSize = 1.0 / WorldsBounds;
     
@@ -175,7 +175,7 @@ float SampleJFAMinDistance(Texture2D jfaTex, float2 uv, float2 currentPixelUV)
 // Signed SDF: -1 to 1, where 0 = surface boundary
 // Negative = inside geometry, Positive = outside geometry
 // Uses alpha for subpixel distance refinement
-float4 GenerateSDFFromJFAPS(PixelShaderInput input) : COLOR
+float4 GenerateSDFFromJFAPS(PixelShaderInput input) : SV_Target
 {
     float alpha = GetSurfaceAlpha(input.UV);
     bool isInside = IsSurface(input.UV);
@@ -267,7 +267,7 @@ float2 SampleJFAClosestSeed(Texture2D jfaTex, float2 uv, float2 currentPixelUV, 
 }
 
 // JFA Direction debug: shows direction to nearest boundary as color wheel + distance as brightness
-float4 DebugJFAPS(PixelShaderInput input) : COLOR
+float4 DebugJFAPS(PixelShaderInput input) : SV_Target
 {
     bool isInside = IsSurface(input.UV);
     float dist;
@@ -302,7 +302,7 @@ float4 DebugJFAPS(PixelShaderInput input) : COLOR
     return float4(dirColor * brightness, 1.0);
 }
 
-float4 DebugJFARawPS(PixelShaderInput input) : COLOR
+float4 DebugJFARawPS(PixelShaderInput input) : SV_Target
 {
     bool hasSurface;
     float2 storedUV = DecodePositionPacked(JFATexture.Sample(JFASampler, input.UV), hasSurface);
@@ -314,7 +314,7 @@ float4 DebugJFARawPS(PixelShaderInput input) : COLOR
 }
 
 // Debug signed SDF: Cyan->Blue = inside, Yellow = boundary, Orange->Red = outside
-float4 DebugSDFVisiblePS(PixelShaderInput input) : COLOR
+float4 DebugSDFVisiblePS(PixelShaderInput input) : SV_Target
 {
     bool isInside = IsSurface(input.UV);
 
@@ -347,7 +347,7 @@ float4 DebugSDFVisiblePS(PixelShaderInput input) : COLOR
     }
 }
 
-float4 DebugEmissivePS(PixelShaderInput input) : COLOR
+float4 DebugEmissivePS(PixelShaderInput input) : SV_Target
 {
     return EmissiveTexture.Sample(SceneColorSampler, input.UV);
 }
@@ -443,7 +443,7 @@ float2 SampleStrongestMotion(float2 center, float2 bounds)
 }
 
 // Debug motion vectors: arrows showing direction and magnitude
-float4 DebugMotionVectorsPS(PixelShaderInput input) : COLOR
+float4 DebugMotionVectorsPS(PixelShaderInput input) : SV_Target
 {
     static const float CELL_SIZE = 24.0;
 
@@ -485,8 +485,8 @@ technique InitializeJFA
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 InitializeJFAPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 InitializeJFAPS();
     }
 }
 
@@ -494,8 +494,8 @@ technique InitializeJFAInterior
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 InitializeJFAInteriorPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 InitializeJFAInteriorPS();
     }
 }
 
@@ -503,8 +503,8 @@ technique JFAPass
 {
     pass P0 
     { 
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 JFAPassPS(); 
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 JFAPassPS();
     }
 }
 
@@ -512,8 +512,8 @@ technique GenerateSDFFromJFA
 {
     pass P0 
     { 
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 GenerateSDFFromJFAPS(); 
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 GenerateSDFFromJFAPS();
     }
 }
 
@@ -521,8 +521,8 @@ technique DebugSDFVisible
 {
     pass P0 
     { 
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 DebugSDFVisiblePS(); 
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 DebugSDFVisiblePS();
     }
 }
 
@@ -530,8 +530,8 @@ technique DebugJFARaw
 {
     pass P0 
     { 
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 DebugJFARawPS(); 
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 DebugJFARawPS();
     }
 }
 
@@ -539,8 +539,8 @@ technique DebugJFA
 {
     pass P0 
     { 
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 DebugJFAPS(); 
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 DebugJFAPS();
     }
 }
 
@@ -548,8 +548,8 @@ technique DebugEmissive
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 DebugEmissivePS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 DebugEmissivePS();
     }
 }
 
@@ -557,8 +557,8 @@ technique DebugMotionVectors
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 DebugMotionVectorsPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 DebugMotionVectorsPS();
     }
 }
 
@@ -566,7 +566,7 @@ technique DebugMotionVectors
 // Color(0.5f) truncates: 0.5*255=127.5 -> byte 127, not 128
 static const float MV_CENTER = 127.0 / 255.0;
 
-float4 ClearMotionPS(PixelShaderInput input) : COLOR
+float4 ClearMotionPS(PixelShaderInput input) : SV_Target
 {
     return float4(MV_CENTER, MV_CENTER, 0.0, 1.0);
 }
@@ -575,7 +575,7 @@ technique ClearMotion
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 ClearMotionPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 ClearMotionPS();
     }
 }

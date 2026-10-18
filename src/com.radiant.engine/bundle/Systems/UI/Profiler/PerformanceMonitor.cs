@@ -14,7 +14,8 @@ public class PerformanceMonitor : core.System
     public override RenderLayer RenderLayer => RenderLayer.Overlay;
     // Dependencies
     private Process Process;
-    private PerformanceCounter CpuCounter;
+    private TimeSpan LastCpuTime;
+    private long LastSampleTimestamp;
     private List<PerformanceCounter> GpuCounters;
 
     // Frame timing - zero-allocation circular buffer
@@ -38,7 +39,7 @@ public class PerformanceMonitor : core.System
     private volatile float CpuUsage;
     private int CpuCoreCount;
     private float CpuCoreCountInv;
-    private volatile float GpuUsage;
+    private volatile float GpuUsage = -1f;
 
     // Background sampling thread
     private Thread SamplerThread;
@@ -64,8 +65,10 @@ public class PerformanceMonitor : core.System
         CpuCoreCount = Environment.ProcessorCount;
         CpuCoreCountInv = 1f / CpuCoreCount;
 
-        InitializeCpuCounter();
-        InitializeGpuCounters();
+        LastCpuTime = Process.TotalProcessorTime;
+        LastSampleTimestamp = Stopwatch.GetTimestamp();
+        if (OperatingSystem.IsWindows())
+            InitializeGpuCounters();
         StartSamplerThread();
 
         Inspector.CreateWindow("perf", "Metrics", 1);
@@ -105,21 +108,24 @@ public class PerformanceMonitor : core.System
 
     private void SampleSystemMetrics()
     {
-        // CPU - runs in background, no main thread impact
-        if (CpuCounter != null)
+        try
         {
-            try
-            {
-                CpuUsage = CpuCounter.NextValue() * CpuCoreCountInv;
-            }
-            catch
-            {
-                CpuUsage = -1f;
-            }
+            var CpuTime = Process.TotalProcessorTime;
+            long Timestamp = Stopwatch.GetTimestamp();
+            double ElapsedSeconds = (Timestamp - LastSampleTimestamp) / (double)Stopwatch.Frequency;
+            CpuUsage = ElapsedSeconds > 0
+                ? (float)((CpuTime - LastCpuTime).TotalSeconds / ElapsedSeconds * 100 * CpuCoreCountInv)
+                : 0f;
+            LastCpuTime = CpuTime;
+            LastSampleTimestamp = Timestamp;
+        }
+        catch
+        {
+            CpuUsage = -1f;
         }
 
         // GPU — individual counters can go stale as GPU processes start/stop
-        if (GpuCounters != null && GpuCounters.Count > 0)
+        if (OperatingSystem.IsWindows() && GpuCounters != null && GpuCounters.Count > 0)
         {
             float totalGpu = 0f;
             for (int i = GpuCounters.Count - 1; i >= 0; i--)
@@ -150,20 +156,9 @@ public class PerformanceMonitor : core.System
         }
     }
 
-    private void InitializeCpuCounter()
-    {
-        try
-        {
-            CpuCounter = new PerformanceCounter("Process", "% Processor Time", Process.ProcessName);
-        }
-        catch
-        {
-            CpuCounter = null;
-        }
-    }
-
     private void InitializeGpuCounters()
     {
+        if (!OperatingSystem.IsWindows()) return;
         GpuCounters = new List<PerformanceCounter>();
         try
         {
@@ -250,7 +245,9 @@ public class PerformanceMonitor : core.System
         CpuBuilder.Clear().Append("CPU: ").AppendFormat("{0:F1}", CpuUsage).Append("% (").Append(CpuCoreCount).Append(" cores)");
         Inspector.SetLabel("perf", "cpu", CpuBuilder.ToString());
 
-        GpuBuilder.Clear().Append("GPU: ").AppendFormat("{0:F1}", GpuUsage).Append('%');
+        GpuBuilder.Clear().Append("GPU: ");
+        if (GpuUsage < 0) GpuBuilder.Append("Unavailable");
+        else GpuBuilder.AppendFormat("{0:F1}", GpuUsage).Append('%');
         Inspector.SetLabel("perf", "gpu", GpuBuilder.ToString());
 
         RamBuilder.Clear().Append("RAM: ").AppendFormat("{0:F1}", MemoryMB).Append("MB");
@@ -274,10 +271,9 @@ public class PerformanceMonitor : core.System
     {
         // Stop sampler thread first
         SamplerRunning = false;
-        SamplerThread?.Join(500);
+        SamplerThread?.Join();
 
-        CpuCounter?.Dispose();
-        if (GpuCounters != null)
+        if (OperatingSystem.IsWindows() && GpuCounters != null)
         {
             foreach (var counter in GpuCounters)
                 counter.Dispose();

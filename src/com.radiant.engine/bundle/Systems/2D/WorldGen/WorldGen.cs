@@ -251,11 +251,14 @@ public class WorldGen : core.System
     private void CreateTileEntity(int tileX, int tileY, int layer, TileType tileType)
     {
         int entity = Scene.ECS.CreateEntity(new Vector3(tileX * TileSize, tileY * TileSize, layer));
-        ref var rect = ref Scene.ECS.AddComponent<Rectangle2D>(entity);
-        ref var tileData = ref Scene.ECS.AddComponent<TileData>(entity);
+        Scene.ECS.AddComponent<Rectangle2D>(entity);
+        Scene.ECS.AddComponent<TileData>(entity);
         Scene.ECS.AddComponent<Material>(entity);
 
-        rect.Size = new Vector2(TileSize, TileSize);
+        // Adding components migrates archetypes; acquire refs after the final add.
+        ref var rectangle = ref Scene.ECS.GetComponent<Rectangle2D>(entity);
+        ref var tileData = ref Scene.ECS.GetComponent<TileData>(entity);
+        rectangle.Size = new Vector2(TileSize, TileSize);
         tileData.X = tileX;
         tileData.Y = tileY;
         tileData.Layer = layer;

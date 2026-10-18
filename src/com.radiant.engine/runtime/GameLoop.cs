@@ -81,7 +81,8 @@ public partial class GameLoop : IGameObject
         UpdateInterval = 1.0 / TargetUpdatesPerSecond;
         FrameInterval = TargetFramesPerSecond > 0 ? 1.0 / TargetFramesPerSecond : 0;
 
-        timeBeginPeriod(1);
+        if (OperatingSystem.IsWindows())
+            timeBeginPeriod(1);
         GlobalTimer.Start();
         LastUpdateTicks = GlobalTimer.ElapsedTicks;
         LastFrameTicks = GlobalTimer.ElapsedTicks;
@@ -97,7 +98,14 @@ public partial class GameLoop : IGameObject
 
     public void Dispose()
     {
-        timeEndPeriod(1);
+        if (SceneId != NoScene)
+        {
+            Scenes[SceneId].Dispose();
+            Scenes[SceneId].Renderer?.Dispose();
+            SceneId = NoScene;
+        }
+        if (OperatingSystem.IsWindows())
+            timeEndPeriod(1);
         GC.SuppressFinalize(this);
     }
 
@@ -106,7 +114,10 @@ public partial class GameLoop : IGameObject
     private void TransitionScene(int id)
     {
         if (SceneId != NoScene)
+        {
             Scenes[SceneId].Dispose();
+            Scenes[SceneId].Renderer?.Dispose();
+        }
 
         SceneId = id;
 

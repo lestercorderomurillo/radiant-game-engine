@@ -1,15 +1,12 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using System;
-using System.IO;
-using WinForms = System.Windows.Forms;
 
 namespace com.radiant.engine.runtime;
 
 public class Window : Game
 {
-    private const string BuildFile = "build.txt";
     public static int BuildNumber { get; private set; }
     public static string BuildTag { get; private set; }
 
@@ -19,19 +16,21 @@ public class Window : Game
 
     public SpriteBatch SpriteBatch;
 
-    private WinForms.Form Form;
     public bool ResizePending { get; private set; }
 
-    public Window(GameLoop gameLoop)
+    public Window(GameLoop gameLoop, WindowOptions Options = null)
     {
-        BuildNumber = LoadAndIncrementBuild();
-        BuildTag = $"RAD-{DateTime.Now:yyyyMMdd}-{BuildNumber}";
+        Options ??= new WindowOptions();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Height);
+        BuildNumber = typeof(Window).Assembly.GetName().Version?.Build ?? 0;
+        BuildTag = $"Radiant {typeof(Window).Assembly.GetName().Version}";
 
         GraphicsDeviceManager = new GraphicsDeviceManager(this);
 
         Window.AllowUserResizing = true;
         Window.IsBorderless = false;
-        Window.Title = BuildTag;
+        Window.Title = Options.Title;
 
         IsMouseVisible = true;
         IsFixedTimeStep = false;
@@ -39,14 +38,12 @@ public class Window : Game
 
         GraphicsDeviceManager.SynchronizeWithVerticalRetrace = false;
         GraphicsDeviceManager.PreferredDepthStencilFormat = DepthFormat.None;
-        GraphicsDeviceManager.PreferredBackBufferWidth = (int)(1920 * 1.75);
-        GraphicsDeviceManager.PreferredBackBufferHeight = (int)(1080 * 1.75);
+        GraphicsDeviceManager.PreferredBackBufferWidth = Options.Width;
+        GraphicsDeviceManager.PreferredBackBufferHeight = Options.Height;
         GraphicsDeviceManager.GraphicsProfile = GraphicsProfile.HiDef;
         GraphicsDeviceManager.IsFullScreen = false;
         GraphicsDeviceManager.HardwareModeSwitch = true;
         GraphicsDeviceManager.PreferMultiSampling = false;
-
-        GraphicsDeviceManager.ApplyChanges();
 
         GameLoop = gameLoop;
         Content.RootDirectory = "Content";
@@ -60,29 +57,16 @@ public class Window : Game
         GraphicsDevice.PresentationParameters.PresentationInterval = PresentInterval.Immediate;
         GameLoop.SpriteBatch = SpriteBatch;
 
-        // Hook into Form resize events for WindowsDX
-        Form = (WinForms.Form)WinForms.Control.FromHandle(Window.Handle);
-        Form.WindowState = WinForms.FormWindowState.Maximized;
-        Form.Resize += OnFormResize;
+        Window.ClientSizeChanged += OnClientSizeChanged;
+        GraphicsDevice.DeviceReset += OnClientSizeChanged;
 
         GameLoop.Initialize(this);
     }
 
-    private void OnFormResize(object sender, EventArgs e)
+    private void OnClientSizeChanged(object Sender, EventArgs Event)
     {
-        if (Form.ClientSize.Width > 0 && Form.ClientSize.Height > 0)
-        {
-            // Update backbuffer to match window size
-            GraphicsDeviceManager.PreferredBackBufferWidth = Form.ClientSize.Width;
-            GraphicsDeviceManager.PreferredBackBufferHeight = Form.ClientSize.Height;
-            GraphicsDeviceManager.ApplyChanges();
-
-            // Signal resize to systems
+        if (Window.ClientBounds.Width > 0 && Window.ClientBounds.Height > 0)
             ResizePending = true;
-
-            // Force game loop to run while Windows message loop is blocked during resize
-            Tick();
-        }
     }
 
     public void ClearResizePending()
@@ -117,24 +101,14 @@ public class Window : Game
         GameLoop.Render();
     }
 
-    private static int LoadAndIncrementBuild()
-    {
-        int Build = 1;
-        if (File.Exists(BuildFile))
-        {
-            var Text = File.ReadAllText(BuildFile).Trim();
-            if (int.TryParse(Text, out var Parsed))
-                Build = Parsed + 1;
-        }
-        File.WriteAllText(BuildFile, Build.ToString());
-        return Build;
-    }
-
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            Window.ClientSizeChanged -= OnClientSizeChanged;
+            if (GraphicsDevice != null) GraphicsDevice.DeviceReset -= OnClientSizeChanged;
             GameLoop.Dispose();
+            SpriteBatch?.Dispose();
         }
         base.Dispose(disposing);
     }

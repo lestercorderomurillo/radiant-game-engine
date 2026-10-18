@@ -1,7 +1,7 @@
 # Radiant Engine
 
 MonoGame C# 2D engine: ECS + GPU-instanced shapes + HRC global illumination.
-.NET 8.0 WindowsDX. MonoGame 3.8.5-preview.1. Unsafe enabled. SQLite 1.0.118. FontStashSharp 1.5.4.
+.NET 8.0 library, MonoGame 3.8.6 DesktopVK (Linux/Windows/macOS). Unsafe enabled. FontStashSharp 1.5.4. Windows-only GPU counters are OS-guarded; CPU metrics use Process.TotalProcessorTime.
 
 ## Rules
 
@@ -40,14 +40,13 @@ ref var t = ref ECS.GetComponent<Transform>(id);                     // WRONG
 ```
 radiant/
 ├── Content/
-│   ├── fonts/Inter-Regular.ttf, Inter-Bold.ttf, PressStart2P.ttf (loaded by FontStashSharp at runtime)
-│   ├── Ghost.png, Eyes.png (premultiplied alpha)
+│   ├── fonts/Inter-Regular.ttf, Inter-Bold.ttf (loaded by FontStashSharp at runtime)
 │   ├── presets/icons/Checkmark.png, Search.png, Trash.png (Material Icons, white, Apache 2.0)
 │   ├── shaders/
 │   │   ├── Geometry.fx, InstancedShapes.fx, ColorManagement.fx, GlassBlur.fx
 │   │   ├── HRC/ (HRC_Extensions, HRC_FluenceSum, HRC_FrustumSeed, HRC_MergingCones)
 │   │   ├── RCGI/RCGI.fx, UDR/UDR1-3.fx
-│   └── Content.mgcb (HiDef, Windows)
+│   └── Content.mgcb (HiDef, DesktopVK)
 │
 ├── src/com.radiant.engine/
 │   ├── core/
@@ -65,18 +64,16 @@ radiant/
 │   │   ├── Extensions/ (LightFactory, VectorExtensions)
 │   │   └── Systems/
 │   │       ├── 2D/ Geometry, HRCGI, RCGI, Tileset, WorldGen, PerlinNoise2D,
-│   │       │       MouseLight, PaintBrush,
-│   │       │       MazeBuilder/ (PacmanMazeBuilder, PacmanMazeGenerator, PacmanMazeRenderer, PacmanLevelConfig),
-│   │       │       AI/Pacman/ (PacmanGhostAI, PacmanHUD,
-│   │       │                   Player/PacmanPlayerController)
+│   │       │       MouseLight, PaintBrush
 │   │       ├── 3D/ Tileset3D
 │   │       ├── FX/ ColorManagement, UDR
 │   │       └── UI/ Gizmos, UIWindow, Profiler
-│   ├── runtime/ (GameClient, GameLoop, GameServer, Window)
+│   ├── runtime/ (GameClient, GameLoop, GameServer, Window, WindowOptions)
 │   ├── mplay/ (NetworkClient, NetworkManager, NetworkMessage)
-│   └── tests/2D/ (PacmanMazeLevelScene, SimpleLightScene, TilesetScene)
+│   └── tests/2D/ (SimpleLightScene, TilesetScene)
 │
-└── Program.cs
+├── tests/Radiant.Scenes/ (test-scene runner)
+└── eng/Radiant.Desktop.props (shared DesktopVK build settings)
 ```
 
 ## ECS
@@ -199,7 +196,7 @@ public abstract class System
 
 `[RunAfter(typeof(A), typeof(B))]`, `[RunBefore(...)]` — params Type[], AllowMultiple.
 `[Pausable]` — skipped when `ECS.GameplayPaused` (default). `[Pausable(PauseGroup.Animation)]` — skipped when `ECS.AnimationPaused`.
-`[SystemTag("Pacman")]` — tags for inspector display/filtering. `[CoreSystem]` — hidden from Systems Inspector.
+`[SystemTag("Gameplay")]` — tags for inspector display/filtering. `[CoreSystem]` — hidden from Systems Inspector.
 Topological sort (Kahn's) at `ECS.Initialize()`. Disabled systems (`Enabled = false`) are skipped during initialization — SystemGroup activates them later via `SetActive()`.
 
 ### RenderLayer
@@ -236,11 +233,11 @@ group.ForEach(system => {}); // Iterate all systems in group
 Tag systems for inspector display and filtering:
 
 ```csharp
-[SystemTag("Pacman")]
-public class PacmanGhostAI : System { }
+[SystemTag("Gameplay")]
+public class ExampleSystem : System { }
 ```
 
-Tags appear in the Systems Inspector after `|`: "PacmanGhostAI  |  Pacman". Group names also shown: "HRCGI  |  GI".
+Tags appear in the Systems Inspector after `|`: "ExampleSystem  |  Gameplay". Group names also shown: "HRCGI  |  GI".
 
 ## Renderer API
 
@@ -370,14 +367,14 @@ Renderer.DrawString("Inter-Bold", 24f, text, position, color, bold: true); // Fa
 Renderer.MeasureString("Inter", 24f, text);                    // Returns Vector2 dimensions
 ```
 
-Pre-loaded fonts: `"Inter"` (Inter-Regular.ttf), `"Inter-Bold"` (Inter-Bold.ttf), `"PressStart2P"` (PressStart2P.ttf).
+Pre-loaded fonts: `"Inter"` (Inter-Regular.ttf), `"Inter-Bold"` (Inter-Bold.ttf).
 
 **FontRenderScale**: Dynamic — Inspector sets `max(1, UIScale)`. At UIScale=1 it's 1; at UIScale=3 it's 3. Default is 1.
 
 ### Assets (all cached)
 
 ```csharp
-Renderer.GetTexture("Ghost");
+Renderer.GetTexture("MyTexture");
 Renderer.GetSolidTexture(Color.White);   // 1x1 solid (cached by color)
 Renderer.GetCircleTexture(64);           // AA circle (cached by diameter)
 Renderer.GetRoundedRectTexture(8);       // AA rounded rect (cached by radius)
@@ -489,12 +486,12 @@ Quality: ProbeScale 4/3/2/1.
 | FinalTexture (HRCGI) | HalfVector4 | World-sized, raw linear |
 | ColorManagement Output | Color | Tonemapped sRGB |
 
-**PreserveContents**: MonoGame WindowsDX discards RT on target switch by default. Use for any RT read later.
+**PreserveContents**: MonoGame discards RT on target switch by default. Use for any RT read later.
 
 ## Shaders
 
 1. **Register collision**: InstancedShapes.fx must NOT overlap Geometry.fx registers (t0-t3, s0-s1). Use t4+/s2+. Auto-assign defaults to t0 = collision. Pink SDF = register collision.
-2. **SM4.0+ only**: `Texture2D`, `SamplerState`, `.Sample()` — no `tex2D()`.
+2. **SM6.0 profiles (`vs_6_0` / `ps_6_0`), `SV_Target` outputs, one cbuffer per effect**: `Texture2D`, `SamplerState`, `.Sample()` — no `tex2D()`.
 3. **MGFX dead-code elimination**: Unused texture params per-technique eliminated. Default/Sharp don't reference ShapeTexture → pass.Apply() skips t4/s2.
 4. **Premultiplied alpha**: `texColor.rgb = origRGB * texColor.a`. Don't double-premultiply.
    Correct: `result.rgb = texPremul.rgb * tint.rgb * (tintA * sdfAlpha); result.a = texA * tintA * sdfAlpha;`
@@ -632,8 +629,26 @@ LightFactory.HueToRGB(0.5f);
 
 ## Controls
 
-F1 = toggle Inspector UI (menu bar + windows). Arrow keys = Pac-Man movement. ESC = close menu dropdown / exit. All other controls via Inspector.
+F1 = toggle Inspector UI (menu bar + windows). ESC = close menu dropdown / exit. All other controls via Inspector.
 
 ## Not Implemented
 
 Audio, physics engine, particles, skeletal animation, save/load, logging, asset hot-reload.
+
+## Repository split and desktop hosting
+
+Pac-Man moved to the sibling `raytracing-pacman` repository, including its maze scene, generator, renderer, gameplay, HUD, textures, and PressStart2P font. The engine must not depend on game code. `radiant.csproj` is a library and excludes test scenes; the preserved lighting/tileset scenes run with `dotnet run --project tests/Radiant.Scenes -- lights` (or `tiles`).
+
+Consumers import `eng/Radiant.Desktop.props` and project-reference `radiant.csproj`. Engine content propagates through the reference. `new GameClient().Run(new MyScene(), new WindowOptions { Title = "My game" })` hosts and disposes a scene. Window sizing uses MonoGame events; timer-resolution calls and GPU counters run only on Windows. Content resolves through MonoGame TitleContainer relative to the executable; keep Content.RootDirectory relative. Startup no longer writes build.txt.
+
+Build: `dotnet build radiant.sln -c Release`. All shaders compile natively through MGCB 3.8.6/DXC to DesktopVK. No Wine. Keep the MGCB manifest and MonoGame package versions aligned.
+
+## Validation and migration fixes
+
+`tests/Radiant.Tests` checks generated tile components/spatial indexes, light initialization, and portable timers without a window. `tests/Shared/SmokeWindow.cs` drives real GPU rendering, pixel readback, window resize, screenshots, and disposal. Both scene runners accept `--smoke` after the scene name. Pac-Man imports the same test helper in its separate test executable.
+
+Acquire component refs only after all AddComponent calls: archetype migration invalidates earlier refs. WorldGen and SimpleLightScene now follow this rule. Tileset uses positive padding and rebuilds its lighting buffers on resize after joining the worker. Screen dimensions come from PresentationParameters, not an active render-target viewport. Device-reset/window-resize signals are processed before systems update.
+
+The shared desktop props restore MGCB immediately before content compilation, after building project references, avoiding concurrent first-install tool restores. Linux CI builds the library/scenes and runs headless checks; graphical smoke tests require a Vulkan display.
+
+VS Code: `.vscode/settings.json` selects `radiant.sln` and associates `.fx` with HLSL. The build task builds Debug, and launch configurations run the preserved lighting/tileset scenes. The sibling Pac-Man solution and multi-root workspace include the library and both engine test projects, allowing C# Dev Kit to resolve sources across repositories.

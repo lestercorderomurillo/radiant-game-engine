@@ -2,7 +2,7 @@
 
 /outputDir:bin/$(Platform)
 /intermediateDir:obj/$(Platform)
-/platform:Windows
+/platform:DesktopVK
 /config:
 /profile:HiDef
 /compress:False
@@ -80,20 +80,6 @@
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
 /build:shaders/UDR/UDR3.fx
-
-#begin Ghost.png
-/importer:TextureImporter
-/processor:TextureProcessor
-/processorParam:PremultiplyAlpha=True
-/processorParam:TextureFormat=Color
-/build:Ghost.png
-
-#begin Eyes.png
-/importer:TextureImporter
-/processor:TextureProcessor
-/processorParam:PremultiplyAlpha=True
-/processorParam:TextureFormat=Color
-/build:Eyes.png
 
 #begin presets/icons/Checkmark.png
 /importer:TextureImporter

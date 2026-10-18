@@ -542,8 +542,8 @@ technique Upscale
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 UDR1_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 UDR1_PS();
     }
 }
 
@@ -551,7 +551,7 @@ technique EdgeSmooth
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 EdgeSmooth_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 EdgeSmooth_PS();
     }
 }

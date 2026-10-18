@@ -148,8 +148,8 @@ technique Default
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 MainPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 MainPS();
     }
 }
 
@@ -157,8 +157,8 @@ technique Sharp
 {
     pass P0
     {
-        VertexShader = compile vs_4_0 MainVS();
-        PixelShader = compile ps_4_0 SharpPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 SharpPS();
     }
 }
 

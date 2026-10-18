@@ -30,10 +30,8 @@ cbuffer CascadeParams : register(b0)
     float SDFScale;
     float ThetaScalar;
     float HigherAngularPerAxis;
-};
 
-cbuffer SkyParams : register(b1)
-{
+    // DesktopVK exposes one effect constant buffer. Keep sky parameters here too.
     float3 PreCalcSkyColor;
     float PreCalcSunAngle;
     float3 PreCalcSunColor;
@@ -194,7 +192,7 @@ technique GenerateOutputTexture
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 GenerateOutputTexture();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 GenerateOutputTexture();
     }
 }

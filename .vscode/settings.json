@@ -1,0 +1,7 @@
+{
+  "dotnet.defaultSolution": "radiant.sln",
+  "files.associations": {
+    "*.fx": "hlsl",
+    "*.mgcb": "plaintext"
+  }
+}

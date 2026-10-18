@@ -66,8 +66,8 @@ technique Blur
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_Blur();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_Blur();
     }
 }
 
@@ -86,8 +86,8 @@ technique RoundedBlit
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_RoundedBlit();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_RoundedBlit();
     }
 }
 
@@ -95,7 +95,7 @@ technique Shadow
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_Shadow();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_Shadow();
     }
 }

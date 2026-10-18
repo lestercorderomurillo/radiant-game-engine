@@ -86,7 +86,7 @@ technique GenerateOutputTexture
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 MainPS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 MainPS();
     }
 }

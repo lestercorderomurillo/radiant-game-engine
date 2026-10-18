@@ -75,7 +75,6 @@ public partial class Renderer : IDisposable
     /// <summary>Name of the currently active shader (null if none).</summary>
     public string CurrentShaderName { get; private set; }
 
-    private GameWindow NativeWindow => Window.Window;
     private readonly ShaderRegistry Shaders;
     private readonly TextureManager Textures;
     private readonly FontRegistry Fonts;
@@ -189,27 +188,22 @@ public partial class Renderer : IDisposable
         InitializeFonts();
         UpdateScreenInfo();
         UpdateScaledScreenInfo();
-
-        NativeWindow.ClientSizeChanged += (_, _) =>
-        {
-            UpdateScreenInfo();
-            UpdateScaledScreenInfo();
-        };
     }
 
     private void InitializeFonts()
     {
         Fonts.Load("Inter", "fonts/Inter-Regular.ttf");
         Fonts.Load("Inter-Bold", "fonts/Inter-Bold.ttf");
-        Fonts.Load("PressStart2P", "fonts/PressStart2P.ttf");
     }
 
-    /// <summary>Updates all screen-related properties from the current viewport.</summary>
+    /// <summary>Updates screen-related properties from the presentation backbuffer.</summary>
     public void UpdateScreenInfo()
     {
-        var viewport = Device.Viewport;
-        ScreenWidth = viewport.Width;
-        ScreenHeight = viewport.Height;
+        // A resize may arrive while an offscreen target owns the viewport.
+        // Screen dimensions always describe the presentation backbuffer.
+        var Presentation = Device.PresentationParameters;
+        ScreenWidth = Presentation.BackBufferWidth;
+        ScreenHeight = Presentation.BackBufferHeight;
         ScreenSize = new Vector2(ScreenWidth, ScreenHeight);
         AspectRatio = (float)ScreenWidth / ScreenHeight;
         InverseAspectRatio = (float)ScreenHeight / ScreenWidth;
@@ -344,6 +338,7 @@ public partial class Renderer : IDisposable
     {
         Window.ClearResizePending();
         UpdateScreenInfo();
+        UpdateScaledScreenInfo();
     }
 
     /// <summary>Clears the backbuffer with the specified color. Routes rendering to SceneRT.</summary>

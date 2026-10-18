@@ -650,8 +650,8 @@ technique Spatial
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 UDR2_Spatial_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 UDR2_Spatial_PS();
     }
 }
 
@@ -659,8 +659,8 @@ technique Temporal
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 UDR2_Temporal_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 UDR2_Temporal_PS();
     }
 }
 
@@ -668,8 +668,8 @@ technique EdgeSmooth
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 EdgeSmooth_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 EdgeSmooth_PS();
     }
 }
 
@@ -677,7 +677,7 @@ technique Copy
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 Copy_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 Copy_PS();
     }
 }

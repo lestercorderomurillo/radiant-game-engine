@@ -38,7 +38,10 @@ internal class FontRegistry : IDisposable
         var settings = new FontSystemSettings { PremultiplyAlpha = true };
         #pragma warning restore CS0618
         var system = new FontSystem(settings);
-        system.AddFont(File.ReadAllBytes(Path.Combine(ContentRootDirectory, path)));
+        using var Stream = TitleContainer.OpenStream(Path.Combine(ContentRootDirectory, path));
+        using var Bytes = new MemoryStream();
+        Stream.CopyTo(Bytes);
+        system.AddFont(Bytes.ToArray());
         Systems[name] = system;
     }
 

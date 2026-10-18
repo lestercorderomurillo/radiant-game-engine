@@ -233,8 +233,8 @@ technique None
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_None();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_None();
     }
 }
 
@@ -242,8 +242,8 @@ technique ACES
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_ACES();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_ACES();
     }
 }
 
@@ -251,8 +251,8 @@ technique ACES2
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_ACES2();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_ACES2();
     }
 }
 
@@ -260,8 +260,8 @@ technique AgX
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_AgX();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_AgX();
     }
 }
 
@@ -269,8 +269,8 @@ technique Filmic
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_Filmic();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_Filmic();
     }
 }
 
@@ -278,8 +278,8 @@ technique Reinhard
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_Reinhard();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_Reinhard();
     }
 }
 
@@ -287,8 +287,8 @@ technique Uchimura
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_Uchimura();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_Uchimura();
     }
 }
 
@@ -296,7 +296,7 @@ technique PBRNeutral
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader  = compile ps_5_0 PS_PBRNeutral();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader  = compile ps_6_0 PS_PBRNeutral();
     }
 }

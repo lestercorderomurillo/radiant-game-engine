@@ -21,7 +21,7 @@ public class Tileset : core.System
 
     private Vector2 CameraPosition = Vector2.Zero;
     private float CameraSpeed = 1000f;
-    private int Padding = -18;
+    private const int Padding = 18;
 
     private MouseState CurrentMouseState;
     private int BrushSize = 1;
@@ -95,9 +95,19 @@ public class Tileset : core.System
         SkyLevelsLighting = new int[WorldWidth];
 
         CalculateSkyLevels();
+        RebuildViewport();
+    }
 
-        ViewportWidth = Renderer.ViewportBounds.Width;
-        ViewportHeight = Renderer.ViewportBounds.Height;
+    private void RebuildViewport()
+    {
+        IsRunning = false;
+        LightingThread?.Join();
+        LightTexture?.Dispose();
+        TileRenderTarget?.Dispose();
+        NewBufferReady = false;
+
+        ViewportWidth = Renderer.ScreenWidth;
+        ViewportHeight = Renderer.ScreenHeight;
 
         // Viewport size in tiles (ceiling + 1 for partial tiles)
         ViewportTilesX = (ViewportWidth + TileSize - 1) / TileSize + 1;
@@ -119,6 +129,7 @@ public class Tileset : core.System
         DisplayBuffer = new Vector3[GridWidth * GridHeight];
 
         IsWorldLoaded = true;
+        IsRunning = true;
 
         LightingThread = new Thread(ProcessLighting) { IsBackground = true, Priority = ThreadPriority.BelowNormal };
         LightingThread.Start();
@@ -520,11 +531,17 @@ public class Tileset : core.System
             }
     }
 
+    public override void OnResize()
+    {
+        if (IsWorldLoaded) RebuildViewport();
+    }
+
     public override void Dispose()
     {
         IsRunning = false;
-        LightingThread?.Join(200);
+        LightingThread?.Join();
         LightTexture?.Dispose();
         TileRenderTarget?.Dispose();
+        MultiplyBlend?.Dispose();
     }
 }

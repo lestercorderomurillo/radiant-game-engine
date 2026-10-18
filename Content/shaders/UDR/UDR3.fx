@@ -295,8 +295,8 @@ technique UDR3_Stage1 // Spatial - Lanczos upsampling
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 Spatial_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 Spatial_PS();
     }
 }
 
@@ -304,8 +304,8 @@ technique UDR3_Stage2 // Edge reconstruction
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 EdgeReconstruct_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 EdgeReconstruct_PS();
     }
 }
 
@@ -313,8 +313,8 @@ technique UDR3_Stage3 // Temporal accumulation
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 Temporal_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 Temporal_PS();
     }
 }
 
@@ -322,8 +322,8 @@ technique UDR3_Stage4 // Copy to history
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 Copy_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 Copy_PS();
     }
 }
 
@@ -331,7 +331,7 @@ technique UDR3_Stage5 // RCAS sharpening
 {
     pass P0
     {
-        VertexShader = compile vs_5_0 MainVS();
-        PixelShader = compile ps_5_0 RCAS_PS();
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 RCAS_PS();
     }
 }
