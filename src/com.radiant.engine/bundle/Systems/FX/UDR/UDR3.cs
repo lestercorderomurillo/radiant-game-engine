@@ -32,7 +32,6 @@ public class UDR3 : core.System
         OutputSize = Renderer.ScreenSize;
         CreateRenderTargets();
         ApplyRenderScale();
-        UDRQuality.Changed += _ => ApplyRenderScale();
         FrameIndex = 0;
 
         Inspector.CreateWindow("udr3", "UDR3", Visible: false);
@@ -40,7 +39,7 @@ public class UDR3 : core.System
         Inspector.AddLabel("udr3", "input", "...");
         Inspector.AddLabel("udr3", "output", "...");
         Inspector.AddDropdown("udr3", "qualityDrop", "Quality", UDRQuality.Names, UDRQuality.Index, UDRQuality.Set);
-        UDRQuality.Changed += _ => Inspector.SetDropdownValue("udr3", "qualityDrop", UDRQuality.Index);
+        UDRQuality.Changed += OnQualityChanged;
         Inspector.AddSlider("udr3", "sharpness", "Sharpness", 0f, 2f, Sharpness, V => Sharpness = V);
         Inspector.AddSlider("udr3", "frames", "Frames to Accumulate", 1, 16, FramesToAccumulate, V => { FramesToAccumulate = (int)V; FrameIndex = 0; });
         Inspector.AddToggle("udr3", "edgeCorr", "Detail Reconstruction", EdgeCorrection, V => EdgeCorrection = V);
@@ -50,6 +49,7 @@ public class UDR3 : core.System
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;
+        FrameIndex = 0;
     }
 
     private void CreateRenderTargets()
@@ -65,6 +65,13 @@ public class UDR3 : core.System
 
         LastFrameTexture = Renderer.CreateRenderTarget(
             (int)OutputSize.X, (int)OutputSize.Y, SurfaceFormat.HalfVector4);
+    }
+
+    private void OnQualityChanged(int index)
+    {
+        ApplyRenderScale();
+        FrameIndex = 0;
+        Inspector.SetDropdownValue("udr3", "qualityDrop", index);
     }
 
     private void ApplyRenderScale()
@@ -83,6 +90,13 @@ public class UDR3 : core.System
             return;
 
         Vector2 inputSize = new Vector2(input.Width, input.Height);
+
+        Inspector.SetLabel("udr3", "quality", $"Quality: {UDRQuality.Names[UDRQuality.Index]} ({UDRQuality.ScaleNormalized:P0})");
+        Inspector.SetLabel("udr3", "input", $"Input Size: {input.Width}x{input.Height}");
+        Inspector.SetLabel("udr3", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
+
+        if (UDRQuality.ScaleFactor == 100)
+            return;
 
         // Pass 1: Spatial (bilinear upsampling)
         Renderer
@@ -169,10 +183,6 @@ public class UDR3 : core.System
 
         if (FrameIndex < FramesToAccumulate)
             FrameIndex++;
-
-        Inspector.SetLabel("udr3", "quality", $"Quality: {UDRQuality.Names[UDRQuality.Index]} ({UDRQuality.ScaleNormalized:P0})");
-        Inspector.SetLabel("udr3", "input", $"Input Size: {input.Width}x{input.Height}");
-        Inspector.SetLabel("udr3", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
     }
 
     public override void Render()
@@ -207,6 +217,7 @@ public class UDR3 : core.System
 
     public override void Dispose()
     {
+        UDRQuality.Changed -= OnQualityChanged;
         Inspector.DestroyWindow("udr3");
         Renderer.RenderScale = 1.0f;
 

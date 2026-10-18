@@ -25,14 +25,13 @@ public class UDR1 : core.System
         OutputSize = Renderer.ScreenSize;
         CreateRenderTargets();
         ApplyRenderScale();
-        UDRQuality.Changed += _ => ApplyRenderScale();
 
         Inspector.CreateWindow("udr1", "UDR1", Visible: false);
         Inspector.AddLabel("udr1", "quality", "...");
         Inspector.AddLabel("udr1", "input", "...");
         Inspector.AddLabel("udr1", "output", "...");
         Inspector.AddDropdown("udr1", "qualityDrop", "Quality", UDRQuality.Names, UDRQuality.Index, UDRQuality.Set);
-        UDRQuality.Changed += _ => Inspector.SetDropdownValue("udr1", "qualityDrop", UDRQuality.Index);
+        UDRQuality.Changed += OnQualityChanged;
         Inspector.AddSlider("udr1", "sharpness", "Sharpness", 0f, 2f, Sharpness, V => Sharpness = V);
         Inspector.AddToggle("udr1", "edgeCorr", "Detail Reconstruction", EdgeCorrection, V => EdgeCorrection = V);
         Inspector.AddToggle("udr1", "debugRays", "Debug Edges", DebugRays, V => DebugRays = V);
@@ -52,6 +51,12 @@ public class UDR1 : core.System
             (int)OutputSize.X, (int)OutputSize.Y, SurfaceFormat.HalfVector4);
     }
 
+    private void OnQualityChanged(int index)
+    {
+        ApplyRenderScale();
+        Inspector.SetDropdownValue("udr1", "qualityDrop", index);
+    }
+
     private void ApplyRenderScale()
     {
         Renderer.RenderScale = UDRQuality.ScaleNormalized;
@@ -68,6 +73,13 @@ public class UDR1 : core.System
             return;
 
         Vector2 inputSize = new Vector2(input.Width, input.Height);
+
+        Inspector.SetLabel("udr1", "quality", $"Quality: {UDRQuality.Names[UDRQuality.Index]} ({UDRQuality.ScaleNormalized:P0})");
+        Inspector.SetLabel("udr1", "input", $"Input Size: {input.Width}x{input.Height}");
+        Inspector.SetLabel("udr1", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
+
+        if (UDRQuality.ScaleFactor == 100)
+            return;
 
         Renderer
             .Reset()
@@ -102,10 +114,6 @@ public class UDR1 : core.System
             .Draw()
             .Commit()
             .SetTarget(null);
-
-        Inspector.SetLabel("udr1", "quality", $"Quality: {UDRQuality.Names[UDRQuality.Index]} ({UDRQuality.ScaleNormalized:P0})");
-        Inspector.SetLabel("udr1", "input", $"Input Size: {input.Width}x{input.Height}");
-        Inspector.SetLabel("udr1", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
     }
 
     public override void Render()
@@ -132,6 +140,7 @@ public class UDR1 : core.System
 
     public override void Dispose()
     {
+        UDRQuality.Changed -= OnQualityChanged;
         Inspector.DestroyWindow("udr1");
         Renderer.RenderScale = 1.0f;
 

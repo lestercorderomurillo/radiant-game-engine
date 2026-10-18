@@ -33,7 +33,6 @@ public class UDR2 : core.System
         OutputSize = Renderer.ScreenSize;
         CreateRenderTargets();
         ApplyRenderScale();
-        UDRQuality.Changed += _ => ApplyRenderScale();
         FrameIndex = 0;
 
         if (Geometry != null)
@@ -44,7 +43,7 @@ public class UDR2 : core.System
         Inspector.AddLabel("udr2", "input", "...");
         Inspector.AddLabel("udr2", "output", "...");
         Inspector.AddDropdown("udr2", "qualityDrop", "Quality", UDRQuality.Names, UDRQuality.Index, UDRQuality.Set);
-        UDRQuality.Changed += _ => Inspector.SetDropdownValue("udr2", "qualityDrop", UDRQuality.Index);
+        UDRQuality.Changed += OnQualityChanged;
         Inspector.AddSlider("udr2", "sharpness", "Sharpness", 0f, 2f, Sharpness, V => Sharpness = V);
         Inspector.AddSlider("udr2", "frames", "Frames to Accumulate", 1, 16, FramesToAccumulate, V => { FramesToAccumulate = (int)V; FrameIndex = 0; });
         Inspector.AddToggle("udr2", "edgeCorr", "Detail Reconstruction", EdgeCorrection, V => EdgeCorrection = V);
@@ -80,6 +79,13 @@ public class UDR2 : core.System
             (int)OutputSize.X, (int)OutputSize.Y, SurfaceFormat.HalfVector4);
     }
 
+    private void OnQualityChanged(int index)
+    {
+        ApplyRenderScale();
+        ResetAccumulation();
+        Inspector.SetDropdownValue("udr2", "qualityDrop", index);
+    }
+
     private void ApplyRenderScale()
     {
         Renderer.RenderScale = UDRQuality.ScaleNormalized;
@@ -96,6 +102,13 @@ public class UDR2 : core.System
             return;
 
         Vector2 inputSize = new Vector2(input.Width, input.Height);
+
+        Inspector.SetLabel("udr2", "quality", $"Quality: {UDRQuality.Names[UDRQuality.Index]} ({UDRQuality.ScaleNormalized:P0})");
+        Inspector.SetLabel("udr2", "input", $"Input Size: {input.Width}x{input.Height}");
+        Inspector.SetLabel("udr2", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
+
+        if (UDRQuality.ScaleFactor == 100)
+            return;
 
         // Pass 1: Spatial upscaling (Lanczos + edge refinement)
         Renderer
@@ -155,10 +168,6 @@ public class UDR2 : core.System
             .SetTarget(null);
 
         FrameIndex++;
-
-        Inspector.SetLabel("udr2", "quality", $"Quality: {UDRQuality.Names[UDRQuality.Index]} ({UDRQuality.ScaleNormalized:P0})");
-        Inspector.SetLabel("udr2", "input", $"Input Size: {input.Width}x{input.Height}");
-        Inspector.SetLabel("udr2", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
     }
 
     public override void Render()
@@ -192,6 +201,7 @@ public class UDR2 : core.System
 
     public override void Dispose()
     {
+        UDRQuality.Changed -= OnQualityChanged;
         var geometry = Scene?.ECS?.GetSystem<Geometry>();
         if (geometry != null)
             geometry.EnableSDF = false;

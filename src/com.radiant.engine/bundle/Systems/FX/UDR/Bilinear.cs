@@ -13,19 +13,24 @@ public class Bilinear : core.System
     public override void Initialize()
     {
         ApplyRenderScale();
-        UDRQuality.Changed += _ => ApplyRenderScale();
 
         Inspector.CreateWindow("bilinear", "Bilinear", Visible: false);
         Inspector.AddLabel("bilinear", "quality", "...");
         Inspector.AddLabel("bilinear", "input", "...");
         Inspector.AddLabel("bilinear", "output", "...");
         Inspector.AddDropdown("bilinear", "qualityDrop", "Quality", UDRQuality.Names, UDRQuality.Index, UDRQuality.Set);
-        UDRQuality.Changed += _ => Inspector.SetDropdownValue("bilinear", "qualityDrop", UDRQuality.Index);
+        UDRQuality.Changed += OnQualityChanged;
     }
 
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;
+    }
+
+    private void OnQualityChanged(int index)
+    {
+        ApplyRenderScale();
+        Inspector.SetDropdownValue("bilinear", "qualityDrop", index);
     }
 
     private void ApplyRenderScale()
@@ -63,6 +68,7 @@ public class Bilinear : core.System
 
     public override void Dispose()
     {
+        UDRQuality.Changed -= OnQualityChanged;
         Inspector.DestroyWindow("bilinear");
         Renderer.RenderScale = 1.0f;
     }
