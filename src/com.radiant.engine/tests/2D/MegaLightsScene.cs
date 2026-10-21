@@ -65,6 +65,8 @@ public class MegaLightsScene : Scene
 
     public override void SetupScene()
     {
+        Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
+
         CreateRotatingLights();
         CreateOccluders();
         CreateMouseLight();

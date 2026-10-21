@@ -37,6 +37,8 @@ public class HRCGI : core.System
     private RenderTarget2D FinalTexture;
 
     private Vector2 WorldSize;
+    private Vector2 ViewSize;
+    private float ProbeSpacing;
     private Vector2[] CascadeSizes;
     private Vector2[] MergeSizes;
 
@@ -62,7 +64,8 @@ public class HRCGI : core.System
     {
         Geometry = Scene.ECS.GetSystem<Geometry>();
 
-        WorldSize = new Vector2(Renderer.ScaledHigherPowerOfTwo, Renderer.ScaledHigherPowerOfTwo);
+        WorldSize = new Vector2(Renderer.ScaledHigherPowerOfTwo);
+        ViewSize = Renderer.ScaledSize;
 
         // Create solid textures for defaults
         BlackTexture = Renderer.GetSolidTexture(Color.Black);
@@ -86,21 +89,26 @@ public class HRCGI : core.System
         });
     }
 
-    private void OnRenderScaleChanged(float newScale)
+    private void OnRenderScaleChanged(float _) => ResizeTargets();
+
+    private void ResizeTargets()
     {
         int newSize = Renderer.ScaledHigherPowerOfTwo;
-        if ((int)WorldSize.X == newSize)
+        if ((int)WorldSize.X == newSize && ViewSize == Renderer.ScaledSize)
             return;
 
         DisposeRenderTargets();
-        WorldSize = new Vector2(newSize, newSize);
+        WorldSize = new Vector2(newSize);
+        ViewSize = Renderer.ScaledSize;
         CalculateCascadeSizes();
         CreateRenderTargets();
-
     }
 
     private void CalculateCascadeSizes()
     {
+        // Use the allocated row count even when the quality divisor does not divide the domain.
+        int probeRows = Math.Max(1, (int)WorldSize.Y / ProbeScale);
+        ProbeSpacing = WorldSize.Y / probeRows;
         CascadeCount = Math.Min((int)MathF.Ceiling(MathF.Log2(WorldSize.X)), MaxCascades);
         CascadeSizes = new Vector2[CascadeCount];
         MergeSizes = new Vector2[CascadeCount];
@@ -111,8 +119,8 @@ public class HRCGI : core.System
             float virtualRays = interval + 1;
             int numProbes = (int)MathF.Floor(WorldSize.X / interval);
 
-            CascadeSizes[cascade] = new Vector2(numProbes * virtualRays, WorldSize.Y / ProbeScale);
-            MergeSizes[cascade] = new Vector2(numProbes * interval, WorldSize.Y / ProbeScale);
+            CascadeSizes[cascade] = new Vector2(numProbes * virtualRays, probeRows);
+            MergeSizes[cascade] = new Vector2(numProbes * interval, probeRows);
         }
     }
 
@@ -139,11 +147,12 @@ public class HRCGI : core.System
         FrustumTransmittance = new RenderTarget2D[FrustumCount];
         for (int frustum = 0; frustum < FrustumCount; frustum++)
         {
-            FrustumRadiance[frustum] = Renderer.CreateRenderTarget((int)WorldSize.X, (int)(WorldSize.Y / ProbeScale), cascadeFormat);
-            FrustumTransmittance[frustum] = Renderer.CreateRenderTarget((int)WorldSize.X, (int)(WorldSize.Y / ProbeScale), cascadeFormat);
+            FrustumRadiance[frustum] = Renderer.CreateRenderTarget((int)WorldSize.X, (int)CascadeSizes[0].Y, cascadeFormat);
+            FrustumTransmittance[frustum] = Renderer.CreateRenderTarget((int)WorldSize.X, (int)CascadeSizes[0].Y, cascadeFormat);
         }
 
-        FinalTexture = Renderer.CreateRenderTarget((int)WorldSize.X, (int)WorldSize.Y, finalFormat);
+        // Cascades use square pixels in a padded square; consumers receive only the viewport.
+        FinalTexture = Renderer.CreateRenderTarget((int)ViewSize.X, (int)ViewSize.Y, finalFormat);
     }
 
     public override void Update()
@@ -177,20 +186,21 @@ public class HRCGI : core.System
 
     private void RenderFrustumSeed(int frustum, Texture2D emissive, Texture2D absorption)
     {
-        // MRT: output to both radiance and transmittance targets
+        // Filter geometry at reduced resolution before seeding both radiance and transmittance.
         Renderer
             .SetTargets(VraysRadiance[0], VraysTransmittance[0])
             .Clear(Color.Transparent)
             .Reset()
             .SetShader("HRC/HRC_FrustumSeed")
-            .Configure(SamplerState.PointClamp)
+            .Configure(SamplerState.LinearClamp)
             .SetParameter("Emissivity", emissive)
             .SetParameter("Absorption", absorption)
             .SetParameter("WorldSize", WorldSize)
+            .SetParameter("ViewSize", ViewSize)
             .SetParameter("CascadeSize", CascadeSizes[0])
             .SetParameter("FrustumMatrix", FrustumMatrices[frustum])
             .SetParameter("FrustumOffset", FrustumOffsets[frustum])
-            .SetParameter("ProbeScale", (float)ProbeScale)
+            .SetParameter("ProbeScale", ProbeSpacing)
             .Draw()
             .Commit();
     }
@@ -209,7 +219,7 @@ public class HRCGI : core.System
             .SetParameter("PrevSize", CascadeSizes[cascade - 1])
             .SetParameter("CascadeSize", CascadeSizes[cascade])
             .SetParameter("CascadeIndex", new Vector2(cascade, CascadeCount))
-            .SetParameter("ProbeScale", (float)ProbeScale)
+            .SetParameter("ProbeScale", ProbeSpacing)
             .Draw()
             .Commit();
     }
@@ -234,7 +244,7 @@ public class HRCGI : core.System
             .SetParameter("PrevSize", hasNext ? MergeSizes[nextCascade] : Vector2.One)
             .SetParameter("CascadeSize", MergeSizes[cascade])
             .SetParameter("CascadeIndex", new Vector2(cascade, CascadeCount))
-            .SetParameter("ProbeScale", (float)ProbeScale)
+            .SetParameter("ProbeScale", ProbeSpacing)
             .Draw()
             .Commit();
     }
@@ -257,6 +267,7 @@ public class HRCGI : core.System
             .SetParameter("FrustumIndex2", FrustumRadiance[2])
             .SetParameter("FrustumIndex3", FrustumRadiance[3])
             .SetParameter("WorldSize", WorldSize)
+            .SetParameter("ViewSize", ViewSize)
             .Draw()
             .Commit();
     }
@@ -268,18 +279,7 @@ public class HRCGI : core.System
 
     public RenderTarget2D GetOutput() => FinalTexture;
 
-    public override void OnResize()
-    {
-        int newSize = Renderer.ScaledHigherPowerOfTwo;
-        if ((int)WorldSize.X == newSize)
-            return;
-
-        DisposeRenderTargets();
-        WorldSize = new Vector2(newSize, newSize);
-        CalculateCascadeSizes();
-        CreateRenderTargets();
-
-    }
+    public override void OnResize() => ResizeTargets();
 
     private void DisposeRenderTargets()
     {

@@ -8,6 +8,7 @@ Texture2D Absorption : register(t1);
 SamplerState Sampler0 : register(s0);
 
 float2 WorldSize;
+float2 ViewSize;
 float2 CascadeSize;
 float4 FrustumMatrix;  // (m00, m01, m10, m11)
 float2 FrustumOffset;
@@ -59,9 +60,10 @@ PixelShaderOutput MainPS(PixelShaderInput input)
     float plane = floor(texel.x / vrays);
     float2 probe = float2((plane * intrv) + 0.5, texel.y * ProbeScale) / WorldSize;
 
-    float2 sampleCoord = TransformProbeToFrustum(probe);
+    // Embed the rectangular viewport in the square cascade grid without stretching.
+    float2 sampleCoord = TransformProbeToFrustum(probe) * WorldSize / ViewSize;
 
-    if (sampleCoord.x < 0.0 || sampleCoord.x > 1.0 || sampleCoord.y < 0.0 || sampleCoord.y > 1.0)
+    if (sampleCoord.x < 0.0 || sampleCoord.x >= 1.0 || sampleCoord.y < 0.0 || sampleCoord.y >= 1.0)
     {
         output.Radiance = float4(0.0, 0.0, 0.0, 1.0);
         output.Transmittance = float4(1.0, 1.0, 1.0, 1.0);

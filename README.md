@@ -51,6 +51,8 @@ The first build restores NuGet packages and the local MGCB tool, then compiles t
 dotnet run --project tests/Radiant.Scenes -c Release -- lights
 ```
 
+Both demos keep geometry proportional through resizing, and HRC computes lighting in isotropic screen pixels. The [HRC implementation notes](docs/HRC.md) explain the viewport fix and numerical regression checks.
+
 Both images are actual scene-render-target captures from the Vulkan smoke tests, at **1024 × 640 after resizing**. They are not mockups or full desktop screenshots.
 
 ## What the engine provides
@@ -142,9 +144,10 @@ Capture and validate the featured scenes with a display and Vulkan available:
 ```sh
 dotnet run --project tests/Radiant.Scenes -c Release -- triangles --smoke
 dotnet run --project tests/Radiant.Scenes -c Release -- lights --smoke
+dotnet run --project tests/Radiant.Scenes -c Release -- --lighting-regression
 ```
 
-Each smoke run loads real content, renders **90 frames**, captures frame 10 at **960 × 540**, resizes the window, captures frame 90 at **1024 × 640**, checks the renderer dimensions and nonempty pixels, and exits. A failed assertion terminates the process with an error. These are basic rendering checks, not pixel-perfect visual regression tests or benchmarks.
+Each smoke run loads real content, renders **90 frames**, captures frame 10 at **960 × 540**, resizes the window, captures frame 90 at **1024 × 640**, checks the renderer dimensions and nonempty pixels, and exits. A failed assertion terminates the process with an error. The scene smoke runs are basic rendering checks. The separate lighting regression measures radial symmetry in linear GPU output across rectangular and square viewports, render scales, probe qualities, opaque shadows, and colored transmission; see [HRC validation](docs/HRC.md#validation).
 
 | Scene | Captures under `artifacts/smoke/` |
 | --- | --- |

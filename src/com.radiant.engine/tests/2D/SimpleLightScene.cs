@@ -21,6 +21,8 @@ public class SimpleLightScene : Scene
 
     public override void SetupScene()
     {
+        Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
+
         CreateCenterLight();
         BilinearSystem.SetInputSource(HRCGISystem.GetOutput);
 

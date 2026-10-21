@@ -6,6 +6,7 @@ Texture2D FrustumIndex3 : register(t3);
 SamplerState Sampler0 : register(s0);
 
 float2 WorldSize;
+float2 ViewSize;
 
 struct VertexShaderInput
 {
@@ -29,7 +30,8 @@ PixelShaderInput MainVS(VertexShaderInput input)
 
 float4 MainPS(PixelShaderInput input) : SV_Target0
 {
-    float2 uv = input.UV;
+    // Crop the padded cascade grid back to the viewport using the same pixel metric.
+    float2 uv = input.UV * ViewSize / WorldSize;
     float2 pixel = float2(1.0, 0.0) / WorldSize;
 
     float2 offset0 = uv + pixel.xy;
