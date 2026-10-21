@@ -19,7 +19,7 @@ public class Tileset : core.System
     private Vector3 MinLight = new Vector3(0.0f, 0.0f, 0.0f);
     private Vector3 SunColor = new Vector3(1.0f, 1.0f, 1.00f);
 
-    private Vector2 CameraPosition = Vector2.Zero;
+    public Vector2 CameraPosition { get; set; } = Vector2.Zero;
     private float CameraSpeed = 1000f;
     private const int Padding = 18;
 
@@ -484,8 +484,9 @@ public class Tileset : core.System
         float maxX = (WorldWidth * TileSize) - ViewportWidth;
         float maxY = (WorldHeight * TileSize) - ViewportHeight;
 
-        CameraPosition.X = MathHelper.Clamp(CameraPosition.X, 0, maxX);
-        CameraPosition.Y = MathHelper.Clamp(CameraPosition.Y, 0, maxY);
+        CameraPosition = new Vector2(
+            MathHelper.Clamp(CameraPosition.X, 0, maxX),
+            MathHelper.Clamp(CameraPosition.Y, 0, maxY));
     }
 
     private void HandleMouseInput()

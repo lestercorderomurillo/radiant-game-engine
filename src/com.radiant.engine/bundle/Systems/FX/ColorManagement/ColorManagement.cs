@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework.Graphics;
 namespace com.radiant.engine.bundle;
 
 [CoreSystem]
-[RunAfter(typeof(HRCGI), typeof(RCGI))]
+[RunAfter(typeof(HRCGI))]
 [RunBefore(typeof(Bilinear), typeof(UDR1), typeof(UDR2), typeof(UDR3))]
 public class ColorManagement : core.System
 {

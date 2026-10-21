@@ -21,12 +21,6 @@
 /processorParam:DebugMode=Auto
 /build:shaders/InstancedShapes.fx
 
-#begin RCGI.fx
-/importer:EffectImporter
-/processor:EffectProcessor
-/processorParam:DebugMode=Auto
-/build:shaders/RCGI/RCGI.fx
-
 #begin HRC_Extensions.fx
 /importer:EffectImporter
 /processor:EffectProcessor

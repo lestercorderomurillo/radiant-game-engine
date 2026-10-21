@@ -45,7 +45,7 @@ radiant/
 │   ├── shaders/
 │   │   ├── Geometry.fx, InstancedShapes.fx, ColorManagement.fx, GlassBlur.fx
 │   │   ├── HRC/ (HRC_Extensions, HRC_FluenceSum, HRC_FrustumSeed, HRC_MergingCones)
-│   │   ├── RCGI/RCGI.fx, UDR/UDR1-3.fx
+│   │   ├── UDR/UDR1-3.fx
 │   └── Content.mgcb (HiDef, DesktopVK)
 │
 ├── src/com.radiant.engine/
@@ -63,7 +63,7 @@ radiant/
 │   │   │   └── GPU/ (Material, MotionTrackable)
 │   │   ├── Extensions/ (LightFactory, VectorExtensions)
 │   │   └── Systems/
-│   │       ├── 2D/ Geometry, HRCGI, RCGI, Tileset, WorldGen, PerlinNoise2D,
+│   │       ├── 2D/ Geometry, HRCGI, Tileset, WorldGen, PerlinNoise2D,
 │   │       │       MouseLight, PaintBrush
 │   │       ├── 3D/ Tileset3D
 │   │       ├── FX/ ColorManagement, UDR
@@ -205,25 +205,25 @@ Topological sort (Kahn's) at `ECS.Initialize()`. Disabled systems (`Enabled = fa
 
 | Layer | Value | Systems |
 |-------|-------|---------|
-| World | 0 | Geometry, HRCGI, RCGI, ColorManagement, Bilinear, UDR1-3 |
+| World | 0 | Geometry, HRCGI, ColorManagement, Bilinear, UDR1-3 |
 | Gameplay | 1 | *(default)* Game systems |
 | Overlay | 2 | GizmosRenderer, PerformanceMonitor |
 | UI | 3 | Inspector |
 
 ### SystemGroup
 
-Mutually exclusive systems (e.g., HRCGI vs RCGI). Supports "all disabled" state (ActiveIndex = -1).
+Mutually exclusive systems (e.g., Bilinear vs UDR3). Supports "all disabled" state (ActiveIndex = -1).
 
 ```csharp
-var group = new SystemGroup("GI",
-    ("HRCGI", ECS.AddSystem<HRCGI>()),
-    ("RCGI",  ECS.AddSystem<RCGI>(enabled: false))
+var group = new SystemGroup("Upscaling",
+    ("Bilinear", ECS.AddSystem<Bilinear>()),
+    ("UDR3", ECS.AddSystem<UDR3>(enabled: false))
 );
 
 group.Toggle();              // Cycle: 0 → 1 → ... → N-1 → -1 (none) → 0
 group.ActiveName;            // Current system name, null when none active
 group.Active;                // Current System instance, null when none active
-group.Name;                  // Group name ("GI")
+group.Name;                  // Group name ("Upscaling")
 group.DisableActive();       // Dispose + disable current, set ActiveIndex = -1
 group.ForEach(system => {}); // Iterate all systems in group
 ```
@@ -237,7 +237,7 @@ Tag systems for inspector display and filtering:
 public class ExampleSystem : System { }
 ```
 
-Tags appear in the Systems Inspector after `|`: "ExampleSystem  |  Gameplay". Group names also shown: "HRCGI  |  GI".
+Tags appear in the Systems Inspector after `|`: "ExampleSystem  |  Gameplay". Group names also shown: "Bilinear  |  Upscaling".
 
 ## Renderer API
 
