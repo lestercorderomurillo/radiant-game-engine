@@ -33,6 +33,10 @@ public class Geometry : core.System
     public RenderTarget2D AbsorptionTexture { get; private set; }
     public RenderTarget2D SDFTexture { get; private set; }
     public RenderTarget2D MotionVectorTexture { get; private set; }
+    /// <summary>Signed, unquantized world displacement for temporal reconstruction.</summary>
+    public RenderTarget2D TemporalMotionTexture { get; private set; }
+    public bool TemporalMotionEnabled { get; set; }
+    private readonly List<(float z, RendererShape shape)> TemporalMotionShapes = new();
 
     public RenderTarget2D BackgroundEmissive { get; set; }
     public RenderTarget2D BackgroundAbsorption { get; set; }
@@ -85,6 +89,7 @@ public class Geometry : core.System
 
         // Motion shapes (kept separate - small count)
         public List<(Vector2 pos, Vector2 size, Vector2 velocity, bool isCircle, float radius)>[] MotionShapesByThread;
+        public List<(float z, RendererShape shape)>[] TemporalMotionByThread;
 
         // Textured shapes drawn via SpriteBatch on emissive+absorption (kept separate from instanced shapes)
         public List<(Vector2 pos, Vector2 size, Texture2D texture, Color emissive, Color absorption)>[] TextureDrawsByThread;
@@ -151,10 +156,12 @@ public class Geometry : core.System
             // Buckets are lazily allocated on first use (most layers are empty)
 
             Buffers[b].MotionShapesByThread = new List<(Vector2, Vector2, Vector2, bool, float)>[ThreadCount];
+            Buffers[b].TemporalMotionByThread = new List<(float, RendererShape)>[ThreadCount];
             Buffers[b].TextureDrawsByThread = new List<(Vector2, Vector2, Texture2D, Color, Color)>[ThreadCount];
             for (int t = 0; t < ThreadCount; t++)
             {
                 Buffers[b].MotionShapesByThread[t] = new();
+                Buffers[b].TemporalMotionByThread[t] = new();
                 Buffers[b].TextureDrawsByThread[t] = new();
             }
 
@@ -308,6 +315,7 @@ public class Geometry : core.System
             buf.AbsorptionMinLayerByThread[t] = MaxZLayers;
             buf.AbsorptionMaxLayerByThread[t] = -1;
             buf.MotionShapesByThread[t].Clear();
+            buf.TemporalMotionByThread[t].Clear();
             buf.TextureDrawsByThread[t].Clear();
         }
 
@@ -320,18 +328,19 @@ public class Geometry : core.System
         var absorptionMinByThread = buf.AbsorptionMinLayerByThread;
         var absorptionMaxByThread = buf.AbsorptionMaxLayerByThread;
         var motionByThread = buf.MotionShapesByThread;
+        var temporalByThread = buf.TemporalMotionByThread;
         var textureByThread = buf.TextureDrawsByThread;
         var occupiedLayers = buf.OccupiedLayers;
         var occupiedLayerCount = buf.OccupiedLayerCount;
 
-        Scene.ECS.Query((int threadIndex, int entity, ref Rectangle2D rectangle, ref Transform transform, ref Material material) =>
+        Scene.ECS.Query((int threadIndex, int entity, ref Rectangle2D rectangle, ref Transform2D transform, ref Material material) =>
         {
 
             Vector2 position = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
             if (position.X + rectangle.Size.X < 0 || position.X >= WorldBounds.X ||
                 position.Y + rectangle.Size.Y < 0 || position.Y >= WorldBounds.Y) return;
 
-            int layer = Math.Clamp((int)transform.Position.Z + ZLayerOffset, 0, MaxZLayers - 1);
+            int layer = Math.Clamp((int)transform.Layer + ZLayerOffset, 0, MaxZLayers - 1);
             int bucketIndex = threadIndex * MaxZLayers + layer;
 
             if (layer < emissiveMinByThread[threadIndex]) emissiveMinByThread[threadIndex] = layer;
@@ -377,14 +386,14 @@ public class Geometry : core.System
             absorptionCounts[bucketIndex] = absorptionIndex + 1;
         });
 
-        Scene.ECS.Query((int threadIndex, int entity, ref Circle2D circle, ref Transform transform, ref Material material) =>
+        Scene.ECS.Query((int threadIndex, int entity, ref Circle2D circle, ref Transform2D transform, ref Material material) =>
         {
 
             Vector2 center = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
             if (center.X + circle.Radius < 0 || center.X - circle.Radius >= WorldBounds.X ||
                 center.Y + circle.Radius < 0 || center.Y - circle.Radius >= WorldBounds.Y) return;
 
-            int layer = Math.Clamp((int)transform.Position.Z + ZLayerOffset, 0, MaxZLayers - 1);
+            int layer = Math.Clamp((int)transform.Layer + ZLayerOffset, 0, MaxZLayers - 1);
             int bucketIndex = threadIndex * MaxZLayers + layer;
 
             if (layer < emissiveMinByThread[threadIndex]) emissiveMinByThread[threadIndex] = layer;
@@ -432,14 +441,14 @@ public class Geometry : core.System
             absorptionCounts[bucketIndex] = absorptionIndex + 1;
         });
 
-        Scene.ECS.Query((int threadIndex, int entity, ref Triangle2D triangle, ref Transform transform, ref Material material) =>
+        Scene.ECS.Query((int threadIndex, int entity, ref Triangle2D triangle, ref Transform2D transform, ref Material material) =>
         {
 
             Vector2 position = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
             if (position.X + triangle.Size.X < 0 || position.X >= WorldBounds.X ||
                 position.Y + triangle.Size.Y < 0 || position.Y >= WorldBounds.Y) return;
 
-            int layer = Math.Clamp((int)transform.Position.Z + ZLayerOffset, 0, MaxZLayers - 1);
+            int layer = Math.Clamp((int)transform.Layer + ZLayerOffset, 0, MaxZLayers - 1);
             int bucketIndex = threadIndex * MaxZLayers + layer;
             float shapeType = triangle.Bordered ? SHAPE_TRIANGLE_BORDER : SHAPE_TRIANGLE;
 
@@ -511,23 +520,39 @@ public class Geometry : core.System
         FlattenMs = (float)swFlatten.Elapsed.TotalMilliseconds;
 
         // Motion tracking
-        Scene.ECS.Query((int threadIndex, int entity, ref Transform transform, ref Rectangle2D rectangle, ref MotionTrackable motion) =>
+        Scene.ECS.Query((int threadIndex, int entity, ref Transform2D transform, ref Rectangle2D rectangle, ref MotionTrackable motion) =>
         {
 
             Vector2 position = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
             Vector2 velocity = motion.CalculateVelocity(transform.Position, MotionHistoryFrames);
+            var temporalShape = RendererShape.Rect(position, rectangle.Size, Color.White);
+            temporalShape.Motion = motion.RenderedDisplacement(transform.Position);
+            temporalByThread[threadIndex].Add((transform.Layer, temporalShape));
             if (velocity.LengthSquared() > 0.0001f)
                 motionByThread[threadIndex].Add((position, rectangle.Size, velocity, false, 0));
             motion.Push(transform.Position);
         });
 
-        Scene.ECS.Query((int threadIndex, int entity, ref Transform transform, ref Circle2D circle, ref MotionTrackable motion) =>
+        Scene.ECS.Query((int threadIndex, int entity, ref Transform2D transform, ref Circle2D circle, ref MotionTrackable motion) =>
         {
 
             Vector2 center = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
             Vector2 velocity = motion.CalculateVelocity(transform.Position, MotionHistoryFrames);
+            var temporalShape = RendererShape.Circle(center, circle.Radius, Color.White);
+            temporalShape.Motion = motion.RenderedDisplacement(transform.Position);
+            temporalByThread[threadIndex].Add((transform.Layer, temporalShape));
             if (velocity.LengthSquared() > 0.0001f)
                 motionByThread[threadIndex].Add((center, Vector2.Zero, velocity, true, circle.Radius));
+            motion.Push(transform.Position);
+        });
+
+        Scene.ECS.Query((int threadIndex, int entity, ref Transform2D transform, ref Triangle2D triangle, ref MotionTrackable motion) =>
+        {
+            Vector2 position = new(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
+            var shape = triangle.Bordered ? RendererShape.TriangleBorder(position, triangle.Size, Color.White)
+                : RendererShape.Triangle(position, triangle.Size, Color.White);
+            shape.Motion = motion.RenderedDisplacement(transform.Position);
+            temporalByThread[threadIndex].Add((transform.Layer, shape));
             motion.Push(transform.Position);
         });
     }
@@ -704,6 +729,23 @@ public class Geometry : core.System
 
         Color motionClearColor = new Color(0.5f, 0.5f, 0f, 1f);
         Renderer.Configure(BlendState.Opaque).FlushShapes(MotionVectorTexture, motionClearColor, "Sharp");
+
+        if (!TemporalMotionEnabled)
+        {
+            TemporalMotionTexture?.Dispose();
+            TemporalMotionTexture = null;
+            return;
+        }
+
+        TemporalMotionTexture ??= Renderer.CreateRenderTarget(Renderer.ScreenWidth,
+            Renderer.ScreenHeight, SurfaceFormat.Vector2);
+        TemporalMotionShapes.Clear();
+        for (int threadIndex = 0; threadIndex < ThreadCount; threadIndex++)
+            TemporalMotionShapes.AddRange(buf.TemporalMotionByThread[threadIndex]);
+        TemporalMotionShapes.Sort((left, right) => left.z.CompareTo(right.z));
+        foreach (var entry in TemporalMotionShapes)
+            Renderer.DrawShape(entry.shape);
+        Renderer.Configure(BlendState.Opaque).FlushShapes(TemporalMotionTexture, Color.Transparent, "Motion");
     }
 
     private void RenderSDFTexture()
@@ -910,6 +952,8 @@ public class Geometry : core.System
         AbsorptionTexture?.Dispose();
         SDFTexture?.Dispose();
         MotionVectorTexture?.Dispose();
+        TemporalMotionTexture?.Dispose();
+        TemporalMotionTexture = null;
         JFATexture1?.Dispose();
         JFATexture2?.Dispose();
         JFATextureInterior1?.Dispose();
@@ -931,6 +975,8 @@ public class Geometry : core.System
         AbsorptionTexture?.Dispose();
         SDFTexture?.Dispose();
         MotionVectorTexture?.Dispose();
+        TemporalMotionTexture?.Dispose();
+        TemporalMotionTexture = null;
         JFATexture1?.Dispose();
         JFATexture2?.Dispose();
         JFATextureInterior1?.Dispose();

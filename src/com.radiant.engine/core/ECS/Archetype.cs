@@ -40,6 +40,19 @@ public sealed class Archetype
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T[] GetArray<T>() where T : struct => (T[])Components[typeof(T)];
 
+    internal bool TryGetComponent(int index, Type type, out Component component)
+    {
+        component = Components.TryGetValue(type, out var values) ? (Component)values.GetValue(index) : null;
+        return component != null;
+    }
+
+    internal bool TrySetComponent(int index, Component component)
+    {
+        if (!Components.TryGetValue(component.GetType(), out var values)) return false;
+        values.SetValue(component, index);
+        return true;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int[] GetEntities() => Entities;
 

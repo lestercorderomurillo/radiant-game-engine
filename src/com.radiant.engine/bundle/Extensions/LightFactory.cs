@@ -11,16 +11,17 @@ public static class LightFactory
         Color albedo, Color emissive, float? z = null, Texture2D texture = null)
     {
         int id = ecs.CreateEntity();
-        ecs.AddComponent<Transform>(id);
+        ecs.AddComponent<Transform2D>(id);
         ecs.AddComponent<Circle2D>(id);
         ecs.AddComponent<Material>(id);
 
-        ref var transform = ref ecs.GetComponent<Transform>(id);
+        ref var transform = ref ecs.GetComponent<Transform2D>(id);
         ref var circle = ref ecs.GetComponent<Circle2D>(id);
         ref var material = ref ecs.GetComponent<Material>(id);
 
-        transform.Position = new Vector3(position, z ?? id);
-        transform.Rotation = Vector3.UnitX;
+        transform.Position = position;
+        transform.Layer = z ?? id;
+        transform.Scale = Vector2.One;
         circle.Radius = radius;
         material.Albedo = albedo;
         material.Emissive = emissive;

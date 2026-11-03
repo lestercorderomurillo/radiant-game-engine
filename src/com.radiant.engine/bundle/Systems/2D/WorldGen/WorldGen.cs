@@ -250,7 +250,7 @@ public class WorldGen : core.System
 
     private void CreateTileEntity(int tileX, int tileY, int layer, TileType tileType)
     {
-        int entity = Scene.ECS.CreateEntity(new Vector3(tileX * TileSize, tileY * TileSize, layer));
+        int entity = Scene.ECS.CreateEntity(new Vector2(tileX * TileSize, tileY * TileSize), layer);
         Scene.ECS.AddComponent<Rectangle2D>(entity);
         Scene.ECS.AddComponent<TileData>(entity);
         Scene.ECS.AddComponent<Material>(entity);

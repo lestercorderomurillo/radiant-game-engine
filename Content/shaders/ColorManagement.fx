@@ -1,5 +1,8 @@
 Texture2D InputTexture : register(t0);
 SamplerState Sampler0 : register(s0);
+int Mapper;
+float Exposure;
+int Transfer;
 
 struct VertexShaderInput
 {
@@ -21,34 +24,21 @@ PixelShaderInput MainVS(VertexShaderInput input)
     return output;
 }
 
-float3 LinearToSRGB(float3 c)
-{
-    return pow(abs(c), 1.0 / 2.2);
-}
 
-// ── None: gamma-only ────────────────────────────────────────────────────────
-
-float4 PS_None(PixelShaderInput input) : SV_Target0
-{
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
-    return float4(LinearToSRGB(color), 1.0);
-}
-
-// ── ACES: Narkowicz fit ─────────────────────────────────────────────────────
+// ACES: Narkowicz fit ─────────────────────────────────────────────────────
 
 float3 ACESNarkowicz(float3 x)
 {
     return saturate((x * mad(2.51, x, 0.03)) / mad(x, mad(2.43, x, 0.59), 0.14));
 }
 
-float4 PS_ACES(PixelShaderInput input) : SV_Target0
+float3 Map_ACES(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
     color = ACESNarkowicz(color);
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
-// ── ACES2: Hill RRT+ODT ────────────────────────────────────────────────────
+// ACES fitted: Hill RRT+ODT ────────────────────────────────────────────────────
 
 static const float3x3 ACESInputMat = float3x3(
     0.59719, 0.35458, 0.04823,
@@ -69,14 +59,13 @@ float3 RRTAndODTFit(float3 v)
     return a / b;
 }
 
-float4 PS_ACES2(PixelShaderInput input) : SV_Target0
+float3 Map_ACESFitted(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
     color = mul(ACESInputMat, color);
     color = RRTAndODTFit(color);
     color = mul(ACESOutputMat, color);
     color = saturate(color);
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
 // ── AgX: Magennis ──────────────────────────────────────────────────────────
@@ -107,9 +96,8 @@ float3 AgXDefaultContrastApprox(float3 x)
            - 0.00232;
 }
 
-float4 PS_AgX(PixelShaderInput input) : SV_Target0
+float3 Map_AgX(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
 
     // AgX inset
     color = mul(AgXInsetMatrix, color);
@@ -127,7 +115,7 @@ float4 PS_AgX(PixelShaderInput input) : SV_Target0
     color = mul(AgXOutsetMatrix, color);
     color = saturate(color);
 
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
 // Filmic: Hable (Uncharted 2)
@@ -143,23 +131,21 @@ float3 HablePartial(float3 x)
     return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
 }
 
-float4 PS_Filmic(PixelShaderInput input) : SV_Target0
+float3 Map_Filmic(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
     float exposureBias = 2.0;
     float3 mapped = HablePartial(color * exposureBias);
     float3 whiteScale = 1.0 / HablePartial(11.2);
     color = mapped * whiteScale;
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
 // Reinhard
 
-float4 PS_Reinhard(PixelShaderInput input) : SV_Target0
+float3 Map_Reinhard(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
     color = color / (1.0 + color);
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
 // Uchimura (Gran Turismo)
@@ -183,9 +169,8 @@ float UchimuraCurve(float x, float P, float a, float m, float l, float c, float 
     return T * w0 + L * w1 + S * w2;
 }
 
-float4 PS_Uchimura(PixelShaderInput input) : SV_Target0
+float3 Map_Uchimura(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
     float P = 1.0;   // Max brightness
     float a = 1.0;   // Contrast
     float m = 0.22;  // Linear section start
@@ -195,7 +180,7 @@ float4 PS_Uchimura(PixelShaderInput input) : SV_Target0
     color.r = UchimuraCurve(color.r, P, a, m, l, c, b);
     color.g = UchimuraCurve(color.g, P, a, m, l, c, b);
     color.b = UchimuraCurve(color.b, P, a, m, l, c, b);
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
 // PBR Neutral (Khronos)
@@ -220,83 +205,39 @@ float3 PBRNeutral(float3 color)
     return lerp(color, newPeak, g);
 }
 
-float4 PS_PBRNeutral(PixelShaderInput input) : SV_Target0
+float3 Map_PBRNeutral(float3 color)
 {
-    float3 color = InputTexture.Sample(Sampler0, input.UV).rgb;
     color = PBRNeutral(color);
-    return float4(LinearToSRGB(color), 1.0);
+    return color;
 }
 
-// Techniques
-
-technique None
+// All renderers share the same color operators. Input/output use premultiplied alpha.
+float3 Encode(float3 color)
+{
+    color = max(color, 0);
+    if (Transfer == 2) return pow(color, 1.0 / 2.2);
+    if (Transfer == 1) return lerp(1.055 * pow(color, 1.0 / 2.4) - 0.055, 12.92 * color, step(color, 0.0031308));
+    return color;
+}
+float4 ColorPS(PixelShaderInput input) : SV_Target0
+{
+    float4 pixel = InputTexture.Sample(Sampler0, input.UV);
+    if (pixel.a <= 0) return 0;
+    float3 color = max(pixel.rgb / max(pixel.a, 1e-6) * Exposure, 0);
+    if (Mapper == 1) color = Map_Reinhard(color);
+    else if (Mapper == 2) color = Map_ACES(color);
+    else if (Mapper == 3) color = Map_ACESFitted(color);
+    else if (Mapper == 4) color = Map_AgX(color);
+    else if (Mapper == 5) color = Map_Filmic(color);
+    else if (Mapper == 6) color = Map_Uchimura(color);
+    else if (Mapper == 7) color = Map_PBRNeutral(color);
+    return float4(Encode(color) * pixel.a, pixel.a);
+}
+technique Color
 {
     pass P0
     {
         VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_None();
-    }
-}
-
-technique ACES
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_ACES();
-    }
-}
-
-technique ACES2
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_ACES2();
-    }
-}
-
-technique AgX
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_AgX();
-    }
-}
-
-technique Filmic
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_Filmic();
-    }
-}
-
-technique Reinhard
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_Reinhard();
-    }
-}
-
-technique Uchimura
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_Uchimura();
-    }
-}
-
-technique PBRNeutral
-{
-    pass P0
-    {
-        VertexShader = compile vs_6_0 MainVS();
-        PixelShader  = compile ps_6_0 PS_PBRNeutral();
+        PixelShader = compile ps_6_0 ColorPS();
     }
 }

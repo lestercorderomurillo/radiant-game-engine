@@ -65,6 +65,8 @@ public abstract class System
     public Renderer Renderer;
 
     public bool Enabled = true;
+    /// <summary>Dependencies by instance, allowing independent views with the same system types.</summary>
+    public System[] After = Array.Empty<System>();
     internal PauseGroup PauseGroups;
 
     public virtual RenderLayer RenderLayer => RenderLayer.Gameplay;

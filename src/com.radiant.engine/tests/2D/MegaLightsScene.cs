@@ -49,6 +49,7 @@ public class MegaLightsScene : Scene
 
     public override void SetupECS()
     {
+        ECS.AddSystem<Inspector>();
         ECS.AddSystem<PerformanceMonitor>();
         ECS.AddSystem<Geometry>();
         HRCGISystem = ECS.AddSystem<HRCGI>();
@@ -93,17 +94,18 @@ public class MegaLightsScene : Scene
     {
         int id = ECS.CreateEntity();
 
-        ECS.AddComponent<Transform>(id);
+        ECS.AddComponent<Transform2D>(id);
         ECS.AddComponent<Triangle2D>(id);
         ECS.AddComponent<Material>(id);
 
-        ref var transform = ref ECS.GetComponent<Transform>(id);
+        ref var transform = ref ECS.GetComponent<Transform2D>(id);
         ref var triangle = ref ECS.GetComponent<Triangle2D>(id);
         ref var material = ref ECS.GetComponent<Material>(id);
 
         float centroidOffsetY = size * 0.117f;
-        transform.Position = new Vector3(center.X - size / 2, center.Y - size / 2 - centroidOffsetY, 1f);  // Layer 1
-        transform.Rotation = Vector3.UnitX;
+        transform.Position = new Vector2(center.X - size / 2, center.Y - size / 2 - centroidOffsetY);
+        transform.Layer = 1f;  // Layer 1
+        transform.Scale = Vector2.One;
 
         triangle.Size = new Vector2(size);
         triangle.Bordered = true;
@@ -193,18 +195,19 @@ public class MegaLightsScene : Scene
         int id = ECS.CreateEntity();
 
         // Add all components first (each AddComponent moves entity to new archetype)
-        ECS.AddComponent<Transform>(id);
+        ECS.AddComponent<Transform2D>(id);
         ECS.AddComponent<Circle2D>(id);
         ECS.AddComponent<Material>(id);
 
         // Now get fresh refs after entity is in final archetype
-        ref var transform = ref ECS.GetComponent<Transform>(id);
+        ref var transform = ref ECS.GetComponent<Transform2D>(id);
         ref var circle = ref ECS.GetComponent<Circle2D>(id);
         ref var material = ref ECS.GetComponent<Material>(id);
 
         // Use entity ID as Z by default (unique, monotonic = newer always on top)
-        transform.Position = new Vector3(position, z ?? id);
-        transform.Rotation = Vector3.UnitX;
+        transform.Position = position;
+        transform.Layer = z ?? id;
+        transform.Scale = Vector2.One;
 
         material.Albedo = color;
         material.Emissive = emissive;
@@ -218,16 +221,17 @@ public class MegaLightsScene : Scene
     {
         int id = ECS.CreateEntity();
 
-        ECS.AddComponent<Transform>(id);
+        ECS.AddComponent<Transform2D>(id);
         ECS.AddComponent<Rectangle2D>(id);
         ECS.AddComponent<Material>(id);
 
-        ref var transform = ref ECS.GetComponent<Transform>(id);
+        ref var transform = ref ECS.GetComponent<Transform2D>(id);
         ref var rect = ref ECS.GetComponent<Rectangle2D>(id);
         ref var material = ref ECS.GetComponent<Material>(id);
 
-        transform.Position = new Vector3(position, 0f);  // Layer 0 (back)
-        transform.Rotation = Vector3.UnitX;
+        transform.Position = position;
+        transform.Layer = 0f;  // Layer 0 (back)
+        transform.Scale = Vector2.One;
 
         rect.Size = new Vector2(size);
 
@@ -241,16 +245,17 @@ public class MegaLightsScene : Scene
     {
         int id = ECS.CreateEntity();
 
-        ECS.AddComponent<Transform>(id);
+        ECS.AddComponent<Transform2D>(id);
         ECS.AddComponent<Rectangle2D>(id);
         ECS.AddComponent<Material>(id);
 
-        ref var transform = ref ECS.GetComponent<Transform>(id);
+        ref var transform = ref ECS.GetComponent<Transform2D>(id);
         ref var rect = ref ECS.GetComponent<Rectangle2D>(id);
         ref var material = ref ECS.GetComponent<Material>(id);
 
-        transform.Position = new Vector3(position, 0f);  // Layer 0 (back)
-        transform.Rotation = Vector3.UnitX;
+        transform.Position = position;
+        transform.Layer = 0f;  // Layer 0 (back)
+        transform.Scale = Vector2.One;
 
         rect.Size = new Vector2(size);
 
@@ -280,14 +285,16 @@ public class MegaLightsScene : Scene
             float x = center.X + OrbitRadius * MathF.Cos(angle);
             float y = center.Y + OrbitRadius * MathF.Sin(angle);
 
-            ref var transform = ref ECS.GetComponent<Transform>(RotatingLightIds[i]);
-            transform.Position = new Vector3(x, y, RotatingLightZ);
+            ref var transform = ref ECS.GetComponent<Transform2D>(RotatingLightIds[i]);
+            transform.Position = new Vector2(x, y);
+            transform.Layer = RotatingLightZ;
         }
 
         // Update mouse light (always on top) - convert screen coords to virtual world coords
         var mouseWorld = Renderer.ScreenToWorld(new Vector2(mouse.X, mouse.Y));
-        ref var mouseTransform = ref ECS.GetComponent<Transform>(MouseLightId);
-        mouseTransform.Position = new Vector3(mouseWorld, MouseLightZ);
+        ref var mouseTransform = ref ECS.GetComponent<Transform2D>(MouseLightId);
+        mouseTransform.Position = mouseWorld;
+        mouseTransform.Layer = MouseLightZ;
 
         // Only allow spawning when window is focused
         if (Renderer.Window.IsActive)

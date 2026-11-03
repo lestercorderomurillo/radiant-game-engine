@@ -311,10 +311,10 @@ public partial class Inspector
         int iconPad = 12;
         var searchTex = Renderer.GetSearchTexture(iconSize * 4);
         var searchRect = new Rectangle(Widget.Bounds.X + iconPad, Widget.Bounds.Y + (Widget.Bounds.Height - iconSize) / 2, iconSize, iconSize);
-        Renderer.DrawSprite(searchTex, searchRect, LabelDim);
+        if (!Widget.TextInputNumeric) Renderer.DrawSprite(searchTex, searchRect, LabelDim);
 
         string value = Widget.TextInputValue ?? "";
-        int leftPadding = iconPad + iconSize + 8;
+        int leftPadding = Widget.TextInputNumeric ? iconPad : iconPad + iconSize + 8;
         int rightPadding = Padding / 2 + 4;
 
         if (value.Length > 0)
@@ -346,6 +346,7 @@ public partial class Inspector
         string displayText = TruncateText(value, maxTextWidth);
         var textSize = MeasureText(displayText);
         var textPos = new Vector2(Widget.Bounds.X + leftPadding, Widget.Bounds.Y + (Widget.Bounds.Height - textSize.Y) / 2);
+        if (focused && Widget.TextInputSelectAll) Renderer.DrawRoundedRect(new Rectangle((int)textPos.X, (int)textPos.Y, (int)textSize.X, (int)textSize.Y), SliderFill * 0.4f, 2);
         DrawText(displayText, textPos, TextColor);
 
         if (focused && ((int)(CursorBlinkTimer / CursorBlinkRate) % 2 == 0))

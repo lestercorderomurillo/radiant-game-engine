@@ -75,6 +75,12 @@
 /processorParam:DebugMode=Auto
 /build:shaders/UDR/UDR3.fx
 
+#begin UDR4.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/UDR/UDR4.fx
+
 #begin presets/icons/Checkmark.png
 /importer:TextureImporter
 /processor:TextureProcessor
@@ -109,3 +115,94 @@
 /processorParam:PremultiplyAlpha=True
 /processorParam:TextureFormat=Color
 /build:presets/icons/VisibilityOff.png
+
+#begin Geometry3D.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/Geometry3D.fx
+
+#begin ImagePipeline.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/ImagePipeline.fx
+
+#begin PathTracer.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/PathTracer.fx
+
+#begin ScalarPreview.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/ScalarPreview.fx
+
+#begin RasterLighting.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/RasterLighting.fx
+
+#begin Geometry2D.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/Geometry2D.fx
+
+
+#begin AA/SMAA/Textures/AreaTexDX10.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=False
+/processorParam:TextureFormat=Color
+/build:shaders/AA/SMAA/Textures/AreaTexDX10.png
+
+#begin AA/SMAA/Textures/SearchTex.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyEnabled=False
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=False
+/processorParam:TextureFormat=Color
+/build:shaders/AA/SMAA/Textures/SearchTex.png
+
+#begin AA/Temporal.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/AA/Temporal.fx
+
+#begin AA/SMAAEdges.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/AA/SMAAEdges.fx
+
+#begin AA/SMAAWeights.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/AA/SMAAWeights.fx
+
+#begin AA/SMAABlend.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/AA/SMAABlend.fx
+
+#begin Denoising.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/Denoising.fx
+
+#begin Denoising/SVGF.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/Denoising/SVGF.fx

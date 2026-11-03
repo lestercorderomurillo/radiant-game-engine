@@ -1,145 +1,84 @@
 # Radiant
 
-**A C# 2D engine for experimenting with real-time lighting.** Radiant combines an archetype ECS, instanced geometry, holographic radiance-cascade global illumination, spatial and temporal upscaling, and runtime inspection on MonoGame's native Vulkan backend.
+A C# 2D and 3D game engine for experimenting with real-time lighting, built on MonoGame and Vulkan. Includes an archetype ECS, instanced geometry, radiance-cascade global illumination, and an in-game inspector.
 
-The engine is a reusable library. The demos in this repository are standalone consumers; [raytracing-pacman](https://github.com/lestercorderomurillo/raytracing-pacman) is a separate game built on it.
+## Cornell Box (3D)
 
-## MegaLights — the triangle lighting demo
+![Cornell Box: path-traced blocks, red and green walls, soft shadows and indirect lighting](docs/images/CornellBoxScene.png)
 
-![MegaLights: orbiting colored lights illuminate nested triangles and columns of occluders](docs/images/MegaLightsScene-resized.png)
-
-The original **MegaLightsScene** pairs a purple emissive triangle and a larger dark triangle with **14 orbiting rainbow lights**, translucent occluders, and a mouse-controlled light. Paint additional lights or blockers, pause the orbit, and compare the upscaling implementations interactively.
-
-This scene was replaced by the maze demo in commit `a6beaed` (February 7, 2026), then renamed and eventually developed into Pac-Man. It is restored here from the version immediately before that replacement, with adaptations for the current engine API.
+A Cornell Box with selectable flat, lit raster, and progressive diffuse path tracing. The demo starts maximized with path tracing selected and À-trous denoising enabled. AA, tonemapping and guided denoising are independent optional systems. F1 → View → Path tracing offers None, Joint bilateral, À-trous, temporal diffuse SVGF and optional OIDN neural denoising for either 2D or 3D. OIDN provides Fast/Balanced/High quality and CPU/GPU preferences through Neural denoising settings. Install its optional runtime with `python3 eng/install-oidn.py`, then rebuild/restart. Native vendor SDKs without integrations remain unavailable; see [denoising capabilities and costs](docs/Rendering.md#optional-path-denoising).
 
 ```sh
-dotnet run --project tests/Radiant.Scenes -c Release -- triangles
+dotnet run --project tests/Radiant.3D -c Release
 ```
 
-| Control | Action |
-| --- | --- |
-| Mouse movement | Move the mouse light |
-| Left mouse button / drag | Paint rainbow lights |
-| Right mouse button / drag | Paint black blockers |
-| Space | Pause or resume orbiting lights |
-| F11 | Cycle Bilinear, UDR1, UDR2, and UDR3 upscaling |
-| X | Add 100,000 small random lights for a stress test |
-| Escape | Exit |
+Left/right orbit within the open front of the room; up/down zoom. **R** switches renderers. **Tab** cycles final output and geometry buffers. **F1** opens Metrics, the 3D pipeline and the View menu with shared Color Management and Antialiasing windows, and the framework ECS inspection tools.
 
-## Quick start
+The [3D sample](src/com.radiant.engine/tests/3D/CornellBoxScene.cs) uses `Transform3D`, `Mesh3D`, and `Camera3D` components with a `Geometry3D` system. The [3D pipeline notes](docs/3D.md) describe its outputs and extension points.
 
-Use the **.NET 8 SDK or newer**, a Vulkan-capable GPU and driver, and a graphical desktop session. The projects target `net8.0` and allow newer installed runtimes through `RollForward=Major`. Linux also needs the Vulkan loader and SDL2 dependencies.
+## MegaLights
 
-Run these commands from the repository root:
+Orbiting lights, translucent obstacles, and a light that follows your mouse. Paint more lights or blockers and try the different upscalers.
+
+![MegaLights: colored lights around nested triangles and columns of occluders](docs/images/MegaLightsScene-resized.png)
+
+## Run it
+
+You'll need the **.NET 8 SDK or newer**, a Vulkan-capable GPU and driver, and a desktop session. On Linux, install the Vulkan loader and SDL2 dependencies too.
 
 ```sh
 dotnet build radiant.sln -c Release
 dotnet run --project tests/Radiant.Scenes -c Release --no-build -- triangles
 ```
 
-The first build restores NuGet packages and the local MGCB tool, then compiles the engine's shaders and content. MonoGame supplies the native runtime and shader compiler through NuGet; Wine is not required. The project references MonoGame **3.8.6 DesktopVK** runtimes for Linux, Windows, and macOS. The captures below were validated on Linux; they are not evidence of testing on every platform.
+The first build restores dependencies and compiles shaders and content.
 
-`radiant.csproj` builds the engine library. `tests/Radiant.Scenes` builds the executable scene runner; running the library project directly will not launch a window.
+| Control | Action |
+| --- | --- |
+| Mouse | Move the light |
+| Left click / drag | Paint rainbow lights |
+| Right click / drag | Paint blockers |
+| Space | Pause or resume orbiting lights |
+| F1 | Toggle the inspector |
+| F11 | Cycle upscalers: Bilinear, UDR1, UDR2, UDR3, UDR4 |
+| X | Add 100,000 lights for a stress test |
+| Escape | Exit |
 
-## Simple lighting reference
+## Simple lighting
 
-![SimpleLightScene: a warm orange light and its radiance falloff against a dark background](docs/images/SimpleLightScene-resized.png)
+One warm light. A small example to start from.
 
-`SimpleLightScene` is the smallest lighting example: one warm emissive circle rendered through `Geometry → HRCGI → Bilinear`. It is useful for checking shader loading, light initialization, and resizing before working with a larger scene.
+![Simple lighting: a warm orange light against a dark background](docs/images/SimpleLightScene-resized.png)
 
 ```sh
 dotnet run --project tests/Radiant.Scenes -c Release -- lights
 ```
 
-Both demos keep geometry proportional through resizing, and HRC computes lighting in isotropic screen pixels. The [HRC implementation notes](docs/HRC.md) explain the viewport fix and numerical regression checks.
+## Modular 2D rendering
 
-Both images are actual scene-render-target captures from the Vulkan smoke tests, at **1024 × 640 after resizing**. They are not mockups or full desktop screenshots.
+The same flat/raster/path tracing choices, AA and tonemappers also work with compact 2D components:
 
-## What the engine provides
-
-| Area | Implementation |
-| --- | --- |
-| Entity model | Archetype ECS, component queries, spatial lookups, and scene-owned systems |
-| Geometry | Instanced rectangles, circles, and triangles with emissive and absorption materials |
-| Lighting | Holographic Radiance Cascades (HRCGI) |
-| Upscaling | Bilinear and UDR1 / UDR2 / UDR3 implementations |
-| Runtime | Window hosting, update/fixed-update/render hooks, resize handling, and resource disposal |
-| Development tools | Inspector, gizmos, and performance monitoring systems |
-| Supporting systems | Procedural world generation, tile rendering, and networking code |
-
-Scenes select and register their systems explicitly. See [SimpleLightScene.cs](src/com.radiant.engine/tests/2D/SimpleLightScene.cs) for a small example and [MegaLightsScene.cs](src/com.radiant.engine/tests/2D/MegaLightsScene.cs) for interactive lighting and upscaler switching.
-
-## Use Radiant in a game
-
-For a sibling game repository, import the shared desktop settings and reference the engine:
-
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../radiant-game-engine/eng/Radiant.Desktop.props" />
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../radiant-game-engine/radiant.csproj" />
-  </ItemGroup>
-</Project>
+```sh
+dotnet run --project tests/Radiant.Scenes -c Release -- rendering2d
 ```
 
-A minimal `Program.cs` can define and launch a lighting scene:
+R switches renderers; F1 opens the pipeline controls. View → Color Management and View → Antialiasing expose the same optional settings windows as 3D. Geometry AA supports MSAA and SSAA; post AA supports FXAA, SMAA and TAA. Exposure works with or without a tonemapper. A 2D-only game does not need 3D entity components or 3D systems. See [rendering architecture, API composition and migration](docs/Rendering.md).
 
-```csharp
-using com.radiant.engine.bundle;
-using com.radiant.engine.core;
-using com.radiant.engine.runtime;
-using Microsoft.Xna.Framework;
+## Build a game
 
-new GameClient().Run(new MyScene(), new WindowOptions
-{
-    Title = "My Radiant game",
-    Width = 1280,
-    Height = 720
-});
+Reference [`radiant.csproj`](radiant.csproj) and import [`eng/Radiant.Desktop.props`](eng/Radiant.Desktop.props) in your game project. Start with [SimpleLightScene.cs](src/com.radiant.engine/tests/2D/SimpleLightScene.cs) for scene setup, or [MegaLightsScene.cs](src/com.radiant.engine/tests/2D/MegaLightsScene.cs) for input and upscaling.
 
-sealed class MyScene : Scene
-{
-    private HRCGI lighting;
-    private Bilinear upscale;
+[raytracing-pacman](https://github.com/lestercorderomurillo/raytracing-pacman) is a game built with Radiant. For the lighting internals, see the [HRC implementation notes](docs/HRC.md).
 
-    public override void SetupECS()
-    {
-        ECS.AddSystem<Geometry>();
-        lighting = ECS.AddSystem<HRCGI>();
-        upscale = ECS.AddSystem<Bilinear>();
-        base.SetupECS();
-    }
+## Tests
 
-    public override void SetupScene()
-    {
-        LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2,
-            100f, Color.Orange, Color.Orange, 0f);
-        upscale.SetInputSource(lighting.GetOutput);
-        base.SetupScene();
-    }
-}
-```
-
-Register systems before calling `base.SetupECS()`, which initializes them. Create entities in `SetupScene()`. Override `Update()`, `FixedUpdate()`, `Render()`, or `LateRender()` for scene behavior; `ECS`, `Renderer`, and `DeltaTime` are available on the scene. The game loop owns and disposes the active scene and renderer.
-
-Use `Renderer.FitWorld(center, size)` to keep a world area centered and fully visible through window resizing while preserving its proportions. Shapes and coordinate conversions follow the fitted view; use `Renderer.WorldTransform` for world-space sprites.
-
-Games with their own content add a `MonoGameContentReference` and a local MGCB tool manifest matching the engine version. Engine shaders, fonts, and inspector icons flow through the project reference into build and publish output. Content is resolved relative to the executable, so published applications can launch from another working directory.
-
-## Tests and screenshot capture
-
-The headless checks need no display or GPU:
+Headless checks:
 
 ```sh
 dotnet run --project tests/Radiant.Tests -c Release
 ```
 
-They verify 2,048 generated tiles, component data after archetype migration, spatial lookups, light creation, and the portable timer lifecycle. This project is an executable check suite, so run it with `dotnet run`.
-
-Capture and validate the featured scenes with a display and Vulkan available:
+Rendering checks require a desktop session and Vulkan:
 
 ```sh
 dotnet run --project tests/Radiant.Scenes -c Release -- triangles --smoke
@@ -147,41 +86,36 @@ dotnet run --project tests/Radiant.Scenes -c Release -- lights --smoke
 dotnet run --project tests/Radiant.Scenes -c Release -- --lighting-regression
 ```
 
-Each smoke run loads real content, renders **90 frames**, captures frame 10 at **960 × 540**, resizes the window, captures frame 90 at **1024 × 640**, checks the renderer dimensions and nonempty pixels, and exits. A failed assertion terminates the process with an error. The scene smoke runs are basic rendering checks. The separate lighting regression measures radial symmetry in linear GPU output across rectangular and square viewports, render scales, probe qualities, opaque shadows, and colored transmission; see [HRC validation](docs/HRC.md#validation).
+Smoke tests render each scene, check resizing, and save screenshots to `artifacts/smoke/`. See [HRC validation](docs/HRC.md#validation) for the lighting regression checks.
 
-| Scene | Captures under `artifacts/smoke/` |
-| --- | --- |
-| MegaLights | `MegaLightsScene-initial.png`, `MegaLightsScene-resized.png` |
-| Simple lighting | `SimpleLightScene-initial.png`, `SimpleLightScene-resized.png` |
-
-The output path is relative to the working directory. `artifacts/` is ignored by Git; README images are retained separately under `docs/images/`. To refresh the gallery after successful smoke runs:
+3D rendering and buffer regression checks (desktop/Vulkan):
 
 ```sh
-mkdir -p docs/images
-cp artifacts/smoke/MegaLightsScene-resized.png docs/images/
-cp artifacts/smoke/SimpleLightScene-resized.png docs/images/
+dotnet run --project tests/Radiant.3D -c Release -- --smoke
+dotnet run --project tests/Radiant.3D -c Release -- --regression
 ```
 
-Linux CI builds the solution and shaders and runs the headless checks. Graphical smoke tests run locally and require a desktop session. Captures checked on **October 21, 2026**, using an **AMD Radeon RX 9070 XT** with RADV on Linux.
+Modular rendering and denoising regressions (2D and 3D):
 
-## Repository map
+```sh
+dotnet run --project tests/Radiant.3D -c Release -- --pipeline-regression
+dotnet run --project tests/Radiant.3D -c Release -- --pipeline-regression --2d
+dotnet run --project tests/Radiant.3D -c Release -- --advanced-denoising-regression
+dotnet run --project tests/Radiant.3D -c Release -- --advanced-denoising-regression --2d
+```
 
-| Path | Purpose |
-| --- | --- |
-| [`src/com.radiant.engine/core`](src/com.radiant.engine/core) | ECS, scenes, rendering primitives, and resource management |
-| [`src/com.radiant.engine/bundle`](src/com.radiant.engine/bundle) | Components and reusable rendering, lighting, world, and UI systems |
-| [`src/com.radiant.engine/runtime`](src/com.radiant.engine/runtime) | Game client, window, and game loop |
-| [`src/com.radiant.engine/mplay`](src/com.radiant.engine/mplay) | Networking code |
-| [`Content`](Content) | Shared shaders, Inter fonts, and inspector icons |
-| [`src/com.radiant.engine/tests/2D`](src/com.radiant.engine/tests/2D) | Demo scene implementations, excluded from the engine library |
-| [`tests`](tests) | Headless checks, graphical runner, and shared smoke harness |
-| [`eng/Radiant.Desktop.props`](eng/Radiant.Desktop.props) | Framework, MonoGame version, backend, and content build settings |
-| [`docs/images`](docs/images) | Captured scene images used in this README |
+AA and stationary raster visibility checks:
 
-## Development notes
+```sh
+dotnet run --project tests/Radiant.3D -c Release -- --raster-stability
+dotnet run --project tests/Radiant.3D -c Release -- --aa-regression
+dotnet run --project tests/Radiant.3D -c Release -- --aa-regression --2d
+```
 
-Open the folder in VS Code to load `radiant.sln` through C# Dev Kit. **Ctrl+Shift+B** builds the solution. Existing F5 launch configurations are in [`.vscode/launch.json`](.vscode/launch.json); the commands above also launch scenes directly.
+Capture the 3D showcase at 1280×720 after 128 progressive samples (desktop/Vulkan):
 
-Shader profiles are `vs_6_0` / `ps_6_0`, with `SV_Target` pixel outputs. DesktopVK currently permits one constant buffer per effect. Keep MonoGame package versions and [`.config/dotnet-tools.json`](.config/dotnet-tools.json) aligned. MGCB validates `.fx` shaders during content builds.
+```sh
+dotnet run --project tests/Radiant.3D -c Release -- --capture
+```
 
-If a graphical run fails, first check that it is running in a graphical session with a working Vulkan driver. If shaders or content are missing, rebuild the solution and check MGCB output. The headless checks can run independently of graphics initialization.
+The unedited final frame is saved to `artifacts/showcase/cornell-box.png`.

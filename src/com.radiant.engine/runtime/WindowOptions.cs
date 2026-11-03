@@ -6,4 +6,5 @@ public sealed class WindowOptions
     public string Title { get; init; } = "Radiant";
     public int Width { get; init; } = 1280;
     public int Height { get; init; } = 720;
+    public bool Maximized { get; init; }
 }

@@ -23,6 +23,8 @@ sealed class LightingRegressionWindow : Window
     private int Frame;
     private int CaseIndex;
     private int BlockerCase = -1;
+    private int CalibrationCase = -1;
+    private static readonly Color[] CalibrationColors = [Color.White, new Color(128, 64, 192), Color.Black];
 
     public LightingRegressionWindow()
         : base(new GameLoop(), new() { Title = "HRC lighting regression", Width = 960, Height = 540 })
@@ -37,13 +39,26 @@ sealed class LightingRegressionWindow : Window
         base.Draw(gameTime);
         if (++Frame % 8 != 0) return;
 
+        if (CalibrationCase >= 0)
+        {
+            CheckCalibration();
+            if (++CalibrationCase == CalibrationColors.Length * 4)
+            {
+                Console.WriteLine("PASS: HRC radial symmetry, output resolution, resize, all render/probe qualities, four shadow directions, RGB transmission, and absolute radiance calibration.");
+                Exit();
+            }
+            else
+                SetCalibration();
+            return;
+        }
+
         if (BlockerCase >= 0)
         {
             CheckBlocker();
             if (++BlockerCase == 5)
             {
-                Console.WriteLine("PASS: HRC radial symmetry, output resolution, resize, all render/probe qualities, four shadow directions, and RGB transmission.");
-                Exit();
+                CalibrationCase = 0;
+                SetCalibration();
             }
             else
                 Scene.SetBlocker(BlockerCase);
@@ -63,11 +78,45 @@ sealed class LightingRegressionWindow : Window
         GraphicsDeviceManager.PreferredBackBufferHeight = testCase.height;
         GraphicsDeviceManager.ApplyChanges();
         UDRQuality.Set(testCase.quality);
+        SetProbeQuality(testCase.probeQuality);
+    }
+
+    private void SetProbeQuality(int quality)
+    {
         var inspector = Scene.ECS.GetSystem<Inspector>();
         var windows = (Dictionary<string, WindowData>)typeof(Inspector)
             .GetField("Windows", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(inspector);
         var window = windows["hrcgi"];
-        window.Widgets[window.WidgetIndex["quality"]].DropdownCallback(testCase.probeQuality);
+        window.Widgets[window.WidgetIndex["quality"]].DropdownCallback(quality);
+    }
+
+    private void SetCalibration()
+    {
+        SetProbeQuality(CalibrationCase % 4);
+        Scene.SetCalibration(CalibrationColors[CalibrationCase / 4]);
+    }
+
+    private void CheckCalibration()
+    {
+        // A uniform opaque emitting medium has the same radiance in every
+        // direction. Its angular mean must equal its linear emission, not pi/2
+        // times that emission. Include black to catch stale merge contents.
+        var color = CalibrationColors[CalibrationCase / 4].ToVector3();
+        var expected = new Vector3(MathF.Pow(color.X, 2.2f), MathF.Pow(color.Y, 2.2f), MathF.Pow(color.Z, 2.2f));
+        var target = Scene.ECS.GetSystem<HRCGI>().GetOutput();
+        var pixels = new HalfVector4[target.Width * target.Height];
+        target.GetData(pixels);
+        float maximumError = 0;
+        for (int y = 4; y <= 6; y++)
+            for (int x = 4; x <= 6; x++)
+            {
+                var pixel = pixels[(target.Height * y / 10) * target.Width + target.Width * x / 10].ToVector4();
+                var error = new Vector3(pixel.X, pixel.Y, pixel.Z) - expected;
+                maximumError = MathF.Max(maximumError, MathF.Max(MathF.Abs(error.X), MathF.Max(MathF.Abs(error.Y), MathF.Abs(error.Z))));
+            }
+        if (!float.IsFinite(maximumError) || maximumError > 0.005f)
+            throw new Exception($"HRC radiance normalization failed: case {CalibrationCase}, expected {expected}, maximum error {maximumError}.");
+        Console.WriteLine($"PASS calibration {CalibrationCase}: expected {expected}, maximum error {maximumError:F6}.");
     }
 
     private void CheckBlocker()
@@ -156,6 +205,7 @@ sealed class LightingReferenceScene : Scene
     private HRCGI Lighting;
     private Bilinear Upscaler;
     private int Blocker;
+    public void SetCalibration(Color emission) => ECS.GetSystem<UniformLightingInput>().Emission = emission;
 
     public static Vector2 BlockerDirection(int index) => (index % 4) switch
     {
@@ -170,7 +220,7 @@ sealed class LightingReferenceScene : Scene
         if (index == 0)
         {
             Blocker = ECS.CreateEntity();
-            ECS.AddComponent<Transform>(Blocker);
+            ECS.AddComponent<Transform2D>(Blocker);
             ECS.AddComponent<Rectangle2D>(Blocker);
             ECS.AddComponent<Material>(Blocker);
         }
@@ -178,7 +228,8 @@ sealed class LightingReferenceScene : Scene
         var direction = BlockerDirection(index);
         var size = direction.X != 0 ? new Vector2(80, 600) : new Vector2(600, 80);
         ECS.GetComponent<Rectangle2D>(Blocker).Size = size;
-        ECS.GetComponent<Transform>(Blocker).Position = new Vector3(Renderer.VirtualSize / 2 + direction * 300 - size / 2, 1);
+        ECS.GetComponent<Transform2D>(Blocker).Position = Renderer.VirtualSize / 2 + direction * 300 - size / 2;
+        ECS.GetComponent<Transform2D>(Blocker).Layer = 1;
         ECS.GetComponent<Material>(Blocker).Albedo = index == 4 ? Color.Lime : Color.Black;
         ECS.GetComponent<Material>(Blocker).Emissive = Color.Black;
     }
@@ -187,6 +238,7 @@ sealed class LightingReferenceScene : Scene
     {
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<Geometry>();
+        ECS.AddSystem<UniformLightingInput>();
         Lighting = ECS.AddSystem<HRCGI>();
         Upscaler = ECS.AddSystem<Bilinear>();
         base.SetupECS();
@@ -198,5 +250,24 @@ sealed class LightingReferenceScene : Scene
         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, Radius, Color.Black, Color.White, 0);
         Upscaler.SetInputSource(Lighting.GetOutput);
         base.SetupScene();
+    }
+}
+
+// Supply independently controlled emission and absorption for absolute calibration;
+// scene materials normally couple the two for colored emitters.
+[RunAfter(typeof(Geometry))]
+[RunBefore(typeof(HRCGI))]
+sealed class UniformLightingInput : com.radiant.engine.core.System
+{
+    public Color? Emission;
+
+    public override void Update()
+    {
+        if (Emission is not Color emission) return;
+        var geometry = Scene.ECS.GetSystem<Geometry>();
+        Renderer.PushTargets();
+        Renderer.SetTarget(geometry.EmissiveTexture).Clear(emission);
+        Renderer.SetTarget(geometry.AbsorptionTexture).Clear(Color.White);
+        Renderer.PopTargets();
     }
 }

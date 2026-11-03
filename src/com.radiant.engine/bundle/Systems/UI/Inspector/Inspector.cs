@@ -98,8 +98,12 @@ public partial class Inspector : core.System
     }
 
     /// <summary> Creates a new window. LayoutOrder controls auto-position column order. </summary>
-    public static void CreateWindow(string Id, string Title, int LayoutOrder = 100, bool AutoPosition = true, bool Visible = true)
-        => Instance?.CreateWindowInternal(Id, Title, LayoutOrder, AutoPosition, Visible);
+    public static void CreateWindow(string Id, string Title, int LayoutOrder = 100, bool AutoPosition = true, bool Visible = true, WindowCategory Category = WindowCategory.System)
+        => Instance?.CreateWindowInternal(Id, Title, LayoutOrder, AutoPosition, Visible, Category);
+
+    /// <summary> Creates a scene window listed below system tools in View. </summary>
+    public static void CreateSceneWindow(string Id, string Title, int LayoutOrder = 100, bool AutoPosition = true, bool Visible = true)
+        => CreateWindow(Id, Title, LayoutOrder, AutoPosition, Visible, WindowCategory.Scene);
 
     /// <summary> Destroys a window and all its widgets. </summary>
     public static void DestroyWindow(string Id)
@@ -210,15 +214,16 @@ public partial class Inspector : core.System
         => Instance?.SetDropdownOptionsInternal(WindowId, WidgetId, Options);
 
     /// <summary> Returns true if the mouse is over any Inspector window or popup. </summary>
-    public static bool IsMouseOverUI() => Instance?.MouseOverUI ?? false;
+    public static bool IsMouseOverUI() => Instance?.GlobalVisible == true && Instance.MouseOverUI;
 
-    private void CreateWindowInternal(string Id, string Title, int LayoutOrder, bool AutoPosition = true, bool Visible = true)
+    private void CreateWindowInternal(string Id, string Title, int LayoutOrder, bool AutoPosition, bool Visible, WindowCategory Category)
     {
         if (Windows.ContainsKey(Id)) return;
         var window = new WindowData
         {
             Id = Id,
             Title = Title,
+            Category = Category,
             Position = Vector2.Zero,
             Size = new Vector2(DefaultWindowWidth, 0),
             Visible = Visible,
@@ -237,6 +242,7 @@ public partial class Inspector : core.System
     private void DestroyWindowInternal(string Id)
     {
         if (!Windows.TryGetValue(Id, out var window)) return;
+        if (FocusedTextInputWindowId == Id) ClearTextInputFocus();
         Windows.Remove(Id);
         RenderOrder.Remove(window);
         RebuildViewMenu();
@@ -247,6 +253,7 @@ public partial class Inspector : core.System
         if (Windows.TryGetValue(Id, out var window))
         {
             window.Visible = Visible;
+            if (!Visible && FocusedTextInputWindowId == Id) ClearTextInputFocus();
             if (Visible)
             {
                 BringToFront(window);
@@ -258,14 +265,7 @@ public partial class Inspector : core.System
     private void ToggleWindowInternal(string Id)
     {
         if (Windows.TryGetValue(Id, out var window))
-        {
-            window.Visible = !window.Visible;
-            if (window.Visible)
-            {
-                BringToFront(window);
-                PlaceNewWindow(window);
-            }
-        }
+            SetWindowVisible(Id, !window.Visible);
     }
 
     private bool IsWindowVisibleInternal(string Id)
@@ -521,14 +521,16 @@ public partial class Inspector : core.System
 
     private void OnTextInput(object Sender, TextInputEventArgs Args)
     {
-        if (FocusedTextInputWindowId == null) return;
+        if (!GlobalVisible || FocusedTextInputWindowId == null) return;
         if (!Windows.TryGetValue(FocusedTextInputWindowId, out var window)) return;
+        if (!window.Visible) return;
         if (!window.WidgetIndex.TryGetValue(FocusedTextInputWidgetId, out int index)) return;
 
         var widget = window.Widgets[index];
         string value = widget.TextInputValue ?? "";
         int cursor = Math.Clamp(widget.TextInputCursor, 0, value.Length);
         char character = Args.Character;
+        if (widget.TextInputSelectAll && (character >= ' ' || character == '\b' || character == 127)) { value = ""; cursor = 0; widget.TextInputSelectAll = false; }
 
         if (character == '\b')
         {
@@ -549,6 +551,7 @@ public partial class Inspector : core.System
             widget.TextInputValue = value;
             widget.TextInputCursor = cursor;
             window.Widgets[index] = widget;
+            ClearTextInputFocus();
             return;
         }
         else if (character == '\t' || character == '\x1b')
@@ -588,20 +591,21 @@ public partial class Inspector : core.System
 
         UpdateSystemsInspector();
         UpdateEntityInspector();
+        UpdateProperties();
+        UpdateCameraNavigation();
 
         var keyboard = Microsoft.Xna.Framework.Input.Keyboard.GetState();
         if (keyboard.IsKeyDown(Keys.F1) && PrevKeyState.IsKeyUp(Keys.F1))
         {
             GlobalVisible = !GlobalVisible;
-            if (!GlobalVisible) CloseMenuDropdown();
+            if (!GlobalVisible) { CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
         }
-        PrevKeyState = keyboard;
-
         if (!GlobalVisible)
-            return;
+        { PrevKeyState = keyboard; return; }
 
         CursorBlinkTimer += (float)(GameTime?.ElapsedGameTime.TotalSeconds ?? 0.016);
         UpdateTextInputKeys(keyboard);
+        PrevKeyState = keyboard;
 
         var currentMouse = Mouse.GetState();
         var virtualMouse = ScreenToVirtual(new Vector2(currentMouse.X, currentMouse.Y));
@@ -778,7 +782,7 @@ public partial class Inspector : core.System
                 {
                     if (window.CloseBounds.Contains((int)virtualMouse.X, (int)virtualMouse.Y))
                     {
-                        window.Visible = false;
+                        SetWindowVisible(window.Id, false);
                         break;
                     }
 
@@ -838,6 +842,8 @@ public partial class Inspector : core.System
         string value = widget.TextInputValue ?? "";
         int cursor = Math.Clamp(widget.TextInputCursor, 0, value.Length);
         bool changed = false;
+        if ((Keyboard.IsKeyDown(Keys.LeftControl) || Keyboard.IsKeyDown(Keys.RightControl)) && Keyboard.IsKeyDown(Keys.A) && PrevKeyState.IsKeyUp(Keys.A))
+        { widget.TextInputSelectAll = true; window.Widgets[index] = widget; }
 
         if (Keyboard.IsKeyDown(Keys.Left) && PrevKeyState.IsKeyUp(Keys.Left) && cursor > 0)
         { cursor--; changed = true; }
@@ -850,6 +856,7 @@ public partial class Inspector : core.System
 
         if (changed)
         {
+            widget.TextInputSelectAll = false;
             widget.TextInputCursor = cursor;
             window.Widgets[index] = widget;
             CursorBlinkTimer = 0;

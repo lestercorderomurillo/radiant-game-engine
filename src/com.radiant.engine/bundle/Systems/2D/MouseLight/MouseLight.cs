@@ -28,7 +28,8 @@ public class MouseLight : core.System
         var mouse = Mouse.GetState();
         var worldPos = Renderer.ScreenToWorld(new Vector2(mouse.X, mouse.Y));
 
-        ref var transform = ref Scene.ECS.GetComponent<Transform>(EntityId);
-        transform.Position = new Vector3(worldPos, Z);
+        ref var transform = ref Scene.ECS.GetComponent<Transform2D>(EntityId);
+        transform.Position = worldPos;
+        transform.Layer = Z;
     }
 }

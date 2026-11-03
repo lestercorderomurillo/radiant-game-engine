@@ -7,6 +7,7 @@ SamplerState Sampler0 : register(s0);
 
 float2 WorldSize;
 float2 ViewSize;
+float2 OutputJitter;
 
 struct VertexShaderInput
 {
@@ -31,7 +32,7 @@ PixelShaderInput MainVS(VertexShaderInput input)
 float4 MainPS(PixelShaderInput input) : SV_Target0
 {
     // Crop the padded cascade grid back to the viewport using the same pixel metric.
-    float2 uv = input.UV * ViewSize / WorldSize;
+    float2 uv = (input.UV * ViewSize + OutputJitter) / WorldSize;
     float2 pixel = float2(1.0, 0.0) / WorldSize;
 
     float2 offset0 = uv + pixel.xy;
@@ -46,7 +47,10 @@ float4 MainPS(PixelShaderInput input) : SV_Target0
 
     float3 radiance = r0 + r1 + r2 + r3;
 
-    return float4(radiance / 4.0, 1.0);
+    // Cone weights integrate radians across all four quadrants. Divide by the
+    // full angular measure, not the number of quadrants, to return mean radiance.
+    // A uniform opaque emitter of linear radiance 1 must therefore return 1.
+    return float4(radiance / 6.283185307179586, 1.0);
 }
 
 technique GenerateOutputTexture

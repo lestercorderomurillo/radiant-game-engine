@@ -306,7 +306,7 @@ public class Tileset : core.System
             ref var m = ref Scene.ECS.GetComponent<Material>(id);
             if (m.Albedo.A == 0) continue;
 
-            ref var t = ref Scene.ECS.GetComponent<Transform>(id);
+            ref var t = ref Scene.ECS.GetComponent<Transform2D>(id);
             ref var r = ref Scene.ECS.GetComponent<Rectangle2D>(id);
 
             // World to render target: subtract grid origin

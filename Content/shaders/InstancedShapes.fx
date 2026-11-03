@@ -14,6 +14,7 @@ struct VSInput
     float2 InstanceSize : TEXCOORD2;
     float4 InstanceColor : COLOR1;
     float InstanceType : TEXCOORD3;
+    float2 InstanceMotion : TEXCOORD4;
 };
 
 struct PSInput
@@ -22,6 +23,7 @@ struct PSInput
     float2 UV : TEXCOORD0;
     float4 Color : COLOR0;
     float Type : TEXCOORD1;
+    float2 Motion : TEXCOORD2;
 };
 
 PSInput MainVS(VSInput input)
@@ -35,6 +37,7 @@ PSInput MainVS(VSInput input)
     output.UV = input.UV;
     output.Color = input.InstanceColor;
     output.Type = input.InstanceType;
+    output.Motion = input.InstanceMotion;
 
     return output;
 }
@@ -142,6 +145,22 @@ float4 SharpPS(PSInput input) : SV_Target
     float4 color = input.Color;
     color.rgb *= color.a;
     return color;
+}
+
+float4 MotionPS(PSInput input) : SV_Target
+{
+    // Use the same silhouette as the sharp geometry pass, without Color quantization.
+    SharpPS(input);
+    return float4(input.Motion, 0, 1);
+}
+
+technique Motion
+{
+    pass P0
+    {
+        VertexShader = compile vs_6_0 MainVS();
+        PixelShader = compile ps_6_0 MotionPS();
+    }
 }
 
 technique Default

@@ -79,3 +79,5 @@ packages/
 *.nupkg
 lib/
 **/runtimes/
+# Optional official OIDN runtime installed by eng/install-oidn.py
+/Native/oidn/

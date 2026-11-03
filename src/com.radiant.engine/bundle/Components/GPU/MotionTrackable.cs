@@ -13,18 +13,18 @@ public struct MotionTrackable : Component
 {
     private const int MaxHistory = 4;
 
-    private Vector3 Pos0, Pos1, Pos2, Pos3;
+    private Vector2 Pos0, Pos1, Pos2, Pos3;
     private int Head;
     private int HistoryCount;
 
     public MotionTrackable()
     {
-        Pos0 = Pos1 = Pos2 = Pos3 = Vector3.Zero;
+        Pos0 = Pos1 = Pos2 = Pos3 = Vector2.Zero;
         Head = 0;
         HistoryCount = 0;
     }
 
-    public void Push(Vector3 position)
+    public void Push(Vector2 position)
     {
         switch (Head)
         {
@@ -38,7 +38,7 @@ public struct MotionTrackable : Component
         if (HistoryCount < MaxHistory) HistoryCount++;
     }
 
-    public readonly Vector2 CalculateVelocity(Vector3 currentPos, int historyFrames)
+    public readonly Vector2 CalculateVelocity(Vector2 currentPos, int historyFrames)
     {
         if (HistoryCount == 0) return Vector2.Zero;
 
@@ -49,12 +49,12 @@ public struct MotionTrackable : Component
         float totalWeight = 0;
 
         int start = (Head - HistoryCount + MaxHistory) % MaxHistory;
-        Vector3 prev = GetAt(start);
+        Vector2 prev = GetAt(start);
 
         for (int i = 1; i < framesToUse; i++)
         {
             int idx = (start + i) % MaxHistory;
-            Vector3 pos = GetAt(idx);
+            Vector2 pos = GetAt(idx);
 
             float weight = i;
             weightedVelocity.X += (pos.X - prev.X) * weight;
@@ -71,7 +71,16 @@ public struct MotionTrackable : Component
         return totalWeight > 0 ? weightedVelocity / totalWeight : Vector2.Zero;
     }
 
-    private readonly Vector3 GetAt(int idx)
+    /// <summary>Displacement between consecutive rounded positions actually used by Geometry.</summary>
+    public readonly Vector2 RenderedDisplacement(Vector2 currentPosition)
+    {
+        if (HistoryCount == 0) return Vector2.Zero;
+        Vector2 previous = GetAt((Head - 1 + MaxHistory) % MaxHistory);
+        return new Vector2(MathF.Round(currentPosition.X) - MathF.Round(previous.X),
+            MathF.Round(currentPosition.Y) - MathF.Round(previous.Y));
+    }
+
+    private readonly Vector2 GetAt(int idx)
     {
         return idx switch
         {
@@ -79,7 +88,7 @@ public struct MotionTrackable : Component
             1 => Pos1,
             2 => Pos2,
             3 => Pos3,
-            _ => Vector3.Zero
+            _ => Vector2.Zero
         };
     }
 }

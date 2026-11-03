@@ -36,6 +36,8 @@ public struct Widget
     public string TextInputPlaceholder;
     public Action<string> TextInputCallback;
     public int TextInputCursor;
+    public bool TextInputSelectAll;
+    public bool TextInputNumeric;
 
     public int ListBoxHeight;
     public string[] ListBoxItems;
@@ -59,7 +61,7 @@ public struct InspectorTheme
 }
 
 /// <summary> Type of menu bar item. </summary>
-public enum MenuItemType { Action, Toggle }
+public enum MenuItemType { Action, Toggle, Separator }
 
 /// <summary> A single item inside a menu bar dropdown. </summary>
 public struct MenuItem
@@ -81,11 +83,15 @@ public class MenuData
     public Rectangle HeaderBounds;
 }
 
+/// <summary> Grouping in View: system tools first, then scene windows below a separator. </summary>
+public enum WindowCategory { System, Scene }
+
 /// <summary> Runtime state for a single Inspector window. </summary>
 public class WindowData
 {
     public string Id;
     public string Title;
+    public WindowCategory Category;
     public Vector2 Position;
     public Vector2 Size;
     public bool Visible;

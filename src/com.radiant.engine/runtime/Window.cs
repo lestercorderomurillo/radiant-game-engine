@@ -17,10 +17,12 @@ public class Window : Game
     public SpriteBatch SpriteBatch;
 
     public bool ResizePending { get; private set; }
+    private bool MaximizeOnShow;
 
     public Window(GameLoop gameLoop, WindowOptions Options = null)
     {
         Options ??= new WindowOptions();
+        MaximizeOnShow = Options.Maximized;
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Height);
         BuildNumber = typeof(Window).Assembly.GetName().Version?.Build ?? 0;
@@ -100,6 +102,7 @@ public class Window : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        if (MaximizeOnShow) { NativeWindow.Maximize(Window.Handle); MaximizeOnShow = false; }
         GameLoop.GameTime = gameTime;
         GameLoop.Render();
     }

@@ -16,4 +16,5 @@ public struct Camera2D : Component
         Zoom = 1f;
         Rotation = 0f;
     }
+    public readonly Camera2D WithTransform(in Transform2D transform) => new() { Position = transform.Position, Rotation = transform.Rotation, Zoom = Zoom };
 }

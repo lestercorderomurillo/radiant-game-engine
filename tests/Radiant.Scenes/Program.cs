@@ -5,6 +5,29 @@ using com.radiant.engine.runtime;
 using Radiant.Testing;
 using Microsoft.Xna.Framework;
 
+if (Array.IndexOf(args, "--color-pipeline") >= 0)
+{
+    using var window = new ColorPipelineRegressionWindow();
+    window.Run();
+    return;
+}
+
+if (Array.IndexOf(args, "--udr4-regression") >= 0)
+{
+    using var window = new UDR4RegressionWindow();
+    window.Run();
+    return;
+}
+
+if (args.Length >= 2 && args[0] == "--lighting-captures")
+{
+    Scene captureScene = args.Length > 2 && args[2] == "triangles"
+        ? new FrozenMegaLightsScene() : new LightingReferenceScene();
+    using var window = new LightingCaptureWindow(captureScene, args[1]);
+    window.Run();
+    return;
+}
+
 if (Array.IndexOf(args, "--lighting-regression") >= 0)
 {
     using var window = new LightingRegressionWindow();
@@ -13,9 +36,10 @@ if (Array.IndexOf(args, "--lighting-regression") >= 0)
 }
 
 Scene Scene = args.Length == 0 || args[0] == "lights" ? new SimpleLightScene()
+    : args[0] == "rendering2d" ? new Rendering2DScene()
     : args[0] == "tiles" ? new TilesetScene()
     : args[0] == "triangles" ? new MegaLightsScene()
-    : throw new ArgumentException("Choose a test scene: lights, tiles, or triangles.");
+    : throw new ArgumentException("Choose a test scene: lights, tiles, triangles, or rendering2d.");
 if (args.Length > 1 && args[1] == "--smoke")
 {
     using var Window = new SmokeWindow(Scene, "artifacts/smoke", (ActiveScene, Frame) =>

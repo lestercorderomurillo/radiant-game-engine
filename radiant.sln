@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.Scenes", "tests\Rad
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.Tests", "tests\Radiant.Tests\Radiant.Tests.csproj", "{E1D18641-3A96-4655-BC7E-781B3D29B20C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.3D", "tests\Radiant.3D\Radiant.3D.csproj", "{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,18 @@ Global
 		{E1D18641-3A96-4655-BC7E-781B3D29B20C}.Release|x64.Build.0 = Release|Any CPU
 		{E1D18641-3A96-4655-BC7E-781B3D29B20C}.Release|x86.ActiveCfg = Release|Any CPU
 		{E1D18641-3A96-4655-BC7E-781B3D29B20C}.Release|x86.Build.0 = Release|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Debug|x64.Build.0 = Debug|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Debug|x86.Build.0 = Debug|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Release|x64.ActiveCfg = Release|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Release|x64.Build.0 = Release|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Release|x86.ActiveCfg = Release|Any CPU
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -64,6 +78,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{387BDB58-C810-46B2-8921-B8BAE5D8F090} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{E1D18641-3A96-4655-BC7E-781B3D29B20C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{7BE74AC2-3DE2-4725-87CE-7DE1ACF71C4D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0F0046A9-614D-4876-A213-C14238FBA206}

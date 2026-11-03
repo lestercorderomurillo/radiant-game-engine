@@ -366,9 +366,15 @@ public partial class Renderer : IDisposable
     /// </summary>
     public RenderTarget2D CreateRenderTarget(int width, int height,
         SurfaceFormat format = SurfaceFormat.Color, DepthFormat depth = DepthFormat.None,
-        RenderTargetUsage usage = RenderTargetUsage.DiscardContents)
+        RenderTargetUsage usage = RenderTargetUsage.DiscardContents, int samples = 0)
     {
-        return new RenderTarget2D(Device, width, height, false, format, depth, 0, usage);
+        return new RenderTarget2D(Device, width, height, false, format, depth, samples, usage);
+    }
+
+    public int GetSupportedSamples(int requested, SurfaceFormat format = SurfaceFormat.Color, DepthFormat depth = DepthFormat.None)
+    {
+        Device.Adapter.QueryRenderTargetFormat(Device.GraphicsProfile, format, depth, requested, out _, out _, out int selected);
+        return selected;
     }
 
     /// <summary>
@@ -523,5 +529,7 @@ public partial class Renderer : IDisposable
         Textures?.Dispose();
         Fonts?.Dispose();
         ShapeBatch?.Dispose();
+        DisposeMeshes();
+        TriangleVertices?.Dispose();
     }
 }

@@ -15,6 +15,7 @@
     <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" Version="$(MonoGameVersion)" />
     <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" Version="$(MonoGameVersion)" />
     <MonoGameContentReference Include="Content/Content.mgcb" />
+    <Content Include="Native/oidn/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Content/fonts/*.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

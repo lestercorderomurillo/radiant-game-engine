@@ -22,11 +22,15 @@ public struct Shape
     /// <summary>Shape type: 0=rect, 1=circle, 2=triangle, 3=triangle_border.</summary>
     public float Type;
 
+    /// <summary>Current minus previous rendered position in world units, for the Motion technique.</summary>
+    public Vector2 Motion;
+
     internal static readonly VertexDeclaration Declaration = new VertexDeclaration(
         new VertexElement(0, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 1),
         new VertexElement(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 2),
         new VertexElement(16, VertexElementFormat.Color, VertexElementUsage.Color, 1),
-        new VertexElement(20, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 3)
+        new VertexElement(20, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 3),
+        new VertexElement(24, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 4)
     );
 
     /// <summary>Creates a rectangle shape.</summary>

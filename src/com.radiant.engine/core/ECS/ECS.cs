@@ -50,6 +50,8 @@ public class ECS : IGameObject
     private static readonly int CachedThreadCount = Environment.ProcessorCount;
 
     public int EntityCount => EntityCountValue;
+    /// <summary>Entity membership, component layout and enabled-state changes; used by tooling caches.</summary>
+    public long EntityRevision { get; private set; }
     public bool GameplayPaused { get; set; }
     public bool AnimationPaused { get; set; }
     public Scene Scene { get; set; }
@@ -114,9 +116,16 @@ public class ECS : IGameObject
     private void SortSystemsByDependencies()
     {
         if (Systems.Count <= 1) return;
-        var typeToIndex = new Dictionary<Type, int>();
+        var typeToIndices = new Dictionary<Type, List<int>>();
         for (int i = 0; i < Systems.Count; i++)
-            typeToIndex[Systems[i].GetType()] = i;
+        {
+            var type = Systems[i].GetType();
+            if (!typeToIndices.TryGetValue(type, out var indices)) typeToIndices[type] = indices = new();
+            indices.Add(i);
+        }
+
+        var instanceToIndex = new Dictionary<System, int>();
+        for (int i = 0; i < Systems.Count; i++) instanceToIndex[Systems[i]] = i;
 
         var outgoing = new List<int>[Systems.Count];
         var inDegree = new int[Systems.Count];
@@ -125,26 +134,34 @@ public class ECS : IGameObject
 
         for (int i = 0; i < Systems.Count; i++)
         {
+            foreach (var dependency in Systems[i].After)
+            {
+                if (!instanceToIndex.TryGetValue(dependency, out int dependencyIndex)) throw new InvalidOperationException("System dependency belongs to another ECS.");
+                outgoing[dependencyIndex].Add(i);
+                inDegree[i]++;
+            }
             var type = Systems[i].GetType();
             foreach (var attr in type.GetCustomAttributes(typeof(RunAfterAttribute), true))
             {
                 var runAfter = (RunAfterAttribute)attr;
                 foreach (var dep in runAfter.SystemTypes)
-                    if (typeToIndex.TryGetValue(dep, out int beforeIdx))
-                    {
-                        outgoing[beforeIdx].Add(i);
-                        inDegree[i]++;
-                    }
+                    if (typeToIndices.TryGetValue(dep, out var beforeIndices))
+                        foreach (int beforeIdx in beforeIndices)
+                        {
+                            outgoing[beforeIdx].Add(i);
+                            inDegree[i]++;
+                        }
             }
             foreach (var attr in type.GetCustomAttributes(typeof(RunBeforeAttribute), true))
             {
                 var runBefore = (RunBeforeAttribute)attr;
                 foreach (var dep in runBefore.SystemTypes)
-                    if (typeToIndex.TryGetValue(dep, out int afterIdx))
-                    {
-                        outgoing[i].Add(afterIdx);
-                        inDegree[afterIdx]++;
-                    }
+                    if (typeToIndices.TryGetValue(dep, out var afterIndices))
+                        foreach (int afterIdx in afterIndices)
+                        {
+                            outgoing[i].Add(afterIdx);
+                            inDegree[afterIdx]++;
+                        }
             }
         }
 
@@ -163,6 +180,7 @@ public class ECS : IGameObject
                     queue.Enqueue(next);
         }
 
+        if (sorted.Count != Systems.Count) throw new InvalidOperationException("System dependencies contain a cycle.");
         if (sorted.Count == Systems.Count)
         {
             Systems.Clear();
@@ -260,14 +278,23 @@ public class ECS : IGameObject
         EnsureEntityCapacity(id);
         EntityRecords[id] = default;
         EntityCountValue++;
+        EntityRevision++;
+        return id;
+    }
+
+    public int CreateEntity(Vector2 position, float layer = 0)
+    {
+        int id = CreateEntity();
+        AddComponent<Transform2D>(id) = new Transform2D { Position = position, Layer = layer };
+        Spatial.Insert(id, new Vector3(position, layer));
         return id;
     }
 
     public int CreateEntity(Vector3 position)
     {
         int id = CreateEntity();
-        AddComponent<Transform>(id);
-        ref var transform = ref GetComponent<Transform>(id);
+        AddComponent<Transform3D>(id) = new Transform3D();
+        ref var transform = ref GetComponent<Transform3D>(id);
         transform.Position = position;
         Spatial.Insert(id, position);
         return id;
@@ -302,6 +329,7 @@ public class ECS : IGameObject
 
     public void DestroyAllEntities()
     {
+        EntityRevision++;
         foreach (var arch in Archetypes)
         {
             var entities = arch.GetEntities();
@@ -339,6 +367,7 @@ public class ECS : IGameObject
         record.Index = -1;
         RecycledIds.Push(entity);
         EntityCountValue--;
+        EntityRevision++;
         return true;
     }
 
@@ -367,6 +396,7 @@ public class ECS : IGameObject
             ArchetypesBySignature[newSig] = newArch;
         }
         int newIndex = newArch.Add(entity);
+        newArch.Set<T>(newIndex, new T());
 
         if (oldArch != null)
         {
@@ -378,6 +408,7 @@ public class ECS : IGameObject
 
         record.Arch = newArch;
         record.Index = newIndex;
+        EntityRevision++;
 
         return ref newArch.Get<T>(newIndex);
     }
@@ -404,10 +435,32 @@ public class ECS : IGameObject
 
     public IReadOnlyCollection<Type> GetRegisteredComponentTypes() => TypeToId.Keys;
 
+    /// <summary>Boxed component access for tooling. Runtime queries retain typed, allocation-free access.</summary>
+    public bool TryGetComponent(int entity, Type type, out Component component)
+    {
+        component = null;
+        return type != null && IsAlive(entity) && EntityRecords[entity].Arch.TryGetComponent(EntityRecords[entity].Index, type, out component);
+    }
+
+    public bool TrySetComponent(int entity, Component component)
+    {
+        if (component == null || !IsAlive(entity) || !EntityRecords[entity].Arch.TrySetComponent(EntityRecords[entity].Index, component)) return false;
+        if (component is Transform2D transform2D) Spatial.Update(entity, new Vector3(transform2D.Position, transform2D.Layer));
+        else if (component is Transform3D transform3D) Spatial.Update(entity, transform3D.Position);
+        return true;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetPosition(int entity, Vector2 position)
+    {
+        ref var transform = ref GetComponent<Transform2D>(entity);
+        transform.Position = position;
+        Spatial.Update(entity, new Vector3(position, transform.Layer));
+    }
+
     public void SetPosition(int entity, Vector3 position)
     {
-        GetComponent<Transform>(entity).Position = position;
+        GetComponent<Transform3D>(entity).Position = position;
         Spatial.Update(entity, position);
     }
 
@@ -473,11 +526,11 @@ public class ECS : IGameObject
 
     /// <summary> Disables an entity. Disabled entities are skipped by Query but remain alive and restorable. </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void DisableEntity(int entity) => DisabledEntities.Add(entity);
+    public void DisableEntity(int entity) { if (DisabledEntities.Add(entity)) EntityRevision++; }
 
     /// <summary> Re-enables a previously disabled entity so it participates in queries again. </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void EnableEntity(int entity) => DisabledEntities.Remove(entity);
+    public void EnableEntity(int entity) { if (DisabledEntities.Remove(entity)) EntityRevision++; }
 
     /// <summary> Returns true if the entity is currently disabled. </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

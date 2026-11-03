@@ -13,6 +13,8 @@ public partial class Inspector
     private const int MenuBarPaddingX = 24;
     private const int MenuItemPaddingX = 30;
     private const int MenuItemHeight = 48;
+    private const int MenuSeparatorHeight = 18;
+    private static int MenuRowHeight(MenuItem item) => item.Type == MenuItemType.Separator ? MenuSeparatorHeight : MenuItemHeight;
     private const int MenuDropdownWidth = 400;
     private const float MenuBarFontSize = 28f;
 
@@ -38,7 +40,7 @@ public partial class Inspector
                 {
                     CreateWindow("about_radiant", "About Radiant", 999, AutoPosition: false);
                     AddSectionLabel("about_radiant", "about_engine", "Radiant Engine");
-                    AddLabel("about_radiant", "about_desc", "A lightweight 2D engine.");
+                    AddLabel("about_radiant", "about_desc", "A lightweight 2D and 3D engine.");
                     AddLabel("about_radiant", "about_spacer1", " ");
                     AddLabel("about_radiant", "about_f2", "High-performance entity system.");
                     AddLabel("about_radiant", "about_f3", "GPU-accelerated rendering.");
@@ -137,13 +139,21 @@ public partial class Inspector
         var ordered = new List<WindowData>(Windows.Values);
         ordered.Sort((a, b) =>
         {
+            int category = a.Category.CompareTo(b.Category);
+            if (category != 0) return category;
             int order = a.LayoutOrder.CompareTo(b.LayoutOrder);
             return order != 0 ? order : a.CreationIndex.CompareTo(b.CreationIndex);
         });
 
+        bool sceneSection = false;
         foreach (var window in ordered)
         {
             if (window.Id == "about_radiant") continue;
+            if (!sceneSection && window.Category == WindowCategory.Scene)
+            {
+                viewMenu.Items.Add(new MenuItem { Id = "scene_views_separator", Type = MenuItemType.Separator });
+                sceneSection = true;
+            }
             string windowId = window.Id;
             viewMenu.Items.Add(new MenuItem
             {
@@ -154,6 +164,7 @@ public partial class Inspector
                 ToggleCallback = (value) => SetWindowVisible(windowId, value)
             });
         }
+        if (OpenMenuId == "view") OpenMenuDropdownBounds = GetMenuDropdownBounds(viewMenu);
     }
 
     private void SyncViewToggleValues()
@@ -273,8 +284,14 @@ public partial class Inspector
         }
         if (menu == null) return;
 
-        int dropdownHeight = menu.Items.Count * MenuItemHeight;
-        OpenMenuDropdownBounds = new Rectangle(menu.HeaderBounds.X, MenuBarHeight, MenuDropdownWidth, dropdownHeight);
+        OpenMenuDropdownBounds = GetMenuDropdownBounds(menu);
+    }
+
+    private Rectangle GetMenuDropdownBounds(MenuData menu)
+    {
+        int height = 0;
+        foreach (var item in menu.Items) height += MenuRowHeight(item);
+        return new Rectangle(menu.HeaderBounds.X, MenuBarHeight, MenuDropdownWidth, height);
     }
 
     private void CloseMenuDropdown()
@@ -291,10 +308,17 @@ public partial class Inspector
         }
         if (menu == null) return;
 
-        int localIndex = ((int)Mouse.Y - OpenMenuDropdownBounds.Y) / MenuItemHeight;
-        if (localIndex < 0 || localIndex >= menu.Items.Count) return;
+        if (!OpenMenuDropdownBounds.Contains((int)Mouse.X, (int)Mouse.Y)) return;
+        int localIndex = 0, rowY = OpenMenuDropdownBounds.Y;
+        while (localIndex < menu.Items.Count && Mouse.Y >= rowY + MenuRowHeight(menu.Items[localIndex]))
+        {
+            rowY += MenuRowHeight(menu.Items[localIndex]);
+            localIndex++;
+        }
+        if (localIndex >= menu.Items.Count) return;
 
         var item = menu.Items[localIndex];
+        if (item.Type == MenuItemType.Separator) return;
         if (item.Type == MenuItemType.Toggle)
         {
             item.ToggleValue = !item.ToggleValue;
@@ -369,10 +393,17 @@ public partial class Inspector
         Renderer.DrawRoundedRect(OpenMenuDropdownBounds, dropdownBg, CornerRadius, RoundedCorners.Bottom);
 
         var solid = Renderer.GetSolidTexture(Color.White);
+        int rowY = OpenMenuDropdownBounds.Y;
         for (int i = 0; i < menu.Items.Count; i++)
         {
             var item = menu.Items[i];
-            var itemRect = new Rectangle(OpenMenuDropdownBounds.X, OpenMenuDropdownBounds.Y + i * MenuItemHeight, OpenMenuDropdownBounds.Width, MenuItemHeight);
+            var itemRect = new Rectangle(OpenMenuDropdownBounds.X, rowY, OpenMenuDropdownBounds.Width, MenuRowHeight(item));
+            rowY += itemRect.Height;
+            if (item.Type == MenuItemType.Separator)
+            {
+                Renderer.DrawSprite(solid, new Rectangle(itemRect.X + Padding, itemRect.Center.Y, itemRect.Width - Padding * 2, 1), LabelDim * 0.5f);
+                continue;
+            }
             bool hovered = itemRect.Contains((int)VirtualMouse.X, (int)VirtualMouse.Y);
 
             if (hovered)
@@ -417,13 +448,14 @@ public partial class Inspector
 
     private readonly List<int> EntityIdCache = new();
     private bool EntityListDirty;
+    private readonly List<int> FilteredEntityIds = new();
+    private long ListedEntityRevision = -1;
 
     private void UpdateEntityInspector()
     {
         if (!IsWindowVisibleInternal("entity_inspector")) return;
 
-        int currentCount = Scene.ECS.EntityCount;
-        if (currentCount != EntityIdCache.Count || EntityListDirty)
+        if (Scene.ECS.EntityRevision != ListedEntityRevision || EntityListDirty)
         {
             EntityListDirty = false;
             RefreshEntityList();
@@ -432,87 +464,46 @@ public partial class Inspector
 
     private void RefreshEntityList()
     {
-        EntityIdCache.Clear();
-        Scene.ECS.GetAllEntityIds(EntityIdCache);
-
+        ListedEntityRevision = Scene.ECS.EntityRevision;
+        var selectedIds = GetSelectedEntityIds();
+        EntityIdCache.Clear(); Scene.ECS.GetAllEntityIds(EntityIdCache); EntityIdCache.Sort();
+        FilteredEntityIds.Clear();
         string filter = GetTextInputValue("entity_inspector", "find_input");
-        List<string> items = new();
+        var items = new List<string>();
         foreach (int id in EntityIdCache)
         {
-            if (filter.Length > 0 && !id.ToString().Contains(filter)) continue;
-            char prefix = Scene.ECS.IsDisabled(id) ? '\x07' : '\x06';
             var types = Scene.ECS.GetComponentTypes(id);
-            if (types.Length == 0)
-            {
-                items.Add($"{prefix}{id}");
-                continue;
-            }
-            var componentNames = new System.Text.StringBuilder();
-            for (int i = 0; i < types.Length; i++)
-            {
-                if (i > 0) componentNames.Append(", ");
-                componentNames.Append(types[i].Name);
-            }
-            items.Add($"{prefix}{id}  |  {componentNames}");
+            string names = string.Join(", ", Array.ConvertAll(types, type => type.Name));
+            if (filter.Length > 0 && !id.ToString().Contains(filter) && !names.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
+            FilteredEntityIds.Add(id);
+            char prefix = Scene.ECS.IsDisabled(id) ? '\x07' : '\x06';
+            items.Add($"{prefix}{id}  |  {names}");
         }
         SetListBoxItems("entity_inspector", "results_list", items.ToArray());
+        var selection = GetListBoxSelected("entity_inspector", "results_list");
+        selection?.Clear();
+        if (selectedIds != null)
+            foreach (int id in selectedIds)
+            {
+                int index = FilteredEntityIds.IndexOf(id);
+                if (index >= 0) selection?.Add(index);
+            }
     }
 
     private void ToggleEntityVisibility(int listIndex)
     {
-        string filter = GetTextInputValue("entity_inspector", "find_input");
-        List<int> filteredIds = new();
-        foreach (int id in EntityIdCache)
-        {
-            if (filter.Length > 0 && !id.ToString().Contains(filter)) continue;
-            filteredIds.Add(id);
-        }
-
-        if (listIndex < 0 || listIndex >= filteredIds.Count) return;
-        int entityId = filteredIds[listIndex];
-        if (!Scene.ECS.IsAlive(entityId)) return;
-
-        bool hidden = Scene.ECS.IsDisabled(entityId);
-        if (hidden)
-            Scene.ECS.EnableEntity(entityId);
-        else
-            Scene.ECS.DisableEntity(entityId);
-
-        if (Windows.TryGetValue("entity_inspector", out var window) && window.WidgetIndex.TryGetValue("results_list", out int widgetIdx))
-        {
-            var widget = window.Widgets[widgetIdx];
-            if (widget.ListBoxItems != null && listIndex < widget.ListBoxItems.Length)
-            {
-                string item = widget.ListBoxItems[listIndex];
-                if (item.Length > 0)
-                    widget.ListBoxItems[listIndex] = (hidden ? '\x06' : '\x07') + item[1..];
-            }
-        }
+        if (listIndex < 0 || listIndex >= FilteredEntityIds.Count) return;
+        int entity = FilteredEntityIds[listIndex];
+        if (!Scene.ECS.IsAlive(entity)) return;
+        if (Scene.ECS.IsDisabled(entity)) Scene.ECS.EnableEntity(entity); else Scene.ECS.DisableEntity(entity);
+        EntityListDirty = true;
     }
 
     private void DeleteSelectedEntities()
     {
-        var selected = GetListBoxSelected("entity_inspector", "results_list");
-        if (selected == null || selected.Count == 0) return;
-
-        string filter = GetTextInputValue("entity_inspector", "find_input");
-        List<int> filteredIds = new();
-        foreach (int id in EntityIdCache)
-        {
-            if (filter.Length > 0 && !id.ToString().Contains(filter)) continue;
-            filteredIds.Add(id);
-        }
-
-        List<int> toDelete = new();
-        foreach (int index in selected)
-        {
-            if (index >= 0 && index < filteredIds.Count)
-                toDelete.Add(filteredIds[index]);
-        }
-
-        foreach (int entityId in toDelete)
-            Scene.ECS.ScheduleDestroy(entityId);
-
+        var selected = GetSelectedEntityIds();
+        if (selected == null) return;
+        foreach (int entity in selected) Scene.ECS.ScheduleDestroy(entity);
         EntityListDirty = true;
     }
 
@@ -520,22 +511,10 @@ public partial class Inspector
     {
         var selected = GetListBoxSelected("entity_inspector", "results_list");
         if (selected == null || selected.Count == 0) return null;
-
-        string filter = GetTextInputValue("entity_inspector", "find_input");
-        List<int> filteredIds = new();
-        foreach (int id in EntityIdCache)
-        {
-            if (filter.Length > 0 && !id.ToString().Contains(filter)) continue;
-            filteredIds.Add(id);
-        }
-
-        List<int> result = new();
+        var ids = new List<int>();
         foreach (int index in selected)
-        {
-            if (index >= 0 && index < filteredIds.Count)
-                result.Add(filteredIds[index]);
-        }
-        return result.Count > 0 ? result : null;
+            if (index >= 0 && index < FilteredEntityIds.Count && Scene.ECS.IsAlive(FilteredEntityIds[index])) ids.Add(FilteredEntityIds[index]);
+        return ids.Count > 0 ? ids : null;
     }
 
     private void OpenEntityInspector()
@@ -546,7 +525,7 @@ public partial class Inspector
             if (Windows.TryGetValue("entity_inspector", out var entityInspectorWindow))
                 entityInspectorWindow.Resizable = true;
             AddSectionLabel("entity_inspector", "find_section", "Find Entity");
-            AddTextInput("entity_inspector", "find_input", "Search by ID...", (value) => RefreshEntityList(), 1f);
+            AddTextInput("entity_inspector", "find_input", "Search ID or component...", (value) => RefreshEntityList(), 1f);
             AddListBox("entity_inspector", "results_list", 500);
             SetListBoxHeader("entity_inspector", "results_list", "ID  |  Components");
             SetListBoxToggleCallback("entity_inspector", "results_list", ToggleEntityVisibility);
@@ -801,7 +780,8 @@ public partial class Inspector
         {
             if (!Scene.ECS.IsAlive(entityId)) continue;
             
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(entityId);
+            if (!Scene.ECS.HasComponent<Transform2D>(entityId)) continue;
+            ref var transform = ref Scene.ECS.GetComponent<Transform2D>(entityId);
             var position = new Vector2(transform.Position.X, transform.Position.Y);
 
             if (Scene.ECS.HasComponent<Circle2D>(entityId))
