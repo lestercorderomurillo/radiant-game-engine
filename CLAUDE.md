@@ -659,3 +659,7 @@ Acquire component refs only after all AddComponent calls: archetype migration in
 The shared desktop props restore MGCB immediately before content compilation, after building project references, avoiding concurrent first-install tool restores. Linux CI builds the library/scenes and runs headless checks; graphical smoke tests require a Vulkan display.
 
 VS Code: `.vscode/settings.json` selects `radiant.sln` and associates `.fx` with HLSL. The build task builds Debug, and launch configurations run the preserved lighting/tileset scenes. The sibling Pac-Man solution and multi-root workspace include the library and both engine test projects, allowing C# Dev Kit to resolve sources across repositories.
+
+## Shared camera controller
+
+`Inspector.OpenCameraControls(entity = -1)` opens one scene-wide Camera Controls window, also available through ECS and View menus. Selection is independent of the property inspector. Search filters IDs/types; compatible ICameraView instances control activation. Missing/disabled cameras stop navigation. Fitted 2D scenes appear as World view with pan/zoom via `Renderer.TryGetWorldFit` and `FitWorld`. Closing the window stops navigation. Pac-Man and Zuma use this shared API.

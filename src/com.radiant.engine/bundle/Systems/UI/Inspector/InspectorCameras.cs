@@ -14,46 +14,140 @@ public partial class Inspector
     private MouseState NavigationMouse;
     private ICameraView[] CameraViews = Array.Empty<ICameraView>();
     private int CameraViewIndex;
+    private int ControlledCamera = -1;
+    private string CameraSearch = "";
+    private int[] CameraEntities = [];
+    private string[] CameraLabels = [];
+    private readonly System.Collections.Generic.List<int> CameraCandidates = new();
+
+    /// <summary>Opens the shared camera controller, optionally selecting an entity independently of the property inspector.</summary>
+    public static void OpenCameraControls(int Entity = -1)
+    {
+        if (Instance == null) return;
+        Instance.EnsureCameraControls();
+        if (Entity >= 0)
+        {
+            Instance.ControlledCamera = Entity;
+            Instance.CameraSearch = "";
+            SetTextInputValue("camera_controls", "search", "");
+        }
+        Instance.RefreshCameraControls();
+        ShowWindow("camera_controls");
+    }
+
     private void AddCameraControls()
     {
         if (!Scene.ECS.IsAlive(InspectedEntity)) return;
-        var previousView = CameraViews.ElementAtOrDefault(CameraViewIndex);
-        CameraViews = Scene.ECS.GetAllSystems().OfType<ICameraView>().Where(view => Scene.ECS.TryGetComponent(InspectedEntity, view.CameraType, out _)).ToArray();
-        if (CameraViews.Length == 0) return;
-        var preferredType = PropertyType == typeof(Camera2D) || PropertyType == typeof(Transform2D) ? typeof(Camera2D) : PropertyType == typeof(Camera3D) || PropertyType == typeof(Transform3D) ? typeof(Camera3D) : previousView?.CameraType;
-        CameraViewIndex = previousView?.CameraType == preferredType ? Array.IndexOf(CameraViews, previousView) : -1;
-        if (CameraViewIndex < 0) CameraViewIndex = Math.Max(0, Array.FindIndex(CameraViews, view => view.CameraType == preferredType));
-        AddButton("entity_properties", "cameraControls", "Camera controls", () => ShowWindow("camera_controls"));
+        if (Scene.ECS.HasComponent<Camera2D>(InspectedEntity) || Scene.ECS.HasComponent<Camera3D>(InspectedEntity))
+        {
+            int entity = InspectedEntity;
+            AddButton("entity_properties", "cameraControls", "Camera controls", () => OpenCameraControls(entity));
+        }
+    }
+
+    private void EnsureCameraControls()
+    {
+        if (Windows.ContainsKey("camera_controls")) return;
         CreateWindow("camera_controls", "Camera Controls", 54, Visible: false);
-        var window = Windows["camera_controls"];
-        window.Widgets.Clear(); window.WidgetIndex.Clear();
-        window.Title = $"Camera {InspectedEntity} Controls";
+        AddTextInput("camera_controls", "search", "Search camera ID or type", text => { CameraSearch = text; RefreshCameraControls(); });
+        AddDropdown("camera_controls", "camera", "Camera instance", [], 0, index =>
+        {
+            if (index < 0 || index >= CameraEntities.Length) return;
+            ControlledCamera = CameraEntities[index];
+            NavigatingCamera = false;
+            SetToggleValue("camera_controls", "navigateCamera", false);
+            RefreshCameraControls();
+        });
         AddLabel("camera_controls", "pose", "");
-        AddDropdown("camera_controls", "cameraView", "Camera view", CameraViews.Select((view, index) => $"{view.GetType().Name} [{index}]").ToArray(), CameraViewIndex, index => { CameraViewIndex = index; RefreshCameraPose(); });
-        AddButton("camera_controls", "activateCamera", "Use selected camera", () => CameraViews[CameraViewIndex].CameraEntity = InspectedEntity);
-        AddToggle("camera_controls", "navigateCamera", "Navigate camera", NavigatingCamera, enabled => NavigatingCamera = enabled);
+        AddDropdown("camera_controls", "cameraView", "Render view", [], 0, index => { CameraViewIndex = index; RefreshCameraPose(); });
+        AddButton("camera_controls", "activateCamera", "Use selected camera", () =>
+        {
+            if (CameraViewIndex >= 0 && CameraViewIndex < CameraViews.Length && Scene.ECS.IsAlive(ControlledCamera) && !Scene.ECS.IsDisabled(ControlledCamera)
+                && Scene.ECS.TryGetComponent(ControlledCamera, CameraViews[CameraViewIndex].CameraType, out _))
+                CameraViews[CameraViewIndex].CameraEntity = ControlledCamera;
+        });
+        AddToggle("camera_controls", "navigateCamera", "Navigate camera", false, enabled => NavigatingCamera = enabled);
         AddLabel("camera_controls", "speedLabel", "Movement speed (units / second)");
         AddTextInput("camera_controls", "speed", "Movement speed", text => { if (float.TryParse(text, CultureInfo.InvariantCulture, out float speed) && float.IsFinite(speed) && speed > 0) NavigationSpeed = speed; });
         MarkNumericInput("camera_controls", "speed");
         SetTextInputValue("camera_controls", "speed", NavigationSpeed.ToString(CultureInfo.InvariantCulture));
+        AddButton("camera_controls", "zoomIn", "Zoom in", () => ZoomWorldCamera(0.8f));
+        AddButton("camera_controls", "zoomOut", "Zoom out", () => ZoomWorldCamera(1.25f));
         AddLabel("camera_controls", "navigationHelp", "Hold RMB: look + WASD / Q E. Shift: fast.");
+    }
+
+    private void RefreshCameraControls()
+    {
+        Scene.ECS.GetAllEntityIds(CameraCandidates);
+        var candidates = CameraCandidates.Where(entity => Scene.ECS.HasComponent<Camera2D>(entity) || Scene.ECS.HasComponent<Camera3D>(entity))
+            .ToList();
+        if (Renderer.TryGetWorldFit(out _, out _)) candidates.Insert(0, -2);
+        var entities = candidates.Where(entity => CameraLabel(entity).Contains(CameraSearch, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var labels = entities.Select(CameraLabel).ToArray();
+        if (!CameraEntities.SequenceEqual(entities) || !CameraLabels.SequenceEqual(labels))
+        {
+            CameraEntities = entities;
+            CameraLabels = labels;
+            SetDropdownOptions("camera_controls", "camera", labels);
+        }
+        if (!CameraEntities.Contains(ControlledCamera))
+        {
+            ControlledCamera = CameraEntities.FirstOrDefault(-1);
+            NavigatingCamera = false;
+            SetToggleValue("camera_controls", "navigateCamera", false);
+        }
+        SetDropdownValue("camera_controls", "camera", Math.Max(0, Array.IndexOf(CameraEntities, ControlledCamera)));
+        SetWidgetEnabled("camera_controls", "camera", CameraEntities.Length > 0);
+        var previousView = CameraViews.ElementAtOrDefault(CameraViewIndex);
+        var views = Scene.ECS.GetAllSystems().OfType<ICameraView>()
+            .Where(view => ControlledCamera >= 0 && Scene.ECS.TryGetComponent(ControlledCamera, view.CameraType, out _)).ToArray();
+        if (!CameraViews.SequenceEqual(views))
+        {
+            CameraViews = views;
+            CameraViewIndex = Math.Max(0, Array.IndexOf(CameraViews, previousView));
+            SetDropdownOptions("camera_controls", "cameraView", views.Select((view, index) => $"{view.GetType().Name} [{index}]").ToArray());
+            SetDropdownValue("camera_controls", "cameraView", CameraViewIndex);
+        }
         RefreshCameraPose();
     }
+
+    private string CameraLabel(int Entity)
+        => Entity == -2 ? "World view (fitted 2D)" : $"Entity {Entity} — {(Scene.ECS.HasComponent<Camera2D>(Entity) ? "Camera2D" : "")}{(Scene.ECS.HasComponent<Camera3D>(Entity) ? " Camera3D" : "")}{(Scene.ECS.IsDisabled(Entity) ? " (disabled)" : "")}";
+
+    private Type ControlledCameraType => CameraViews.ElementAtOrDefault(CameraViewIndex)?.CameraType
+        ?? (ControlledCamera >= 0 && Scene.ECS.HasComponent<Camera3D>(ControlledCamera) ? typeof(Camera3D) : typeof(Camera2D));
+
     private void RefreshCameraPose()
     {
-        var type = CameraViews[CameraViewIndex].CameraType;
-        string pose = type == typeof(Camera3D) && Scene.ECS.HasComponent<Transform3D>(InspectedEntity) ? "Transform3D" : type == typeof(Camera2D) && Scene.ECS.HasComponent<Transform2D>(InspectedEntity) ? "Transform2D" : type.Name;
-        SetLabel("camera_controls", "pose", $"Edit position / rotation in {pose}.");
-        bool navigable = type == typeof(Camera3D) || type == typeof(Camera2D);
-        SetWidgetEnabled("camera_controls", "navigateCamera", navigable);
-        if (!navigable) { NavigatingCamera = false; SetToggleValue("camera_controls", "navigateCamera", false); }
+        bool worldView = ControlledCamera == -2 && Renderer.TryGetWorldFit(out _, out _);
+        bool available = worldView || ControlledCamera >= 0 && Scene.ECS.IsAlive(ControlledCamera) && !Scene.ECS.IsDisabled(ControlledCamera);
+        var type = ControlledCameraType;
+        string pose = ControlledCamera >= 0 && type == typeof(Camera3D) && Scene.ECS.HasComponent<Transform3D>(ControlledCamera) ? "Transform3D" : ControlledCamera >= 0 && type == typeof(Camera2D) && Scene.ECS.HasComponent<Transform2D>(ControlledCamera) ? "Transform2D" : type.Name;
+        SetLabel("camera_controls", "pose", worldView ? "Fitted world view. WASD pans; use buttons to zoom." : ControlledCamera < 0 ? "No matching camera instances in this scene." : !available ? "Selected camera is disabled." : $"Edit position / rotation in {pose}.");
+        SetWidgetEnabled("camera_controls", "zoomIn", worldView);
+        SetWidgetEnabled("camera_controls", "zoomOut", worldView);
+        SetWidgetEnabled("camera_controls", "cameraView", available && CameraViews.Length > 0);
+        SetWidgetEnabled("camera_controls", "activateCamera", available && CameraViews.Length > 0);
+        SetWidgetEnabled("camera_controls", "navigateCamera", available);
+        if (!available) { NavigatingCamera = false; SetToggleValue("camera_controls", "navigateCamera", false); }
+    }
+
+    private void ZoomWorldCamera(float Scale)
+    {
+        if (ControlledCamera == -2 && Renderer.TryGetWorldFit(out var center, out var size))
+        {
+            var scaled = size * Scale;
+            if (float.IsFinite(scaled.X) && float.IsFinite(scaled.Y) && scaled.X >= 1 && scaled.Y >= 1)
+                Renderer.FitWorld(center, scaled);
+        }
     }
 
     private void UpdateCameraNavigation()
     {
+        if (IsWindowVisible("camera_controls")) RefreshCameraControls();
         var mouse = Mouse.GetState();
         var previous = NavigationMouse; NavigationMouse = mouse;
-        if (!GlobalVisible || !NavigatingCamera || !Renderer.IsActive || IsEditingText || !Scene.ECS.IsAlive(InspectedEntity) || Scene.ECS.IsDisabled(InspectedEntity) || mouse.RightButton != ButtonState.Pressed) return;
+        if (!GlobalVisible || !IsWindowVisible("camera_controls") || !NavigatingCamera || !Renderer.IsActive || IsEditingText || (ControlledCamera != -2 && (!Scene.ECS.IsAlive(ControlledCamera) || Scene.ECS.IsDisabled(ControlledCamera))) || mouse.RightButton != ButtonState.Pressed) return;
         var cursor = ScreenToVirtual(new Vector2(mouse.X, mouse.Y));
         if (cursor.Y < MenuBarHeight || Windows.Values.Any(window => window.Visible && window.WindowBounds.Contains(cursor)) || OpenDropdownWindowId != null || OpenMenuId != null) return;
         var keyboard = Keyboard.GetState();
@@ -61,6 +155,11 @@ public partial class Inspector
         var look = previous.RightButton == ButtonState.Pressed ? new Vector2(mouse.X - previous.X, mouse.Y - previous.Y) * 0.003f : Vector2.Zero;
         var movement = new Vector3((keyboard.IsKeyDown(Keys.D) ? 1 : 0) - (keyboard.IsKeyDown(Keys.A) ? 1 : 0), (keyboard.IsKeyDown(Keys.E) ? 1 : 0) - (keyboard.IsKeyDown(Keys.Q) ? 1 : 0), (keyboard.IsKeyDown(Keys.S) ? 1 : 0) - (keyboard.IsKeyDown(Keys.W) ? 1 : 0));
         if (movement.LengthSquared() > 1) movement.Normalize();
-        CameraEditor.Move(Scene.ECS, InspectedEntity, movement, look, distance, CameraViews[CameraViewIndex].CameraType);
+        if (ControlledCamera == -2)
+        {
+            if (Renderer.TryGetWorldFit(out var center, out var size))
+                Renderer.FitWorld(center + new Vector2(movement.X, movement.Z) * distance, size);
+        }
+        else CameraEditor.Move(Scene.ECS, ControlledCamera, movement, look, distance, ControlledCameraType);
     }
 }

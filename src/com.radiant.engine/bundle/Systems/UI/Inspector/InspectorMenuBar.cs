@@ -27,6 +27,7 @@ public partial class Inspector
     private void InitializeMenuBar()
     {
         Menus.Clear();
+        EnsureCameraControls();
 
         var about = new MenuData { Id = "about", Label = "Help" };
         about.Items.Add(new MenuItem
@@ -65,6 +66,8 @@ public partial class Inspector
         ecs.Items.Add(new MenuItem { Id = "entity_inspector", Label = "Open Entity Inspector", Type = MenuItemType.Action, ActionCallback = OpenEntityInspector });
         ecs.Items.Add(new MenuItem { Id = "component_inspector", Label = "Open Component Inspector", Type = MenuItemType.Action, ActionCallback = OpenComponentInspector });
         ecs.Items.Add(new MenuItem { Id = "system_inspector", Label = "Open System Inspector", Type = MenuItemType.Action, ActionCallback = OpenSystemsInspector });
+
+        ecs.Items.Add(new MenuItem { Id = "camera_controls", Label = "Open Camera Controls", Type = MenuItemType.Action, ActionCallback = () => OpenCameraControls() });
 
         var file = new MenuData { Id = "file", Label = "File" };
         file.Items.Add(new MenuItem

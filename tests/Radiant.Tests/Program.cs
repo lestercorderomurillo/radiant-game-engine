@@ -154,6 +154,8 @@ using (var editing = new DisposableScene())
 }
 Console.WriteLine("PASS: generic component editing, vector axes, finite values, camera validation, spatial indexing, archetype migration, destroyed entities and optional camera transforms.");
 
+CameraControllerRegression.Run();
+
 struct EditorTestData : Component
 {
     public Vector3 Position;

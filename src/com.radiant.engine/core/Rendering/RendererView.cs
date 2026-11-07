@@ -28,6 +28,14 @@ public partial class Renderer
         UpdateWorldView();
     }
 
+    /// <summary>Returns the current fitted 2D world view for shared camera tools.</summary>
+    public bool TryGetWorldFit(out Vector2 Center, out Vector2 Size)
+    {
+        Center = FittedWorldCenter.GetValueOrDefault();
+        Size = FittedWorldSize;
+        return FittedWorldCenter.HasValue;
+    }
+
     private void UpdateWorldView()
     {
         WorldScale = VirtualToScreenScale;
