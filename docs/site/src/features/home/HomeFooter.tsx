@@ -42,10 +42,7 @@ export function HomeFooter() {
               <ul>
                 {index?.groups.map((group) => (
                   <li key={group.id}>
-                    <Link to="/api" hash={group.id} className={`${linkClass} radiant-footer__api-link`}>
-                      <span>{group.title}</span>
-                      <span className="radiant-footer__count">{t("footer.typeCount", { count: group.areas.reduce((total, area) => total + area.types.length, 0) })}</span>
-                    </Link>
+                    <Link to="/api" hash={group.id} className={linkClass}>{group.title}</Link>
                   </li>
                 ))}
                 <li><Link to="/api" className={linkClass}>{t("footer.allTypes")}</Link></li>

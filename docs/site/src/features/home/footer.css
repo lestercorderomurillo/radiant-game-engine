@@ -54,20 +54,6 @@
   text-underline-offset: 4px;
 }
 
-.radiant-footer__api-link {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  max-width: 250px;
-}
-
-.radiant-footer__count {
-  color: var(--muted-foreground);
-  flex-shrink: 0;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
 .radiant-footer__link:hover { color: var(--foreground); text-decoration: underline; }
 .radiant-footer a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 
@@ -88,11 +74,9 @@
   .radiant-footer__link { min-height: 44px; }
   .radiant-footer__project { grid-column: 1 / -1; }
   .radiant-footer__project ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
-  .radiant-footer__api-link { gap: 8px; }
   .radiant-footer__bottom { margin-top: 24px; flex-wrap: wrap; }
 }
 
 @media (max-width: 359px) {
   .radiant-footer__nav { column-gap: 16px; }
-  .radiant-footer__api-link { flex-wrap: wrap; gap: 0 8px; }
 }

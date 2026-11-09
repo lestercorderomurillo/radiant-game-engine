@@ -61,7 +61,6 @@ export const en = {
   "footer.releases": "Releases",
   "footer.changelog": "Commit history",
   "footer.allTypes": "Explore all types",
-  "footer.typeCount": "{count} types",
   "footer.backToTop": "Back to top",
   "footer.credit": "Created by Lester Cordero Murillo.",
 
