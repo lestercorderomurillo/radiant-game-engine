@@ -5,7 +5,7 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Computes 2D global illumination using Holographic Radiance Cascades.</summary>
 /// <remarks>
-/// Pair with <see cref="Geometry"/>. Emissive shapes contribute light; material transmission controls blockers and colored glass.
+/// Pair with <see cref="com.radiant.engine.bundle.Geometry"/>. Emissive shapes contribute light; material transmission controls blockers and colored glass.
 /// This is one lighting technique, alongside <see cref="RasterRenderer"/> and <see cref="PathTracer"/>.
 /// The HRC quality presets control probe spacing, independently of <see cref="UDRQuality"/> resolution presets.
 /// Pass the linear-light output to color management before display.
