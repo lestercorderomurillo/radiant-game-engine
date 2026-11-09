@@ -15,6 +15,7 @@ namespace com.radiant.engine.bundle;
 public class HRCGI : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+
     private const int FrustumCount = 4;
     private const int MaxCascades = 11;
     private static readonly int[] ProbeScales = [4, 3, 2, 1];
@@ -62,6 +63,7 @@ public class HRCGI : core.System
     // Solid textures for default values
     private Texture2D BlackTexture;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Geometry = Scene.ECS.GetSystem<Geometry>();
@@ -74,7 +76,6 @@ public class HRCGI : core.System
 
         CalculateCascadeSizes();
         CreateRenderTargets();
-
 
         Renderer.RenderScaleChanged += OnRenderScaleChanged;
 
@@ -90,13 +91,15 @@ public class HRCGI : core.System
         });
     }
 
+    /// <summary>Rebuilds lighting resources for the new renderer scale.</summary>
     private void OnRenderScaleChanged(float _) => ResizeTargets();
 
+    /// <summary>Releases and recreates lighting targets at the current view size.</summary>
     private void ResizeTargets()
     {
         int newSize = Renderer.ScaledHigherPowerOfTwo;
-        if ((int)WorldSize.X == newSize && ViewSize == Renderer.ScaledSize)
-            return;
+
+        if ((int)WorldSize.X == newSize && ViewSize == Renderer.ScaledSize) return;
 
         DisposeRenderTargets();
         WorldSize = new Vector2(newSize);
@@ -105,6 +108,7 @@ public class HRCGI : core.System
         CreateRenderTargets();
     }
 
+    /// <summary>Computes the resolution and coverage of each lighting cascade.</summary>
     private void CalculateCascadeSizes()
     {
         // Use the allocated row count even when the quality divisor does not divide the domain.
@@ -125,6 +129,7 @@ public class HRCGI : core.System
         }
     }
 
+    /// <summary>Allocates the image targets required by this rendering stage.</summary>
     private void CreateRenderTargets()
     {
         var cascadeFormat = SurfaceFormat.HalfVector4;
@@ -142,10 +147,12 @@ public class HRCGI : core.System
 
         // Every merge level has WorldSize.X columns and the same probe rows.
         MergeRadiance = new RenderTarget2D[2];
+
         for (int i = 0; i < MergeRadiance.Length; i++)
             MergeRadiance[i] = Renderer.CreateRenderTarget((int)MergeSizes[0].X, (int)MergeSizes[0].Y, cascadeFormat);
 
         FrustumRadiance = new RenderTarget2D[FrustumCount];
+
         for (int frustum = 0; frustum < FrustumCount; frustum++)
         {
             FrustumRadiance[frustum] = Renderer.CreateRenderTarget((int)WorldSize.X, (int)CascadeSizes[0].Y, cascadeFormat);
@@ -155,6 +162,7 @@ public class HRCGI : core.System
         FinalTexture = Renderer.CreateRenderTarget((int)ViewSize.X, (int)ViewSize.Y, finalFormat);
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         var emissive = Geometry.EmissiveTexture;
@@ -184,6 +192,7 @@ public class HRCGI : core.System
         Inspector.SetLabel("hrcgi", "cascades", $"Number of Cascades: {CascadeCount}");
     }
 
+    /// <summary>Seeds the first lighting cascade from geometry and emission buffers.</summary>
     private void RenderFrustumSeed(int frustum, Texture2D emissive, Texture2D absorption)
     {
         // Filter geometry at reduced resolution before seeding both radiance and transmittance.
@@ -205,6 +214,7 @@ public class HRCGI : core.System
             .Commit();
     }
 
+    /// <summary>Extends lighting probes across each cascade's frustum.</summary>
     private void RenderExtensions(int cascade)
     {
         // MRT: output to both radiance and transmittance targets
@@ -224,6 +234,7 @@ public class HRCGI : core.System
             .Commit();
     }
 
+    /// <summary>Merges cascade lighting into the reconstructed irradiance field.</summary>
     private void RenderMerging(int cascade)
     {
         int nextCascade = cascade + 1;
@@ -249,11 +260,13 @@ public class HRCGI : core.System
             .Commit();
     }
 
+    /// <summary>Copies a cascade result into its persistent frustum output.</summary>
     private void CopyToFrustumOutput(int frustum)
     {
         Renderer.Blit(MergeRadiance[0], FrustumRadiance[frustum]);
     }
 
+    /// <summary>Combines reconstructed lighting and scene materials into the output image.</summary>
     private void Compose()
     {
         LastOutputJitter = OutputJitter;
@@ -273,6 +286,7 @@ public class HRCGI : core.System
             .Commit();
     }
 
+    /// <inheritdoc/>
     public override void Render()
     {
         Renderer.Blit(FinalTexture, BlendState.AlphaBlend, SamplerState.PointClamp);
@@ -281,8 +295,10 @@ public class HRCGI : core.System
     /// <summary>Linear RGB mean radiance (angular integral divided by 2*pi), at viewport resolution.</summary>
     public RenderTarget2D GetOutput() => FinalTexture;
 
+    /// <inheritdoc/>
     public override void OnResize() => ResizeTargets();
 
+    /// <summary>Releases render targets owned by this stage.</summary>
     private void DisposeRenderTargets()
     {
         FinalTexture?.Dispose();
@@ -295,6 +311,7 @@ public class HRCGI : core.System
                 VraysRadiance[i]?.Dispose();
                 VraysTransmittance[i]?.Dispose();
             }
+
             VraysRadiance = null;
             VraysTransmittance = null;
         }
@@ -302,6 +319,7 @@ public class HRCGI : core.System
         if (MergeRadiance != null)
         {
             foreach (var target in MergeRadiance) target?.Dispose();
+
             MergeRadiance = null;
         }
 
@@ -311,10 +329,12 @@ public class HRCGI : core.System
             {
                 FrustumRadiance[i]?.Dispose();
             }
+
             FrustumRadiance = null;
         }
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         Inspector.DestroyWindow("hrcgi");

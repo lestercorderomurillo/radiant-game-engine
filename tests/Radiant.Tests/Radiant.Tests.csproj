@@ -5,6 +5,7 @@
     <RollForward>Major</RollForward>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../eng/Radiant.Numerics.cs" Link="Radiant.Numerics.cs" />
     <ProjectReference Include="../../radiant.csproj" />
   </ItemGroup>
 </Project>

@@ -7,8 +7,10 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../eng/Radiant.Numerics.cs" Link="Radiant.Numerics.cs" />
     <Compile Include="../../src/com.radiant.engine/tests/2D/Rendering2DScene.cs" Link="Scenes/Rendering2DScene.cs" />
     <ProjectReference Include="../../radiant.csproj" />
+    <Compile Include="../Shared/UpscalingRegressionWindow.cs" Link="UpscalingRegressionWindow.cs" />
     <Compile Include="../Shared/SmokeWindow.cs" Link="SmokeWindow.cs" />
     <Compile Include="../../src/com.radiant.engine/tests/3D/*.cs" Link="Scenes/%(Filename)%(Extension)" />
   </ItemGroup>

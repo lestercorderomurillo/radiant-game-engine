@@ -1,11 +1,12 @@
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
+using com.radiant.engine.input;
 
 namespace com.radiant.engine.runtime;
 
-public class Window : Game
+/// <summary>Hosts the game loop in a MonoGame window and forwards resizing and drawing events.</summary>
+public class Window : Game, IRuntimeHost
 {
     public static int BuildNumber { get; private set; }
     public static string BuildTag { get; private set; }
@@ -14,11 +15,13 @@ public class Window : Game
 
     public GameLoop GameLoop;
 
-    public SpriteBatch SpriteBatch;
-
     public bool ResizePending { get; private set; }
-    private bool MaximizeOnShow;
 
+    private bool MaximizeOnShow;
+    private MonoGameInputSource DesktopInput;
+    IInputSource IRuntimeHost.Input => DesktopInput ?? (IInputSource)NullInputSource.Instance;
+
+    /// <summary>Creates a MonoGame host with the supplied game loop and window settings.</summary>
     public Window(GameLoop gameLoop, WindowOptions Options = null)
     {
         Options ??= new WindowOptions();
@@ -50,6 +53,16 @@ public class Window : Game
         Content.RootDirectory = "Content";
     }
 
+    void IRuntimeHost.PrepareScene(com.radiant.engine.core.Scene Scene) => Scene.Renderer = new com.radiant.engine.core.Renderer(this);
+    void IRuntimeHost.ReleaseScene(com.radiant.engine.core.Scene Scene)
+    {
+        Scene.Renderer?.Dispose();
+        Scene.Renderer = null;
+    }
+    void IRuntimeHost.BeginFrame(com.radiant.engine.core.Scene Scene) => Scene.Renderer.ClearBackBuffer(Color.Black);
+    void IRuntimeHost.EndFrame(com.radiant.engine.core.Scene Scene) => Scene.Renderer.PresentToBackBuffer();
+
+    /// <inheritdoc/>
     protected override void Initialize()
     {
         base.Initialize();
@@ -59,54 +72,56 @@ public class Window : Game
         GraphicsDeviceManager.SynchronizeWithVerticalRetrace = false;
         GraphicsDeviceManager.ApplyChanges();
 
-        SpriteBatch = new SpriteBatch(GraphicsDevice);
-        GameLoop.SpriteBatch = SpriteBatch;
-
         Window.ClientSizeChanged += OnClientSizeChanged;
         GraphicsDevice.DeviceReset += OnClientSizeChanged;
 
+        DesktopInput = new MonoGameInputSource(Window, () => IsActive);
         GameLoop.Initialize(this);
     }
 
+    /// <summary>Marks a window resize for deferred renderer updates.</summary>
     private void OnClientSizeChanged(object Sender, EventArgs Event)
     {
-        if (Window.ClientBounds.Width > 0 && Window.ClientBounds.Height > 0)
-            ResizePending = true;
+        if (Window.ClientBounds.Width > 0 && Window.ClientBounds.Height > 0) ResizePending = true;
     }
 
+    /// <summary>Clears the deferred-resize flag once the new size has been handled.</summary>
     public void ClearResizePending()
     {
         ResizePending = false;
     }
 
+    /// <summary>Returns the center of the current client area in pixels.</summary>
     public Vector2 GetScreenCenter()
     {
         return new Vector2(GraphicsDeviceManager.PreferredBackBufferWidth / 2, GraphicsDeviceManager.PreferredBackBufferHeight / 2);
     }
 
+    /// <summary>Returns the current client-area dimensions in pixels.</summary>
     public Vector2 GetScreenSize()
     {
         return new Vector2(GraphicsDeviceManager.PreferredBackBufferWidth, GraphicsDeviceManager.PreferredBackBufferHeight);
     }
 
+    /// <inheritdoc/>
     protected override void Update(GameTime gameTime)
     {
         base.Update(gameTime);
 
-        GameLoop.GameTime = gameTime;
         GameLoop.Update();
 
-        if (Keyboard.GetState().IsKeyDown(Keys.Escape))
-            Exit();
+        if (GameLoop.Controls.IsDown(Key.Escape)) Exit();
     }
 
+    /// <inheritdoc/>
     protected override void Draw(GameTime gameTime)
     {
         if (MaximizeOnShow) { NativeWindow.Maximize(Window.Handle); MaximizeOnShow = false; }
-        GameLoop.GameTime = gameTime;
+
         GameLoop.Render();
     }
 
+    /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -114,8 +129,9 @@ public class Window : Game
             Window.ClientSizeChanged -= OnClientSizeChanged;
             if (GraphicsDevice != null) GraphicsDevice.DeviceReset -= OnClientSizeChanged;
             GameLoop.Dispose();
-            SpriteBatch?.Dispose();
+            DesktopInput?.Dispose();
         }
+
         base.Dispose(disposing);
     }
 }

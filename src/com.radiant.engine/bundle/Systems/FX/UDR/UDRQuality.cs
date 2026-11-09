@@ -16,9 +16,11 @@ public static class UDRQuality
 
     public static event Action<int> Changed;
 
+    /// <summary>Changes the global reconstruction quality and notifies subscribers.</summary>
     public static void Set(int index)
     {
         index = Math.Clamp(index, 0, ScaleFactors.Length - 1);
+
         if (Index != index)
         {
             Index = index;
@@ -26,6 +28,7 @@ public static class UDRQuality
         }
     }
 
+    /// <summary>Advances to the next reconstruction quality preset.</summary>
     public static void Cycle()
     {
         Set((Index + 1) % ScaleFactors.Length);

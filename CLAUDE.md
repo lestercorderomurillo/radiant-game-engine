@@ -27,6 +27,8 @@ MonoGame C# 2D engine: ECS + GPU-instanced shapes + HRC global illumination.
 | **Descriptive local variable names** | `transform`, `material`, `circle` — never `t`, `m`, `c` |
 | **No dead code** | Remove unused fields/variables/usings. Public API awaiting callers is fine |
 
+Keep class and method hover documentation to one purposeful XML summary; use `inheritdoc` for unchanged override contracts and document partial types once. Build outputs include XML documentation; see `docs/human-code-readable.md` for the approved readability rules.
+
 **Critical**: never use single-letter or abbreviated variable names. Local refs use lowercase type name (camelCase) to avoid type shadowing:
 
 ```csharp
@@ -573,7 +575,7 @@ Inspector.GetThemeNames();
 Inspector.WindowsRestored += () => {}; // Fired by View > Reorder Windows
 ```
 
-Built-in themes: Solaris, Carbon, Midnight, Sentinel (light), Greenfields (olive), Neon, Nord.
+Built-in themes: Solaris, Carbon, Midnight, Sentinel (light), Greenfields (olive), Neon, Nord. Carbon is the default, with red close buttons that brighten on hover; the Theme dropdown starts on Carbon.
 
 ### Menu Bar
 
@@ -659,6 +661,34 @@ Acquire component refs only after all AddComponent calls: archetype migration in
 The shared desktop props restore MGCB immediately before content compilation, after building project references, avoiding concurrent first-install tool restores. Linux CI builds the library/scenes and runs headless checks; graphical smoke tests require a Vulkan display.
 
 VS Code: `.vscode/settings.json` selects `radiant.sln` and associates `.fx` with HLSL. The build task builds Debug, and launch configurations run the preserved lighting/tileset scenes. The sibling Pac-Man solution and multi-root workspace include the library and both engine test projects, allowing C# Dev Kit to resolve sources across repositories.
+
+### Path lighting resolution
+
+Cornell Box and Rendering2D use `PathLighting` after `Denoising` and before tone mapping. `PathTracer.SeparateLighting` enables stable primary hits; its raw radiance and denoiser guides keep their original matching resolution. The Lighting resolution slider scales tracing only. `PathLighting` caches full-view pixel-center albedo, normal, depth and emission hits using the same BVH, reconstructs diffuse illumination with depth/normal weights, and reapplies full-resolution albedo/emission. Camera, scene, camera availability and view-size changes invalidate the surface cache. At scale 1 it forwards native-resolution radiance through the same stage without spatial reconstruction. Inactive tracing releases reconstruction targets. Fine lighting remains limited by trace resolution; surfaces with no matching low-resolution sample use environment illumination. Full-resolution surface buffers are exposed in the pipeline inspector and provide AA depth. `PathSurfaces.fx` and `PathTracer.fx` share BVH traversal through `TraceScene.fxh`.
+
+## Shared reconstruction in test demos
+
+`Upscaling` is an `ImageSystem` stage between `AntiAliasing` and `RenderInspector` / `RenderPresentation`. It owns only the selected UDR backend, runs reconstruction in Render after its input producers, and releases the previous backend on selection changes. `None` and Native bypass reconstruction. `AntiAliasingSettings.Upscaler` adds the common Image quality selector; sources without a camera omit TAA. UDR1–3 are available only for an explicitly declared HRC input; generic inputs expose UDR4 spatial reconstruction with temporal accumulation disabled. UDR4 supports `Present`, `UseHrcGeometry`, and `Temporal` integration flags; spatial mode preserves alpha and uses two targets and two passes. Its default standalone behavior remains the HRC Update-phase path.
+
+All five interactive demos expose the same Image quality controls. `DemoRendering` shares the HRC / tiles image-stage wiring; SimpleLight and MegaLights default to UDR4. Rendering2D, CornellBox, and Tileset default to None and allow UDR4 selection. Modern scenes call `Upscaling.ResolveViewSize` before rendering to reduce producer resolution and restore explicit resolutions on bypass. Tileset can set `Present = false` and expose its cropped viewport through `GetOutput`. MegaLights F11 cycles None / UDR1–4.
+
+GPU selector regression: `tests/Radiant.Scenes <lights|triangles|tiles|rendering2d> --upscaling-regression` and `tests/Radiant.3D --upscaling-regression [--2d]`. These cover all supported modes and quality settings, AA composition, Native identity bypass, off/on, finite output and resize. See `docs/RenderingPipeline.md` for integration and remaining per-view limitations.
+
+## Optional Vulkan hardware path tracing
+
+`PathTracer.Backend` selects Auto (default), Software (GPU shader BVH), or Vulkan (strict; throws if unavailable). `ActiveBackend`, `BackendStatus`, `HardwareBuildCount` and `TraceGpuMilliseconds` expose the selected path; timing covers only the last completed native ray-query dispatch. The Path tracing inspector has the same selector. `Renderer.SupportsVulkanPathTracing` checks the active device and runtime ABI. All native resource access stays behind `RendererRayTracing` and `VulkanPathTraceSession` in core rendering.
+
+Build the optional runtime with `python3 eng/build-vulkan-rt.py`, then use `-p:RadiantVulkanRT=true` when building/running/publishing. The script downloads pinned MonoGame 3.8.6, SDL, FAudio, Volk, VMA, Vulkan headers and stb into ignored `artifacts/native`; requires Python 3.12+, CMake, C/C++ tooling, .NET and glslangValidator. `Native/VulkanRT` contains the checked runtime patch, C ABI implementation and GLSL ray-query shader. The patch enables Vulkan 1.2 + KHR acceleration structures/ray queries only when supported, and fixes acquired-image semaphore consumption for mid-frame flushes. Normal builds restore the stock runtime. Native builds are platform/architecture specific; do not copy a Linux binary into Windows or an x64 binary into arm64 output. The optional runtime is pinned to MonoGame 3.8.6.
+
+Tracing builds one BLAS over the existing world-triangle adapter plus an identity TLAS, caches by source/revision, and writes an RGBA32F sample in MonoGame's command buffer. Its external texture feeds the existing accumulation/denoising/lighting/color pipeline without CPU image transfers. Flush before disposing external texture views; do not force-purge MonoGame's unrelated deferred resources. Native dispatch restores shader-read layout before raster consumers. Geometry changes, resizing and disposal synchronize; ordinary tracing frames do not wait for CPU readback. Guides/full-resolution PathLighting still use the existing software BVH. Material transport remains the existing diffuse integrator, and geometry changes currently rebuild rather than refit.
+
+`tests/Radiant.3D --vulkan-rt-regression` requires real Vulkan RT and checks analytic transport, software parity away from shared-edge roundoff, clipping, cameras, empty geometry, revisions, accumulation, texture sharing, resizing, switching and disposal. With the stock runtime use `--vulkan-rt-regression --expect-software` to check Auto fallback and rejection of explicit Vulkan. `--pipeline-regression [--2d]` exercises full integration. Interactive Cornell accepts `--path-backend=auto|software|vulkan`. Windows build support is provided but requires validation on Windows hardware; development validation uses Linux/RADV on RX 9070 XT.
+
+## Native NRD diffuse reconstruction
+
+`python3 eng/build-vulkan-rt.py --nrd` adds pinned official NRD 4.18.0 to the optional runtime; the managed/native RT ABI is now 2. Build/run with `-p:RadiantVulkanRT=true`. `Denoising.TraceSource` connects current native signals; `NrdReblur` and `NrdRelax` / IDs `nrd.reblur` and `nrd.relax` use `NrdDenoiser`, `VulkanNrdSession`, and `Native/VulkanRT/nrd.inl`. Capability checks require the NRD runtime, ray queries and unformatted storage-image reads/writes. The native device enables supported features explicitly. Shader sources emit demodulated diffuse radiance, second-segment hit distance and primary guides; REBLUR packing differs from RELAX. Native reconstruction uses per-view resources, per-flight-frame constants/descriptors and GPU-only composition; software selection forwards raw input. `PathTracer.NativeDenoiserProvider` tracks disabled/changed denoisers before tracing. Scene revisions reset history; zero world motion is valid between revisions, with camera matrices handling camera motion. Only diffuse materials are supported. DLSS, OptiX and FSR RR remain unavailable; FSR RR currently requires Windows/DX12.
+
+`--nrd-regression` validates actual REBLUR/RELAX analytic transport, lifecycle and noisy diffuse error; `--expect-unavailable` checks stock runtime rejection. Cornell accepts `--denoiser=nrd.reblur|nrd.relax|none|bilateral|atrous|svgf|oidn`, including `--capture`, which saves a backend-specific image for non-default modes. `--pipeline-regression --2d --denoiser=nrd.reblur` covers native NRD through the 2D lighting/composition stages. Native NRD requires CMake 3.30+ and downloads pinned ShaderMake/MathLib/compiler dependencies; published runtime licenses include NRD, MathLib and ShaderMake. See `docs/Rendering.md` for limitations and verification.
 
 ## Shared camera controller
 

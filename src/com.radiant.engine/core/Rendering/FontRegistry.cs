@@ -21,6 +21,7 @@ internal class FontRegistry : IDisposable
     /// </summary>
     public float FontRenderScale { get; set; } = 1f;
 
+    /// <summary>Locates renderer fonts under the supplied content directory.</summary>
     public FontRegistry(string contentRootDirectory)
     {
         ContentRootDirectory = contentRootDirectory;
@@ -34,6 +35,7 @@ internal class FontRegistry : IDisposable
     public void Load(string name, string path)
     {
         if (Systems.ContainsKey(name)) return;
+
         #pragma warning disable CS0618
         var settings = new FontSystemSettings { PremultiplyAlpha = true };
         #pragma warning restore CS0618
@@ -56,7 +58,7 @@ internal class FontRegistry : IDisposable
     public Vector2 Measure(string fontName, float size, string text)
     {
         var font = Systems[fontName].GetFont(size * FontRenderScale);
-        return font.MeasureString(text) / FontRenderScale;
+        return font.MeasureString(text).ToNumerics() / FontRenderScale;
     }
 
     /// <summary>
@@ -70,6 +72,7 @@ internal class FontRegistry : IDisposable
     {
         foreach (var fontSystem in Systems.Values)
             fontSystem.Dispose();
+
         Systems.Clear();
     }
 }

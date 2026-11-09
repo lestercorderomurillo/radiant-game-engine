@@ -1,5 +1,31 @@
 # Modular rendering
 
+## Optional Vulkan ray-query path tracer
+
+`PathTracer.Backend` accepts `Auto`, `Software`, or `Vulkan`. Auto uses the optional native backend when the active device enables Vulkan KHR ray queries; otherwise it reports the reason and uses the existing GPU shader BVH. Explicit Vulkan selection fails if unavailable. The Path tracing inspector exposes the selection and the last completed ray-query GPU time, excluding geometry guides, denoising and other image stages.
+
+Build and run the optional runtime on the target platform:
+
+```sh
+python3 eng/build-vulkan-rt.py
+dotnet run --project tests/Radiant.3D -c Release -p:RadiantVulkanRT=true -- --path-backend=vulkan
+```
+
+The native build requires Python 3.12+, CMake, a C/C++ compiler, .NET 8+ and `glslangValidator` (included in the Vulkan SDK). Linux also needs the development dependencies for SDL's X11/Wayland support. On Windows, use a Visual Studio C++ development environment and the Vulkan SDK. Sources are pinned to MonoGame 3.8.6 and its dependencies; downloads, generated shaders and binaries stay under `artifacts/native`. The first build needs network access. Normal engine builds use the stock MonoGame runtime and need none of this native tooling. Use `-p:RadiantVulkanRT=true` for publishing as well; native binaries must match the target OS and architecture. Distribution includes the dependency licenses.
+
+The backend builds BLAS/TLAS acceleration structures, traces diffuse paths using `VK_KHR_ray_query`, and exposes a shared RGBA32F GPU texture to MonoGame. It records into the existing Vulkan command buffer, so the steady-state path has no CPU image transfer. The existing HDR accumulation, denoisers, lighting reconstruction and tone mapping remain composable. Resource changes synchronize before rebuilding or freeing resources. Geometry is currently flattened into one BLAS and rebuilt on adapter revision; per-mesh instancing/refits are future work. Surface guides and full-resolution lighting reconstruction still traverse the software BVH. This is the existing diffuse integrator accelerated by Vulkan, without NRD, DLSS or FSR Ray Regeneration integration.
+
+Validation commands:
+
+```sh
+dotnet run --project tests/Radiant.3D -c Release -p:RadiantVulkanRT=true -- --vulkan-rt-regression
+dotnet run --project tests/Radiant.3D -c Release -p:RadiantVulkanRT=true -- --pipeline-regression
+dotnet run --project tests/Radiant.3D -c Release -p:RadiantVulkanRT=true -- --pipeline-regression --2d
+dotnet run --project tests/Radiant.3D -c Release -- --vulkan-rt-regression --expect-software
+```
+
+For an installed Khronos validation layer, add `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation` and `VK_LAYER_VALIDATE_SYNC=1` to the test environment. Linux/RADV on Radeon RX 9070 XT is the tested hardware; Windows and NVIDIA execution need separate validation.
+
 Scenes and entities are dimension-neutral containers. An entity may have 2D components, 3D components, both, or neither. Installing a 2D system does not install any 3D system. Nothing enforces a single renderer for the entire game.
 
 ## Data and movement
@@ -131,6 +157,8 @@ Diffuse paths use cosine-weighted hemisphere sampling, emissive surfaces, an env
 
 The optional `ViewSize` provider supplies the base tracing resolution before `ResolutionScale`. Both demos use their view size here, so selecting raster MSAA/SSAA does not silently change path resolution or consume raster targets. Path tracing provides stochastic ray sampling; its image can additionally use FXAA, SMAA or TAA.
 
+Both demos separate surface detail from lighting with `PathLighting`, placed after denoising and before tone mapping. The **Lighting resolution** slider reduces the path-traced lighting buffer while model silhouettes, albedo and emission retain the full view resolution. `PathTracer.SeparateLighting` holds primary rays at pixel centers so low-resolution samples and their surface guides agree; bounce directions remain stochastic. The reconstruction stage divides diffuse radiance by its source albedo, gathers lighting using normal/depth weights, then applies full-resolution albedo and emission. It keeps the existing radiance/guide contracts and denoiser resolutions intact. At native resolution it copies radiance without extra filtering. Full-resolution surface buffers are cached until the camera, geometry or view changes, exposed under **Path lighting** in the pipeline inspector, and used for AA depth. Disabling tracing releases these targets. Small lighting features still depend on trace resolution; surfaces missed by every nearby lighting sample fall back to environment illumination. Cached surface tracing and reconstruction add GPU work, so this is a quality/performance tradeoff rather than a guaranteed frame-rate gain.
+
 Shape tracing tessellates circles using `CircleSegments`. New shape rendering is opaque and untextured; the existing 2D pipeline retains its texture/transparency features. Shape color, raster lighting and trace albedo are interpreted as linear numeric RGB; tone mapping is independent of output transfer/gamma conversion. HRC/UDR and the opaque 2D/3D pipelines share the same color shader and operators.
 
 Algorithm references: [PBRT's simple path tracer](https://pbr-book.org/4ed/Light_Transport_I_Surface_Reflection/A_Simple_Path_Tracer), [PBRT path termination](https://pbr-book.org/4ed/Light_Transport_I_Surface_Reflection/A_Better_Path_Tracer), and [NVIDIA's FXAA white paper](https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf). The shaders here are engine-specific implementations.
@@ -194,7 +222,13 @@ This integration uses **host readback/upload**, including when OIDN chooses a GP
 
 There is no universal “best denoiser”: reconstruction quality depends on signals, motion, supported hardware, sampling and frame budget. [DLSS 4.5 Ray Reconstruction](https://www.nvidia.com/en-us/geforce/news/dlss-4-5-ray-reconstruction-1000-rtx-games-apps-out-now/), [FSR Ray Regeneration](https://gpuopen.com/amd-fsr-sdk/), [NRD REBLUR/RELAX](https://github.com/NVIDIA-RTX/NRD) and OptiX are distinct vendor/native integrations. SIGMA in NRD handles shadows, rather than arbitrary beauty-image denoising. These are not extra names for the portable filters above.
 
-NRD needs native compute dispatch/resource integration and additional signal conventions, including separated lobes/hit distances. DLSS/FSR require their supported native APIs/platforms, signals and hardware. OptiX requires NVIDIA CUDA/OptiX. Radiant’s current MonoGame renderer exposes neither compute dispatch nor native resource/command-list interop, so **none of those SDKs is integrated**. They appear as unavailable capabilities, with reasons; this does not promise identical image quality or performance to a production Cyberpunk renderer. Adding native compute/interop and richer tracing signals is the next prerequisite.
+**NRD REBLUR and RELAX are integrated for diffuse path tracing through the optional Vulkan runtime.** Build with `python3 eng/build-vulkan-rt.py --nrd`, then build/run with `-p:RadiantVulkanRT=true`. This pins official NRD 4.18.0 and compiles its SPIR-V shaders; CMake 3.30+ is required and the first build downloads the SDK’s shader compiler dependencies. Assign `Denoising.TraceSource = tracer` (already wired in both path tracing demos), use Auto or Vulkan tracing, and select `nrd.reblur` / `nrd.relax` with `TrySelectBackend`. The selector checks the loaded runtime and device. Standard builds keep both entries unavailable. Cornell also accepts `--denoiser=nrd.reblur` or `--denoiser=nrd.relax`, including with `--capture`.
+
+NRD consumes a current, stable-primary diffuse sample with primary albedo/emission removed, second-segment hit distance, packed normals/roughness, world-unit view depth, and zero world motion. Camera reprojection uses current/previous matrices; geometry revisions reset history rather than attempting object-motion tracking. REBLUR receives normalized hit distance and YCoCg encoding; RELAX receives linear radiance and world-unit hit distance. Reconstruction reapplies exact primary albedo/emission and forwards misses from the current raw sample. All tracing, NRD passes and composition remain in MonoGame’s GPU command stream, with per-view pools and per-flight-frame constants/descriptors. Selecting software tracing forwards raw radiance with a status message. Resize, scene/radiance revisions, explicit reset, and trace-session replacement invalidate history. Native signals are allocated at trace resolution only while a native denoiser is selected; ordinary tracing uses minimal dummy bindings. This is a diffuse-only integrator: specular/glass denoising and per-object motion are not implemented.
+
+`tests/Radiant.3D --nrd-regression` checks both real SDK denoisers, analytic transport, revisions, perspective/orthographic cameras, missing cameras, resize, selection/off/on, software fallback, empty scenes, and noise reduction against a 64-sample reference. With a stock runtime, `--nrd-regression --expect-unavailable` verifies capability rejection. Linux/RADV RX 9070 XT validation covers both filters with Vulkan synchronization validation, the full 2D pipeline and a 3D Cornell capture. The noisy diffuse fixture measured filtered/raw MSE ratios of 0.036 (RELAX) and 0.057 (REBLUR); these are fixture results, not general quality guarantees. Windows hardware validation remains outstanding.
+
+DLSS Ray Reconstruction and OptiX remain unimplemented native backends requiring NVIDIA hardware/runtime support. [FSR Ray Regeneration 1.2.1 requirements](https://gpuopen.com/manuals/fsr_sdk/techniques/denoising/#6-requirements) specify Windows 11, DirectX 12 and RX 9000-series or later; the broader FSR SDK’s Vulkan upscaling support does not provide a Vulkan Ray Regeneration backend. These three entries stay unavailable. Enabling them requires separate SDK integrations and supported validation hardware/platforms; they are not aliases for NRD or the portable filters.
 
 `IDenoisingBackend` provides per-view Render/Update, output/buffers, status/capability, reset and disposal. Register an independently owned, lazy backend factory; a small disposable probe supplies metadata. Distinct IDs are required, including when overriding an unavailable catalog entry:
 

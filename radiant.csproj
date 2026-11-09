@@ -1,12 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="eng/Radiant.Desktop.props" />
   <PropertyGroup>
+    <Version>0.3.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Keep field/property documentation optional; validate all XML comments. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <OutputType>Library</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <Optimize>true</Optimize>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="eng/Radiant.Numerics.cs" />
     <Compile Include="src/com.radiant.engine/**/*.cs" Exclude="src/com.radiant.engine/tests/**/*.cs" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
     <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.4" />

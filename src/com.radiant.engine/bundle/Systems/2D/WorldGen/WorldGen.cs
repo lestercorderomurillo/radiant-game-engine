@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Populates the ECS with terrain and cave tiles derived from noise.</summary>
 public class WorldGen : core.System
 {
     private PerlinNoise2D PerlinNoise;
@@ -24,16 +25,20 @@ public class WorldGen : core.System
 
     private int SurfaceLevel;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         PerlinNoise = Scene.ECS.GetSystem<PerlinNoise2D>();
         Random = new Random();
     }
 
+    /// <summary>Surface terrain categories used during world generation.</summary>
     enum SurfaceBiomeType { Greenfields, Desert, Snowy, Volcanic, Mountain }
 
+    /// <summary>Underground material categories used during world generation.</summary>
     enum CaveBiomeType { Surface, Underground }
 
+    /// <summary>Creates terrain and cave entities for the requested world dimensions.</summary>
     public void GenerateWorld(int width, int height)
     {
         WorldWidth = width;
@@ -51,6 +56,7 @@ public class WorldGen : core.System
         for (int x = 0; x < width; x++)
         {
             BiomeCounter--;
+
             if (BiomeCounter <= 0)
             {
                 if (CurrentBiome == SurfaceBiomeType.Greenfields)
@@ -147,6 +153,7 @@ public class WorldGen : core.System
         }
     }
 
+    /// <summary>Maps a value between piecewise input and output ranges, clamping at the endpoints.</summary>
     float Scale(float input, float[] inputRange, float[] outputRange)
     {
         if (input <= inputRange[0]) return outputRange[0];
@@ -164,8 +171,10 @@ public class WorldGen : core.System
         return outputRange[0];
     }
 
+    /// <summary>Converts a tile-space period into a noise sampling frequency.</summary>
     public static float Freq(float tilePeriod) => 1f / tilePeriod;
 
+    /// <summary>Chooses a tile material from terrain height and biome noise.</summary>
     private TileType DetermineTileType(int x, int y, int layer)
     {
         TileType surface = TileType.Grass;
@@ -214,17 +223,13 @@ public class WorldGen : core.System
         {
             tile = TileType.Stone;
 
-            if (Random.Next(100) < Scale(y, [100, WorldHeight], [0, 10, 15, 0]))
-            {
-                tile = TileType.Dirt;
-            }
+            if (Random.Next(100) < Scale(y, [100, WorldHeight], [0, 10, 15, 0])) tile = TileType.Dirt;
         }
 
         if (y > SurfaceLevel + 15 && tile.Id != TileType.Air.Id && layer == 0)
         {
             int depth = y - SurfaceLevel;
 
-            
             //var normalizedSin = (double frequency) => (Math.Sin(y / 10 * x * frequency) + 1) / 2;
 
            // var variance = (float)(0.050 * normalizedSin(0.025f));
@@ -248,6 +253,7 @@ public class WorldGen : core.System
         return tile;
     }
 
+    /// <summary>Creates a spatially indexed tile entity with its render components.</summary>
     private void CreateTileEntity(int tileX, int tileY, int layer, TileType tileType)
     {
         int entity = Scene.ECS.CreateEntity(new Vector2(tileX * TileSize, tileY * TileSize), layer);
@@ -265,10 +271,18 @@ public class WorldGen : core.System
         tileData.TileTypeId = tileType.Id;
     }
 
+    /// <inheritdoc/>
     public override void Update() { }
 
+    /// <inheritdoc/>
     public override void FixedUpdate() { }
+
+    /// <inheritdoc/>
     public override void Render() { }
+
+    /// <inheritdoc/>
     public override void LateRender() { }
+
+    /// <inheritdoc/>
     public override void Dispose() { }
 }

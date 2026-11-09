@@ -22,6 +22,7 @@ internal class TextureManager : IDisposable
         public readonly int MinSize;
         public readonly Dictionary<int, Texture2D> Cache = new();
 
+        /// <summary>Stores a procedural texture generator and its minimum cache size.</summary>
         public ShapeEntry(Func<GraphicsDevice, int, Texture2D> generator, int minSize)
         {
             Generator = generator;
@@ -35,6 +36,7 @@ internal class TextureManager : IDisposable
     private readonly Dictionary<(Color, int, int), Texture2D> SolidCache = new();
     private readonly Dictionary<string, ShapeEntry> ShapeEntries = new();
 
+    /// <summary>Binds procedural texture caching to the supplied graphics device.</summary>
     public TextureManager(GraphicsDevice device, ContentManager content)
     {
         Device = device;
@@ -60,11 +62,13 @@ internal class TextureManager : IDisposable
     {
         var entry = ShapeEntries[name];
         if (size < entry.MinSize) size = entry.MinSize;
+
         if (!entry.Cache.TryGetValue(size, out var texture))
         {
             texture = entry.Generator(Device, size);
             entry.Cache[size] = texture;
         }
+
         return texture;
     }
 
@@ -78,6 +82,7 @@ internal class TextureManager : IDisposable
             texture = Content.Load<Texture2D>(name);
             ContentCache[name] = texture;
         }
+
         return texture;
     }
 
@@ -87,17 +92,21 @@ internal class TextureManager : IDisposable
     public Texture2D GetSolid(Color color, int width = 1, int height = 1)
     {
         var key = (color, width, height);
+
         if (!SolidCache.TryGetValue(key, out var texture))
         {
             texture = new Texture2D(Device, width, height);
+
             var data = new Color[width * height];
             Array.Fill(data, color);
             texture.SetData(data);
             SolidCache[key] = texture;
         }
+
         return texture;
     }
 
+    /// <summary>Rasterizes a reusable circle texture for shape drawing.</summary>
     private static Texture2D GenerateCircle(GraphicsDevice device, int diameter)
     {
         var texture = new Texture2D(device, diameter, diameter);
@@ -118,7 +127,7 @@ internal class TextureManager : IDisposable
                 float dy = y - centerY;
                 float dist = MathF.Sqrt(dx * dx + dy * dy);
 
-                float alpha = 1.0f - MathHelper.Clamp((dist - innerRadius) / aaWidth, 0f, 1f);
+                float alpha = 1.0f - global::System.Math.Clamp((dist - innerRadius) / aaWidth, 0f, 1f);
                 byte a = (byte)(alpha * 255f + 0.5f);
 
                 data[y * diameter + x] = new Color(a, a, a, a);
@@ -126,9 +135,11 @@ internal class TextureManager : IDisposable
         }
 
         texture.SetData(data);
+
         return texture;
     }
 
+    /// <summary>Rasterizes a reusable triangle texture for shape drawing.</summary>
     private static Texture2D GenerateTriangle(GraphicsDevice device, int size)
     {
         var texture = new Texture2D(device, size, size);
@@ -147,12 +158,14 @@ internal class TextureManager : IDisposable
                 float d1 = EdgeDist(p, c, a);
                 float d2 = EdgeDist(p, a, b);
                 float dist = MathF.Max(d0, MathF.Max(d1, d2));
-                float alpha = MathHelper.Clamp(0.5f - dist, 0f, 1f);
+                float alpha = global::System.Math.Clamp(0.5f - dist, 0f, 1f);
                 byte val = (byte)(alpha * 255f + 0.5f);
                 data[y * size + x] = new Color(val, val, val, val);
             }
         }
+
         texture.SetData(data);
+
         return texture;
 
         static float EdgeDist(Vector2 p, Vector2 v0, Vector2 v1)
@@ -160,10 +173,12 @@ internal class TextureManager : IDisposable
             Vector2 edge = v1 - v0;
             Vector2 normal = new(edge.Y, -edge.X);
             float len = normal.Length();
+
             return (normal.X * (p.X - v0.X) + normal.Y * (p.Y - v0.Y)) / len;
         }
     }
 
+    /// <summary>Rasterizes a reusable rounded-rectangle texture for shape drawing.</summary>
     private static Texture2D GenerateRoundedRect(GraphicsDevice device, int radius)
     {
         int size = radius * 2 + 2;
@@ -181,29 +196,34 @@ internal class TextureManager : IDisposable
                 float dx = MathF.Max(MathF.Abs(px - center) - innerDist, 0f);
                 float dy = MathF.Max(MathF.Abs(py - center) - innerDist, 0f);
                 float dist = MathF.Sqrt(dx * dx + dy * dy) - radius;
-                float alpha = MathHelper.Clamp(0.5f - dist, 0f, 1f);
+                float alpha = global::System.Math.Clamp(0.5f - dist, 0f, 1f);
                 byte a = (byte)(alpha * 255f + 0.5f);
                 data[y * size + x] = new Color(a, a, a, a);
             }
         }
 
         texture.SetData(data);
+
         return texture;
     }
 
+    /// <summary>Releases cached procedural textures.</summary>
     public void Dispose()
     {
         foreach (var texture in ContentCache.Values)
             texture?.Dispose();
+
         ContentCache.Clear();
 
         foreach (var texture in SolidCache.Values)
             texture?.Dispose();
+
         SolidCache.Clear();
 
         foreach (var entry in ShapeEntries.Values)
             foreach (var texture in entry.Cache.Values)
                 texture?.Dispose();
+
         ShapeEntries.Clear();
     }
 }

@@ -1,0 +1,13 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(set = 0, binding = 0, rgba32f) uniform image2D OutputImage;
+layout(push_constant) uniform Parameters { vec4 Color; } Params;
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, imageSize(OutputImage)))) return;
+    if (Params.Color.w < 0)
+        imageStore(OutputImage, pixel, imageLoad(OutputImage, pixel) + vec4(Params.Color.xyz, 0));
+    else
+        imageStore(OutputImage, pixel, Params.Color);
+}

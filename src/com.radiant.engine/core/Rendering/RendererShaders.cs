@@ -1,3 +1,4 @@
+using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -6,6 +7,7 @@ namespace com.radiant.engine.core;
 public partial class Renderer
 {
     private Effect CurrentShader;
+    private readonly MonoGameRenderStates NativeStates = new();
 
     private BlendState BlendState = BlendState.Opaque;
     private DepthStencilState DepthStencilState = DepthStencilState.None;
@@ -45,6 +47,7 @@ public partial class Renderer
             CurrentShader = null;
             CurrentShaderName = null;
         }
+
         return this;
     }
 
@@ -55,8 +58,7 @@ public partial class Renderer
     /// <returns>This renderer for method chaining.</returns>
     public Renderer SetTechnique(string technique)
     {
-        if (CurrentShader != null)
-            CurrentShader.CurrentTechnique = CurrentShader.Techniques[technique];
+        if (CurrentShader != null) CurrentShader.CurrentTechnique = CurrentShader.Techniques[technique];
         return this;
     }
 
@@ -91,6 +93,7 @@ public partial class Renderer
             SamplerStates[slot] = state;
             SamplerDirtyMask |= 1 << slot;
         }
+
         return this;
     }
 
@@ -109,11 +112,13 @@ public partial class Renderer
             SamplerStates[s0.slot] = s0.state;
             SamplerDirtyMask |= 1 << s0.slot;
         }
+
         if (s1.slot >= 0 && s1.slot < SamplerStates.Length)
         {
             SamplerStates[s1.slot] = s1.state;
             SamplerDirtyMask |= 1 << s1.slot;
         }
+
         return this;
     }
 
@@ -125,16 +130,19 @@ public partial class Renderer
             SamplerStates[s0.slot] = s0.state;
             SamplerDirtyMask |= 1 << s0.slot;
         }
+
         if (s1.slot >= 0 && s1.slot < SamplerStates.Length)
         {
             SamplerStates[s1.slot] = s1.state;
             SamplerDirtyMask |= 1 << s1.slot;
         }
+
         if (s2.slot >= 0 && s2.slot < SamplerStates.Length)
         {
             SamplerStates[s2.slot] = s2.state;
             SamplerDirtyMask |= 1 << s2.slot;
         }
+
         return this;
     }
 
@@ -146,21 +154,25 @@ public partial class Renderer
             SamplerStates[s0.slot] = s0.state;
             SamplerDirtyMask |= 1 << s0.slot;
         }
+
         if (s1.slot >= 0 && s1.slot < SamplerStates.Length)
         {
             SamplerStates[s1.slot] = s1.state;
             SamplerDirtyMask |= 1 << s1.slot;
         }
+
         if (s2.slot >= 0 && s2.slot < SamplerStates.Length)
         {
             SamplerStates[s2.slot] = s2.state;
             SamplerDirtyMask |= 1 << s2.slot;
         }
+
         if (s3.slot >= 0 && s3.slot < SamplerStates.Length)
         {
             SamplerStates[s3.slot] = s3.state;
             SamplerDirtyMask |= 1 << s3.slot;
         }
+
         return this;
     }
 
@@ -185,16 +197,23 @@ public partial class Renderer
         {
             switch (state)
             {
-                case BlendState bs: BlendState = bs; break;
-                case DepthStencilState ds: DepthStencilState = ds; break;
-                case RasterizerState rs: RasterizerState = rs; break;
-                case SpriteSortMode sm: SpriteSortMode = sm; break;
+                case BlendState bs: BlendState = bs;
+                break;
+                case DepthStencilState ds: DepthStencilState = ds;
+                break;
+                case RasterizerState rs: RasterizerState = rs;
+                break;
+                case SpriteSortMode sm: SpriteSortMode = sm;
+                break;
                 case SamplerState ss:
                     SamplerStates[0] = ss;
                     SamplerDirtyMask |= 1;
                     break;
+                default:
+                    throw new global::System.ArgumentException("Configure accepts Radiant render-state descriptions only.", nameof(states));
             }
         }
+
         return this;
     }
 
@@ -267,28 +286,28 @@ public partial class Renderer
     /// <summary>Sets a Vector2 array parameter on the current (or specified) shader.</summary>
     public Renderer SetParameter(string name, Vector2[] value, Effect shader = null)
     {
-        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
+        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
         return this;
     }
 
     /// <summary>Sets a Vector3 array parameter on the current (or specified) shader.</summary>
     public Renderer SetParameter(string name, Vector3[] value, Effect shader = null)
     {
-        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
+        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
         return this;
     }
 
     /// <summary>Sets a Vector4 array parameter on the current (or specified) shader.</summary>
     public Renderer SetParameter(string name, Vector4[] value, Effect shader = null)
     {
-        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
+        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
         return this;
     }
 
     /// <summary>Sets a Matrix array parameter on the current (or specified) shader.</summary>
     public Renderer SetParameter(string name, Matrix[] value, Effect shader = null)
     {
-        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
+        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
         return this;
     }
 
@@ -296,6 +315,7 @@ public partial class Renderer
     public Renderer SetParameter(Effect shader = null, params (string name, object value)[] parameters)
     {
         var target = shader ?? CurrentShader;
+
         if (target == null) return this;
 
         foreach (var (name, value) in parameters)
@@ -310,23 +330,37 @@ public partial class Renderer
     public static void SetParameter(Effect shader, string key, object value)
     {
         var parameter = shader?.Parameters[key];
+
         if (parameter == null) return;
 
         switch (value)
         {
-            case float f: parameter.SetValue(f); break;
-            case int i: parameter.SetValue(i); break;
-            case bool b: parameter.SetValue(b); break;
-            case Vector2 v2: parameter.SetValue(v2); break;
-            case Vector3 v3: parameter.SetValue(v3); break;
-            case Vector4 v4: parameter.SetValue(v4); break;
-            case Matrix m: parameter.SetValue(m); break;
-            case Texture2D t: parameter.SetValue(t); break;
-            case float[] fa: parameter.SetValue(fa); break;
-            case Vector2[] v2a: parameter.SetValue(v2a); break;
-            case Vector3[] v3a: parameter.SetValue(v3a); break;
-            case Vector4[] v4a: parameter.SetValue(v4a); break;
-            case Matrix[] ma: parameter.SetValue(ma); break;
+            case float f: parameter.SetValue(f);
+            break;
+            case int i: parameter.SetValue(i);
+            break;
+            case bool b: parameter.SetValue(b);
+            break;
+            case Vector2 v2: parameter.SetValue(v2);
+            break;
+            case Vector3 v3: parameter.SetValue(v3);
+            break;
+            case Vector4 v4: parameter.SetValue(v4);
+            break;
+            case Matrix m: parameter.SetValue(m);
+            break;
+            case Texture2D t: parameter.SetValue(t);
+            break;
+            case float[] fa: parameter.SetValue(fa);
+            break;
+            case Vector2[] v2a: MonoGameMath.SetValue(parameter, v2a);
+            break;
+            case Vector3[] v3a: MonoGameMath.SetValue(parameter, v3a);
+            break;
+            case Vector4[] v4a: MonoGameMath.SetValue(parameter, v4a);
+            break;
+            case Matrix[] ma: MonoGameMath.SetValue(parameter, ma);
+            break;
         }
     }
 }

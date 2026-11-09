@@ -1,6 +1,5 @@
 using System;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.bundle;
 
@@ -17,6 +16,7 @@ public struct MotionTrackable : Component
     private int Head;
     private int HistoryCount;
 
+    /// <summary>Initializes an empty position-history ring for motion reconstruction.</summary>
     public MotionTrackable()
     {
         Pos0 = Pos1 = Pos2 = Pos3 = Vector2.Zero;
@@ -24,25 +24,32 @@ public struct MotionTrackable : Component
         HistoryCount = 0;
     }
 
+    /// <summary>Records a position in the motion-history ring buffer.</summary>
     public void Push(Vector2 position)
     {
         switch (Head)
         {
-            case 0: Pos0 = position; break;
-            case 1: Pos1 = position; break;
-            case 2: Pos2 = position; break;
-            case 3: Pos3 = position; break;
+            case 0: Pos0 = position;
+            break;
+            case 1: Pos1 = position;
+            break;
+            case 2: Pos2 = position;
+            break;
+            case 3: Pos3 = position;
+            break;
         }
 
         Head = (Head + 1) % MaxHistory;
         if (HistoryCount < MaxHistory) HistoryCount++;
     }
 
+    /// <summary>Estimates velocity from the retained motion samples.</summary>
     public readonly Vector2 CalculateVelocity(Vector2 currentPos, int historyFrames)
     {
         if (HistoryCount == 0) return Vector2.Zero;
 
         int framesToUse = Math.Min(HistoryCount, Math.Min(historyFrames, MaxHistory));
+
         if (framesToUse == 0) return Vector2.Zero;
 
         Vector2 weightedVelocity = Vector2.Zero;
@@ -75,11 +82,13 @@ public struct MotionTrackable : Component
     public readonly Vector2 RenderedDisplacement(Vector2 currentPosition)
     {
         if (HistoryCount == 0) return Vector2.Zero;
+
         Vector2 previous = GetAt((Head - 1 + MaxHistory) % MaxHistory);
         return new Vector2(MathF.Round(currentPosition.X) - MathF.Round(previous.X),
             MathF.Round(currentPosition.Y) - MathF.Round(previous.Y));
     }
 
+    /// <summary>Reads a position sample relative to the motion-history ring.</summary>
     private readonly Vector2 GetAt(int idx)
     {
         return idx switch

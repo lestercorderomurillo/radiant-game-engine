@@ -66,6 +66,10 @@ R switches renderers; F1 opens the pipeline controls. View → Color Management 
 
 ## Build a game
 
+Start with `new GameClient().Run(new MyScene())`. The runtime accepts an
+`IRuntimeBackend`; simulation can also run with `HeadlessBackend` without a window.
+Scenes and ECS systems receive Radiant's `FrameTime` and `Controls` for keyboard, mouse and text. See [runtime backends and API migration](docs/RuntimeBackends.md) and [Radiant input](docs/Input.md). Vectors and matrices use [System.Numerics](docs/Math.md), and meshes accept Radiant `MeshVertex` data. Colors, points, rectangles and colored vertices are Radiant types (`com.radiant.engine.math` / `ColorVertex`). [Render states](docs/RenderStates.md) use immutable Radiant descriptions.
+
 Reference [`radiant.csproj`](radiant.csproj) and import [`eng/Radiant.Desktop.props`](eng/Radiant.Desktop.props) in your game project. Start with [SimpleLightScene.cs](src/com.radiant.engine/tests/2D/SimpleLightScene.cs) for scene setup, or [MegaLightsScene.cs](src/com.radiant.engine/tests/2D/MegaLightsScene.cs) for input and upscaling.
 
 [raytracing-pacman](https://github.com/lestercorderomurillo/raytracing-pacman) is a game built with Radiant. For the lighting internals, see the [HRC implementation notes](docs/HRC.md).

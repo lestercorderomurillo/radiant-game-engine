@@ -9,9 +9,11 @@ using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Samples process and GPU metrics and displays frame-performance history.</summary>
 public class PerformanceMonitor : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.Overlay;
+
     // Dependencies
     private Process Process;
     private TimeSpan LastCpuTime;
@@ -59,6 +61,7 @@ public class PerformanceMonitor : core.System
     private readonly StringBuilder RamBuilder = new(32);
     private readonly StringBuilder PeakBuilder = new(32);
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Process = Process.GetCurrentProcess();
@@ -67,8 +70,7 @@ public class PerformanceMonitor : core.System
 
         LastCpuTime = Process.TotalProcessorTime;
         LastSampleTimestamp = Stopwatch.GetTimestamp();
-        if (OperatingSystem.IsWindows())
-            InitializeGpuCounters();
+        if (OperatingSystem.IsWindows()) InitializeGpuCounters();
         StartSamplerThread();
 
         Inspector.CreateWindow("perf", "Metrics", 1);
@@ -85,6 +87,7 @@ public class PerformanceMonitor : core.System
         Inspector.AddLabel("perf", "peak", "Peak: -");
     }
 
+    /// <summary>Starts background collection of process and device metrics.</summary>
     private void StartSamplerThread()
     {
         SamplerRunning = true;
@@ -97,6 +100,7 @@ public class PerformanceMonitor : core.System
         SamplerThread.Start();
     }
 
+    /// <summary>Collects performance samples until disposal requests shutdown.</summary>
     private void SamplerLoop()
     {
         while (SamplerRunning)
@@ -106,6 +110,7 @@ public class PerformanceMonitor : core.System
         }
     }
 
+    /// <summary>Refreshes CPU, memory, and available GPU measurements.</summary>
     private void SampleSystemMetrics()
     {
         try
@@ -128,6 +133,7 @@ public class PerformanceMonitor : core.System
         if (OperatingSystem.IsWindows() && GpuCounters != null && GpuCounters.Count > 0)
         {
             float totalGpu = 0f;
+
             for (int i = GpuCounters.Count - 1; i >= 0; i--)
             {
                 try
@@ -140,6 +146,7 @@ public class PerformanceMonitor : core.System
                     GpuCounters.RemoveAt(i);
                 }
             }
+
             GpuUsage = totalGpu;
         }
 
@@ -156,10 +163,13 @@ public class PerformanceMonitor : core.System
         }
     }
 
+    /// <summary>Creates supported platform GPU counters when available.</summary>
     private void InitializeGpuCounters()
     {
         if (!OperatingSystem.IsWindows()) return;
+
         GpuCounters = new List<PerformanceCounter>();
+
         try
         {
             var category = new PerformanceCounterCategory("GPU Engine");
@@ -182,9 +192,10 @@ public class PerformanceMonitor : core.System
         }
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
-        float Delta = (float)GameTime.ElapsedGameTime.TotalSeconds;
+        float Delta = Time.DeltaSeconds;
         float DeltaMs = Delta * 1000f;
 
         UpdateFrameHistory(DeltaMs);
@@ -203,17 +214,19 @@ public class PerformanceMonitor : core.System
         UpdateDisplay();
     }
 
+    /// <summary>Appends the latest frame duration to the performance history.</summary>
     private void UpdateFrameHistory(float DeltaMs)
     {
         // Subtract old value, add new value - O(1) running average
         FrameTimeSum -= FrameTimeHistory[FrameHistoryIndex];
         FrameTimeHistory[FrameHistoryIndex] = DeltaMs;
         FrameTimeSum += DeltaMs;
-        
+
         FrameHistoryIndex = (FrameHistoryIndex + 1) & FrameHistoryMask;
         FrameTimeAverage = FrameTimeSum * FrameHistorySizeInv;
     }
 
+    /// <summary>Refreshes the profiler's labels and graphs from cached samples.</summary>
     private void UpdateDisplay()
     {
         var gameLoop = Renderer.GameLoop;
@@ -223,6 +236,7 @@ public class PerformanceMonitor : core.System
 
         // Smooth FPS display - exponential moving average (less flickery)
         SmoothedDisplayFps = SmoothedDisplayFps == 0 ? ActualFps : SmoothedDisplayFps * 0.9f + ActualFps * 0.1f;
+
         int DisplayFps = (int)MathF.Round(SmoothedDisplayFps);
 
         FpsBuilder.Clear().Append("Frames Per Second: ").Append(DisplayFps);
@@ -258,15 +272,26 @@ public class PerformanceMonitor : core.System
     }
 
     #region Public API
+    /// <summary>Returns the latest measured frame rate.</summary>
     public float GetFps() => Fps;
+
+    /// <summary>Returns the average duration of the retained frame samples.</summary>
     public float GetFrameTimeAverage() => FrameTimeAverage;
+
+    /// <summary>Returns the sampled process memory usage in megabytes.</summary>
     public float GetMemoryMB() => MemoryMB;
+
+    /// <summary>Returns the sampled process CPU utilization.</summary>
     public float GetCpuUsage() => CpuUsage;
+
+    /// <summary>Returns sampled GPU utilization when the platform provides it.</summary>
     public float GetGpuUsage() => GpuUsage;
     #endregion
 
+    /// <inheritdoc/>
     public override void Render() { }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         // Stop sampler thread first
@@ -277,8 +302,10 @@ public class PerformanceMonitor : core.System
         {
             foreach (var counter in GpuCounters)
                 counter.Dispose();
+
             GpuCounters.Clear();
         }
+
         Process?.Dispose();
     }
 }

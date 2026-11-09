@@ -88,33 +88,33 @@ float4 InitializeJFAInteriorPS(PixelShaderInput input) : SV_Target
 float4 JFAPassPS(PixelShaderInput input) : SV_Target
 {
     float2 texelSize = 1.0 / WorldsBounds;
-    
+
     bool hasSurface;
     float4 currentData = JFATexture.Sample(JFASampler, input.UV);
     float2 storedUV = DecodePositionPacked(currentData, hasSurface);
-    
+
     float2 closestUV = storedUV;
     float minDistanceSq = hasSurface ? UVDistanceSq(storedUV, input.UV) : 999999.0;
     bool foundSurface = hasSurface;
-    
+
     float2 offsets[8] = {
         float2(-1, -1), float2(0, -1), float2(1, -1),
         float2(-1,  0),                float2(1,  0),
         float2(-1,  1), float2(0,  1), float2(1,  1)
     };
-    
+
     [unroll]
     for (int i = 0; i < 8; i++)
     {
         float2 neighborUV = input.UV + offsets[i] * JumpDistance * texelSize;
-        
-        if (neighborUV.x < 0.0 || neighborUV.x > 1.0 || 
+
+        if (neighborUV.x < 0.0 || neighborUV.x > 1.0 ||
             neighborUV.y < 0.0 || neighborUV.y > 1.0)
             continue;
-        
+
         bool neighborHasSurface;
         float2 neighborStoredUV = DecodePositionPacked(JFATexture.Sample(JFASampler, neighborUV), neighborHasSurface);
-        
+
         if (neighborHasSurface)
         {
             float distSq = UVDistanceSq(neighborStoredUV, input.UV);
@@ -127,7 +127,7 @@ float4 JFAPassPS(PixelShaderInput input) : SV_Target
             }
         }
     }
-    
+
     return EncodePositionPacked(closestUV, foundSurface);
 }
 
@@ -306,10 +306,10 @@ float4 DebugJFARawPS(PixelShaderInput input) : SV_Target
 {
     bool hasSurface;
     float2 storedUV = DecodePositionPacked(JFATexture.Sample(JFASampler, input.UV), hasSurface);
-    
+
     if (!hasSurface)
         return float4(0.0, 0.0, 0.0, 1.0);
-    
+
     return float4(storedUV.x, storedUV.y, 0.5, 1.0);
 }
 
@@ -396,6 +396,7 @@ float2 SampleStrongestMotion(float2 center, float2 bounds)
 
     // Sample radii - close, medium, far
     static const float RADII[3] = { 4.0, 12.0, 24.0 };
+
     // Falloff multipliers - closer samples contribute more
     static const float FALLOFF[3] = { 1.0, 0.6, 0.3 };
 
@@ -433,6 +434,7 @@ float2 SampleStrongestMotion(float2 center, float2 bounds)
             if (weightedSpeed > bestWeightedSpeed)
             {
                 bestWeightedSpeed = weightedSpeed;
+
                 // Scale velocity by falloff to create gradient effect
                 bestVelocity = vel * falloff;
             }
@@ -501,8 +503,8 @@ technique InitializeJFAInterior
 
 technique JFAPass
 {
-    pass P0 
-    { 
+    pass P0
+    {
         VertexShader = compile vs_6_0 MainVS();
         PixelShader = compile ps_6_0 JFAPassPS();
     }
@@ -510,8 +512,8 @@ technique JFAPass
 
 technique GenerateSDFFromJFA
 {
-    pass P0 
-    { 
+    pass P0
+    {
         VertexShader = compile vs_6_0 MainVS();
         PixelShader = compile ps_6_0 GenerateSDFFromJFAPS();
     }
@@ -519,8 +521,8 @@ technique GenerateSDFFromJFA
 
 technique DebugSDFVisible
 {
-    pass P0 
-    { 
+    pass P0
+    {
         VertexShader = compile vs_6_0 MainVS();
         PixelShader = compile ps_6_0 DebugSDFVisiblePS();
     }
@@ -528,8 +530,8 @@ technique DebugSDFVisible
 
 technique DebugJFARaw
 {
-    pass P0 
-    { 
+    pass P0
+    {
         VertexShader = compile vs_6_0 MainVS();
         PixelShader = compile ps_6_0 DebugJFARawPS();
     }
@@ -537,8 +539,8 @@ technique DebugJFARaw
 
 technique DebugJFA
 {
-    pass P0 
-    { 
+    pass P0
+    {
         VertexShader = compile vs_6_0 MainVS();
         PixelShader = compile ps_6_0 DebugJFAPS();
     }

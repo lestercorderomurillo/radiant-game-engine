@@ -1,3 +1,4 @@
+using com.radiant.engine.runtime;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -21,6 +22,7 @@ public partial class Renderer
     private int BindingPool3Index = 0;
     private int BindingPool4Index = 0;
 
+    /// <summary>Prepares reusable render-target bindings for drawing commands.</summary>
     private void InitializeBindingPools()
     {
         for (int i = 0; i < BindingPoolSize; i++)
@@ -56,6 +58,7 @@ public partial class Renderer
                 Device.SetRenderTargets(targets);
             CurrentTargets = targets;
         }
+
         return this;
     }
 
@@ -65,6 +68,7 @@ public partial class Renderer
         CommitTextures();
         Device.SetRenderTarget(target ?? SceneRT);
         CurrentTargets = target != null ? [new RenderTargetBinding(target)] : null;
+
         return this;
     }
 
@@ -75,11 +79,13 @@ public partial class Renderer
         TwoTargetBindings[0] = new RenderTargetBinding(target0);
         TwoTargetBindings[1] = new RenderTargetBinding(target1);
         Device.SetRenderTargets(TwoTargetBindings);
+
         var pooled = BindingPool2[BindingPool2Index];
         BindingPool2Index = (BindingPool2Index + 1) & (BindingPoolSize - 1);
         pooled[0] = TwoTargetBindings[0];
         pooled[1] = TwoTargetBindings[1];
         CurrentTargets = pooled;
+
         return this;
     }
 
@@ -91,12 +97,14 @@ public partial class Renderer
         ThreeTargetBindings[1] = new RenderTargetBinding(target1);
         ThreeTargetBindings[2] = new RenderTargetBinding(target2);
         Device.SetRenderTargets(ThreeTargetBindings);
+
         var pooled = BindingPool3[BindingPool3Index];
         BindingPool3Index = (BindingPool3Index + 1) & (BindingPoolSize - 1);
         pooled[0] = ThreeTargetBindings[0];
         pooled[1] = ThreeTargetBindings[1];
         pooled[2] = ThreeTargetBindings[2];
         CurrentTargets = pooled;
+
         return this;
     }
 
@@ -109,6 +117,7 @@ public partial class Renderer
         FourTargetBindings[2] = new RenderTargetBinding(target2);
         FourTargetBindings[3] = new RenderTargetBinding(target3);
         Device.SetRenderTargets(FourTargetBindings);
+
         var pooled = BindingPool4[BindingPool4Index];
         BindingPool4Index = (BindingPool4Index + 1) & (BindingPoolSize - 1);
         pooled[0] = FourTargetBindings[0];
@@ -116,6 +125,7 @@ public partial class Renderer
         pooled[2] = FourTargetBindings[2];
         pooled[3] = FourTargetBindings[3];
         CurrentTargets = pooled;
+
         return this;
     }
 
@@ -123,11 +133,15 @@ public partial class Renderer
     public Renderer SetTargets(params RenderTarget2D[] targets)
     {
         CommitTextures();
+
         var bindings = new RenderTargetBinding[targets.Length];
+
         for (int i = 0; i < targets.Length; i++)
             bindings[i] = new RenderTargetBinding(targets[i]);
+
         Device.SetRenderTargets(bindings);
         CurrentTargets = bindings;
+
         return this;
     }
 
@@ -137,6 +151,7 @@ public partial class Renderer
         CommitTextures();
         Device.SetRenderTargets(bindings);
         CurrentTargets = bindings;
+
         return this;
     }
 
@@ -146,7 +161,7 @@ public partial class Renderer
     /// <param name="color">Clear color (defaults to Black).</param>
     public Renderer Clear(Color? color = null)
     {
-        Device.Clear(color ?? Color.Black);
+        Device.Clear((color ?? Color.Black).ToNative());
         return this;
     }
 }

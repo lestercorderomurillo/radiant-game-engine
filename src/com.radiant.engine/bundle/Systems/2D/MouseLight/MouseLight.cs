@@ -1,10 +1,11 @@
 using com.radiant.engine.core;
 using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Input;
+using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Moves an emissive entity with the mouse in world coordinates.</summary>
 public class MouseLight : core.System
 {
     public float Radius { get; set; } = 100f;
@@ -14,18 +15,20 @@ public class MouseLight : core.System
 
     public int EntityId { get; private set; }
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
-        var mouse = Mouse.GetState();
+        var mouse = Controls.Mouse;
         var worldPos = Renderer.ScreenToWorld(new Vector2(mouse.X, mouse.Y));
 
         EntityId = LightFactory.CreateLight(Scene.ECS, worldPos, Radius, Albedo, Emissive, Z);
         Scene.ECS.AddComponent<MotionTrackable>(EntityId);
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
-        var mouse = Mouse.GetState();
+        var mouse = Controls.Mouse;
         var worldPos = Renderer.ScreenToWorld(new Vector2(mouse.X, mouse.Y));
 
         ref var transform = ref Scene.ECS.GetComponent<Transform2D>(EntityId);

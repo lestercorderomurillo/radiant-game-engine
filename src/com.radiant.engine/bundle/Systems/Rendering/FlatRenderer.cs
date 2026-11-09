@@ -7,5 +7,6 @@ namespace com.radiant.engine.bundle;
 [SystemTag("Rendering")]
 public class FlatRenderer : ImageSystem
 {
+    /// <summary>Returns the stage's current output image, or its input when processing is bypassed.</summary>
     public override Texture2D GetOutput() => Input?.Invoke();
 }

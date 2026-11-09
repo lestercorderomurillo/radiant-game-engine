@@ -14,6 +14,7 @@ float HasGeometry;
 float HasMotion;
 float MaxHistory;
 float Sharpness;
+float PreserveAlpha;
 float4x4 CurrentScreenToWorld;
 float4x4 PreviousWorldToScreen;
 
@@ -28,19 +29,25 @@ PixelInput MainVS(VertexInput input)
 }
 
 float Luma(float3 color) { return dot(color, float3(0.2126, 0.7152, 0.0722)); }
+
 float4 Guide(float2 uv)
 {
     if (HasGeometry < 0.5) return 0;
+
     float4 emission = EmissiveTexture.SampleLevel(LinearSampler, uv, 0);
     float4 absorption = AbsorptionTexture.SampleLevel(LinearSampler, uv, 0);
     return float4(Luma(emission.rgb), emission.a, absorption.a, Luma(absorption.rgb));
 }
+
 float Maximum(float4 value) { return max(max(value.x, value.y), max(value.z, value.w)); }
+
 float Kernel(float x)
 {
     x = abs(x);
+
     if (x < 1) return 1.5 * x*x*x - 2.5 * x*x + 1;
     if (x < 2) return -0.5 * x*x*x + 2.5 * x*x - 4*x + 2;
+
     return 0;
 }
 
@@ -51,16 +58,16 @@ float4 SpatialPS(PixelInput input) : SV_Target0
     float2 basePixel = floor(position);
     float2 fraction = position - basePixel;
     float4 centerGuide = Guide(input.UV);
-    float3 result = 0;
+    float4 result = 0;
     float weightSum = 0;
-    float3 minimum = 1e20;
-    float3 maximum = -1e20;
+    float4 minimum = 1e20;
+    float4 maximum = -1e20;
     [unroll] for (int y = -1; y <= 2; y++)
     {
         [unroll] for (int x = -1; x <= 2; x++)
         {
             int2 pixel = clamp(int2(basePixel) + int2(x,y), int2(0,0), int2(InputSize)-1);
-            float3 color = max(InputTexture.Load(int3(pixel,0)).rgb, 0);
+            float4 color = max(InputTexture.Load(int3(pixel,0)), 0);
             float2 sampleUV = (float2(pixel) + 0.5 + Jitter) / InputSize;
             float difference = Maximum(abs(Guide(sampleUV) - centerGuide));
             float weight = Kernel(x - fraction.x) * Kernel(y - fraction.y) / (1 + 8*difference);
@@ -73,14 +80,16 @@ float4 SpatialPS(PixelInput input) : SV_Target0
             }
         }
     }
-    float3 fallback = InputTexture.SampleLevel(LinearSampler, input.UV - Jitter / InputSize, 0).rgb;
-    return float4(clamp(abs(weightSum) > 0.0001 ? result / weightSum : fallback, minimum, maximum), 1);
+
+    float4 fallback = InputTexture.SampleLevel(LinearSampler, input.UV - Jitter / InputSize, 0);
+    return clamp(abs(weightSum) > 0.0001 ? result / weightSum : fallback, minimum, maximum);
 }
 
 float4 TemporalPS(PixelInput input) : SV_Target0
 {
     float2 uv = input.UV;
     float3 current = InputTexture.SampleLevel(LinearSampler, uv, 0).rgb;
+
     if (HasHistory < 0.5) return float4(current, 1);
 
     float2 motion = HasMotion > 0.5 ? MotionTexture.SampleLevel(LinearSampler, uv, 0).rg : float2(0,0);
@@ -88,6 +97,7 @@ float4 TemporalPS(PixelInput input) : SV_Target0
     world.xy -= motion;
     float2 previousUV = mul(world, PreviousWorldToScreen).xy / OutputSize;
     float2 margin = 0.5 / OutputSize;
+
     if (any(previousUV < margin) || any(previousUV > 1-margin)) return float4(current, 1);
 
     float4 old = HistoryTexture.SampleLevel(LinearSampler, previousUV, 0);
@@ -106,12 +116,14 @@ float4 TemporalPS(PixelInput input) : SV_Target0
             squareSum += neighbor*neighbor;
         }
     }
+
     float3 mean = sum / 9;
     float3 deviation = sqrt(max(squareSum/9 - mean*mean, 0));
     float3 history = clamp(old.rgb, max(minimum, mean - 1.5*deviation), min(maximum, mean + 1.5*deviation));
 
     float guideDifference = Maximum(abs(Guide(uv) - GeometryHistory.SampleLevel(LinearSampler, previousUV, 0)));
     float validity = HasGeometry > 0.5 ? 1 - smoothstep(0.03, 0.2, guideDifference) : 1;
+
     // Light and shadow motion need not match object motion. Respond to radiance changes too.
     float difference = length(current-old.rgb) / (0.05 + length(current) + length(old.rgb));
     float reactive = smoothstep(0.04, 0.3, difference);
@@ -134,7 +146,7 @@ float4 SharpenPS(PixelInput input) : SV_Target0
     float3 minimum = min(center,min(min(north,south),min(east,west)));
     float3 maximum = max(center,max(max(north,south),max(east,west)));
     float3 detail = center - (north+south+east+west)*0.25;
-    return float4(clamp(center + detail*Sharpness, minimum, maximum), 1);
+    return float4(clamp(center + detail*Sharpness, minimum, maximum), PreserveAlpha > 0.5 ? saturate(InputTexture.SampleLevel(LinearSampler, uv, 0).a) : 1);
 }
 
 technique Spatial { pass P0 { VertexShader = compile vs_6_0 MainVS(); PixelShader = compile ps_6_0 SpatialPS(); } }

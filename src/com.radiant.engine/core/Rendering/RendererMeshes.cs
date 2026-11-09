@@ -1,3 +1,4 @@
+using com.radiant.engine.runtime;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -13,6 +14,7 @@ public partial class Renderer
     public Renderer DrawMesh(Mesh mesh)
     {
         CommitTextures();
+
         if (!MeshBuffers.TryGetValue(mesh, out var buffers))
         {
             buffers.Vertices = new VertexBuffer(Device, VertexPositionNormalTexture.VertexDeclaration,
@@ -23,19 +25,23 @@ public partial class Renderer
             buffers.Indices.SetData(mesh.Indices);
             MeshBuffers.Add(mesh, buffers);
         }
-        Device.BlendState = BlendState;
-        Device.DepthStencilState = DepthStencilState;
-        Device.RasterizerState = RasterizerState;
+
+        Device.BlendState = NativeStates.Get(BlendState);
+        Device.DepthStencilState = NativeStates.Get(DepthStencilState);
+        Device.RasterizerState = NativeStates.Get(RasterizerState);
         Device.SetVertexBuffer(buffers.Vertices);
         Device.Indices = buffers.Indices;
+
         foreach (var pass in CurrentShader.CurrentTechnique.Passes)
         {
             pass.Apply();
             Device.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, mesh.TriangleCount);
         }
+
         return this;
     }
 
+    /// <summary>Releases cached vertex and index buffers for uploaded meshes.</summary>
     private void DisposeMeshes()
     {
         foreach (var buffers in MeshBuffers.Values)
@@ -43,6 +49,7 @@ public partial class Renderer
             buffers.Vertices.Dispose();
             buffers.Indices.Dispose();
         }
+
         MeshBuffers.Clear();
     }
 }

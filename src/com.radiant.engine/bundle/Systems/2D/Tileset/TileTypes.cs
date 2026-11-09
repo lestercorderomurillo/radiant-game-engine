@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Material, lighting, and display settings shared by a kind of tile.</summary>
 public struct TileType
 {
     public string Id;
@@ -16,8 +17,9 @@ public struct TileType
     public Vector3 LightColor;
     public float LightIntensity;
 
-    public TileType(string id, Color color, bool isSolid, string name, 
-        float lightTransmission = 0f, bool isLightSource = false, 
+    /// <summary>Stores a tile's identity, appearance, and lighting behavior.</summary>
+    public TileType(string id, Color color, bool isSolid, string name,
+        float lightTransmission = 0f, bool isLightSource = false,
         Vector3? lightColor = null, float lightIntensity = 0f)
     {
         Id = id;
@@ -35,21 +37,22 @@ public struct TileType
     public static TileType Dirt => new TileType("main:dirt", new Color(139, 69, 19), true, "Dirt", 0f);
     public static TileType Stone => new TileType("main:stone", new Color(105, 105, 105), true, "Stone", 0f);
 
-
     public static TileType Basite => new TileType("main:basite", new Color(255, 255, 255), true, "Basite", 0f);
     public static TileType Ash => new TileType("main:ash", new Color(255, 255, 255), true, "Ash", 0f);
     public static TileType Snow => new TileType("main:snow", new Color(255, 255, 255), true, "Snow", 0f);
     public static TileType Sandstone => new TileType("main:sandstone", new Color(255, 200, 100), true, "Sandstone", 0f);
     public static TileType Sand => new TileType("main:sand", new Color(255, 200, 100), true, "Sand", 0f);
-    public static TileType Torch => new TileType("main:torch", new Color(255, 200, 100), false, "Torch", 
+    public static TileType Torch => new TileType("main:torch", new Color(255, 200, 100), false, "Torch",
         1.0f, true, new Vector3(1.0f, 0.8f, 0.4f), 1.0f);
 }
 
+/// <summary>Looks up tile definitions by their stable identifier.</summary>
 public static class TileTypeRegistry
 {
     private static Dictionary<string, TileType> _tileTypes = new Dictionary<string, TileType>();
     private static TileType _defaultTileType = TileType.Air;
 
+    /// <summary>Registers the built-in tile definitions.</summary>
     static TileTypeRegistry()
     {
         RegisterTileType(TileType.Air);
@@ -59,17 +62,20 @@ public static class TileTypeRegistry
         RegisterTileType(TileType.Torch);
     }
 
+    /// <summary>Adds or replaces a tile definition under its identifier.</summary>
     public static void RegisterTileType(TileType tileType)
     {
         _tileTypes[tileType.Id] = tileType;
     }
 
+    /// <summary>Looks up the tile definition associated with the supplied identifier or cell.</summary>
     public static TileType GetTileType(string id)
     {
         return _tileTypes.TryGetValue(id, out var tileType) ? tileType : _defaultTileType;
     }
 }
 
+/// <summary>Tile coordinates and type identifier stored on an ECS entity.</summary>
 [ComponentDescription("Tile position, layer and type for 2D tilesets.")]
 public struct TileData : Component
 {

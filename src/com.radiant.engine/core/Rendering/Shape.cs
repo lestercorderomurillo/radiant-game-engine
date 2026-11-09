@@ -104,6 +104,7 @@ internal struct ShapeQuadVertex : IVertexType
 
     VertexDeclaration IVertexType.VertexDeclaration => Declaration;
 
+    /// <summary>Stores one quad corner's position and texture coordinates.</summary>
     public ShapeQuadVertex(Vector2 position, Vector2 uv)
     {
         Position = position;

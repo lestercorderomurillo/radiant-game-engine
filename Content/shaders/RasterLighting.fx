@@ -20,6 +20,7 @@ PixelInput MeshVS(MeshInput input)
     output.Color = float4(BaseColor.rgb, 1);
     return output;
 }
+
 PixelInput ShapeVS(ShapeInput input)
 {
     PixelInput output;
@@ -28,10 +29,12 @@ PixelInput ShapeVS(ShapeInput input)
     output.Color = input.Color;
     return output;
 }
+
 float4 PS(PixelInput input) : SV_Target
 {
     float diffuse = max(dot(normalize(input.Normal), LightDirection), 0);
     return float4(input.Color.rgb * (Ambient + diffuse * LightColor), input.Color.a);
 }
+
 technique Meshes { pass P0 { VertexShader = compile vs_6_0 MeshVS(); PixelShader = compile ps_6_0 PS(); } }
 technique Shapes { pass P0 { VertexShader = compile vs_6_0 ShapeVS(); PixelShader = compile ps_6_0 PS(); } }

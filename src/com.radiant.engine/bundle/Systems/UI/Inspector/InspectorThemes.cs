@@ -30,8 +30,7 @@ public partial class Inspector
     /// <summary> Registers a custom theme. Overwrites if the name already exists. </summary>
     public static void RegisterTheme(string Name, InspectorTheme Theme)
     {
-        if (!Themes.ContainsKey(Name))
-            ThemeNameList.Add(Name);
+        if (!Themes.ContainsKey(Name)) ThemeNameList.Add(Name);
         Themes[Name] = Theme;
     }
 
@@ -39,6 +38,7 @@ public partial class Inspector
     public static void ApplyTheme(string Name)
     {
         if (!Themes.TryGetValue(Name, out var theme)) return;
+
         WindowBg = theme.WindowBg;
         TitleBarColor = theme.TitleBarColor;
         TitleBarHover = theme.TitleBarHover;
@@ -59,10 +59,10 @@ public partial class Inspector
     /// <summary> Applies a registered theme by index in the registration order. </summary>
     public static void ApplyTheme(int Index)
     {
-        if (Index >= 0 && Index < ThemeNameList.Count)
-            ApplyTheme(ThemeNameList[Index]);
+        if (Index >= 0 && Index < ThemeNameList.Count) ApplyTheme(ThemeNameList[Index]);
     }
 
+    /// <summary>Registers the bundled inspector color and appearance presets.</summary>
     private static void RegisterBuiltInThemes()
     {
         if (Themes.Count > 0) return;
@@ -93,7 +93,7 @@ public partial class Inspector
             ButtonColor = new(36, 36, 40, 225), ButtonHover = new(52, 52, 58, 245),
             SliderTrack = new(28, 28, 32, 210), SliderFill = new(130, 135, 145, 255), SliderHandle = new(180, 184, 192, 255),
             ToggleOn = new(120, 125, 135, 255), ToggleOff = new(44, 44, 48, 220),
-            CloseColor = new(100, 104, 112, 255), CloseHover = new(140, 144, 155, 255),
+            CloseColor = new(195, 75, 70, 255), CloseHover = new(220, 90, 85, 255),
             TextColor = new(210, 212, 218, 255), CloseText = new(210, 212, 218, 255), LabelDim = new(120, 122, 130, 255)
         });
 

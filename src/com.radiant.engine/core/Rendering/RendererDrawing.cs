@@ -1,3 +1,4 @@
+using com.radiant.engine.runtime;
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -11,6 +12,7 @@ public partial class Renderer
     private IndexBuffer QuadIndexBuffer;
     private bool IsDrawingTextures;
 
+    /// <summary>Creates the shared quad geometry used by image passes.</summary>
     private void InitializeQuad()
     {
         var vertices = new VertexPositionTexture[]
@@ -29,23 +31,18 @@ public partial class Renderer
         QuadIndexBuffer.SetData(indices);
     }
 
+    /// <summary>Begins a texture batch using the renderer's current drawing state.</summary>
     private void BeginTextures()
     {
         if (IsDrawingTextures) return;
 
-        SpriteBatch.Begin(
-            SpriteSortMode,
-            BlendState,
-            SamplerStates[0],
-            DepthStencilState,
-            RasterizerState,
-            CurrentShader
-        );
+        SpriteBatch.Begin(MonoGameRenderStates.ToNative(SpriteSortMode), NativeStates.Get(BlendState), NativeStates.Get(SamplerStates[0]), NativeStates.Get(DepthStencilState), NativeStates.Get(RasterizerState), CurrentShader);
 
         IsDrawingTextures = true;
         IsDrawing = true;
     }
 
+    /// <summary>Flushes pending texture draws to the active render target.</summary>
     private void CommitTextures()
     {
         if (!IsDrawingTextures) return;
@@ -62,14 +59,13 @@ public partial class Renderer
     {
         CommitTextures();
 
-        Device.BlendState = BlendState;
-        Device.DepthStencilState = DepthStencilState;
-        Device.RasterizerState = RasterizerState;
+        Device.BlendState = NativeStates.Get(BlendState);
+        Device.DepthStencilState = NativeStates.Get(DepthStencilState);
+        Device.RasterizerState = NativeStates.Get(RasterizerState);
 
         for (int i = 0; i < SamplerStates.Length; i++)
         {
-            if ((SamplerDirtyMask & (1 << i)) != 0)
-                Device.SamplerStates[i] = SamplerStates[i];
+            if ((SamplerDirtyMask & (1 << i)) != 0) Device.SamplerStates[i] = NativeStates.Get(SamplerStates[i]);
         }
 
         Device.SetVertexBuffer(QuadVertexBuffer);
@@ -85,6 +81,7 @@ public partial class Renderer
         }
 
         IsDrawing = true;
+
         return this;
     }
 
@@ -95,7 +92,7 @@ public partial class Renderer
     public Renderer DrawTexture(Texture2D texture, Vector2 position, Color color)
     {
         BeginTextures();
-        SpriteBatch.Draw(texture, position, color);
+        SpriteBatch.Draw(texture, position, color.ToNative());
         return this;
     }
 
@@ -106,7 +103,7 @@ public partial class Renderer
     public Renderer DrawTexture(Texture2D texture, Rectangle destination, Color color)
     {
         BeginTextures();
-        SpriteBatch.Draw(texture, destination, color);
+        SpriteBatch.Draw(texture, destination.ToNative(), color.ToNative());
         return this;
     }
 
@@ -114,7 +111,7 @@ public partial class Renderer
     public Renderer DrawTexture(Texture2D texture, Rectangle destination, Rectangle? source, Color color)
     {
         BeginTextures();
-        SpriteBatch.Draw(texture, destination, source, color);
+        SpriteBatch.Draw(texture, destination.ToNative(), source.ToNative(), color.ToNative());
         return this;
     }
 
@@ -122,7 +119,7 @@ public partial class Renderer
     public Renderer DrawTexture(Texture2D texture, Vector2 position, Rectangle? source, Color color, float rotation, Vector2 origin, Vector2 scale, SpriteEffects effects, float depth)
     {
         BeginTextures();
-        SpriteBatch.Draw(texture, position, source, color, rotation, origin, scale, effects, depth);
+        SpriteBatch.Draw(texture, position, source.ToNative(), color.ToNative(), rotation, origin, scale, MonoGameRenderStates.ToNative(effects), depth);
         return this;
     }
 
@@ -133,8 +130,8 @@ public partial class Renderer
     public void Blit(Texture2D source, BlendState blend = null, SamplerState sampler = null)
     {
         CommitTextures();
-        SpriteBatch.Begin(SpriteSortMode.Immediate, blend ?? BlendState.Opaque, sampler ?? SamplerState.PointClamp);
-        SpriteBatch.Draw(source, Device.Viewport.Bounds, Color.White);
+        SpriteBatch.Begin(MonoGameRenderStates.ToNative(SpriteSortMode.Immediate), NativeStates.Get(blend ?? BlendState.Opaque), NativeStates.Get(sampler ?? SamplerState.PointClamp));
+        SpriteBatch.Draw(source, Device.Viewport.Bounds, Color.White.ToNative());
         SpriteBatch.End();
     }
 
@@ -146,10 +143,9 @@ public partial class Renderer
     {
         CommitTextures();
         Device.SetRenderTarget(target ?? SceneRT);
-        if (clearColor.HasValue)
-            Device.Clear(clearColor.Value);
-        SpriteBatch.Begin(SpriteSortMode.Immediate, blend ?? BlendState.Opaque, sampler ?? SamplerState.PointClamp);
-        SpriteBatch.Draw(source, Vector2.Zero, Color.White);
+        if (clearColor.HasValue) Device.Clear(clearColor.Value.ToNative());
+        SpriteBatch.Begin(MonoGameRenderStates.ToNative(SpriteSortMode.Immediate), NativeStates.Get(blend ?? BlendState.Opaque), NativeStates.Get(sampler ?? SamplerState.PointClamp));
+        SpriteBatch.Draw(source, Vector2.Zero, Color.White.ToNative());
         SpriteBatch.End();
     }
 
@@ -160,13 +156,13 @@ public partial class Renderer
         BlendState blend = null, SamplerState sampler = null, Matrix? transform = null)
     {
         CommitTextures();
-        SpriteBatch.Begin(sort, blend ?? BlendState.AlphaBlend, sampler, null, null, null, transform);
+        SpriteBatch.Begin(MonoGameRenderStates.ToNative(sort), NativeStates.Get(blend ?? BlendState.AlphaBlend), NativeStates.Get(sampler), null, null, null, transform);
     }
 
     /// <summary>Draws a texture to a destination rectangle during a BeginDraw/EndDraw session.</summary>
     public void DrawSprite(Texture2D texture, Rectangle destination, Color color)
     {
-        SpriteBatch.Draw(texture, destination, color);
+        SpriteBatch.Draw(texture, destination.ToNative(), color.ToNative());
     }
 
     /// <summary>Draws a texture with opacity (premultiplied alpha) during a BeginDraw/EndDraw session.</summary>
@@ -177,14 +173,14 @@ public partial class Renderer
             (byte)(color.G * opacity),
             (byte)(color.B * opacity),
             (byte)(color.A * opacity));
-        SpriteBatch.Draw(texture, destination, premul);
+        SpriteBatch.Draw(texture, destination.ToNative(), premul.ToNative());
     }
 
     /// <summary>Draws a texture region to a destination rectangle during a BeginDraw/EndDraw session.</summary>
     public void DrawSprite(Texture2D texture, Rectangle destination, Rectangle? source,
         Color color, float rotation = 0f, Vector2 origin = default, SpriteEffects effects = SpriteEffects.None)
     {
-        SpriteBatch.Draw(texture, destination, source, color, rotation, origin, effects, 0);
+        SpriteBatch.Draw(texture, destination.ToNative(), source.ToNative(), color.ToNative(), rotation, origin, MonoGameRenderStates.ToNative(effects), 0);
     }
 
     /// <summary>Ends a SpriteBatch drawing session started by BeginDraw.</summary>
@@ -200,8 +196,8 @@ public partial class Renderer
     public void BlitMask(Texture2D mask, Rectangle destination, float rotation = 0f, Vector2 origin = default)
     {
         CommitTextures();
-        SpriteBatch.Begin(SpriteSortMode.Immediate, MaskSubtract);
-        SpriteBatch.Draw(mask, destination, null, Color.White, rotation, origin, SpriteEffects.None, 0);
+        SpriteBatch.Begin(MonoGameRenderStates.ToNative(SpriteSortMode.Immediate), NativeStates.Get(MaskSubtract));
+        SpriteBatch.Draw(mask, destination.ToNative(), null, Color.White.ToNative(), rotation, origin, MonoGameRenderStates.ToNative(SpriteEffects.None), 0);
         SpriteBatch.End();
     }
 
@@ -220,9 +216,10 @@ public partial class Renderer
     public void DrawRoundedRect(Rectangle bounds, Color color, int cornerRadius, RoundedCorners corners = RoundedCorners.All)
     {
         int radius = Math.Min(cornerRadius, Math.Min(bounds.Width, bounds.Height) / 2);
+
         if (radius <= 1 || corners == RoundedCorners.None)
         {
-            SpriteBatch.Draw(GetSolidTexture(Color.White), bounds, color);
+            SpriteBatch.Draw(GetSolidTexture(Color.White), bounds.ToNative(), color.ToNative());
             return;
         }
 
@@ -235,31 +232,30 @@ public partial class Renderer
         var srcSolid = new Rectangle(hdRadius, hdRadius, 1, 1);
 
         Rectangle srcTL = corners.HasFlag(RoundedCorners.TL) ? new Rectangle(0, 0, hdRadius, hdRadius) : srcSolid;
-        SpriteBatch.Draw(tex, new Rectangle(bx, by, radius, radius), srcTL, color);
+        SpriteBatch.Draw(tex, new Rectangle(bx, by, radius, radius).ToNative(), srcTL.ToNative(), color.ToNative());
 
         Rectangle srcTR = corners.HasFlag(RoundedCorners.TR) ? new Rectangle(texSize - hdRadius, 0, hdRadius, hdRadius) : srcSolid;
-        SpriteBatch.Draw(tex, new Rectangle(bx + bw - radius, by, radius, radius), srcTR, color);
+        SpriteBatch.Draw(tex, new Rectangle(bx + bw - radius, by, radius, radius).ToNative(), srcTR.ToNative(), color.ToNative());
 
         Rectangle srcBL = corners.HasFlag(RoundedCorners.BL) ? new Rectangle(0, texSize - hdRadius, hdRadius, hdRadius) : srcSolid;
-        SpriteBatch.Draw(tex, new Rectangle(bx, by + bh - radius, radius, radius), srcBL, color);
+        SpriteBatch.Draw(tex, new Rectangle(bx, by + bh - radius, radius, radius).ToNative(), srcBL.ToNative(), color.ToNative());
 
         Rectangle srcBR = corners.HasFlag(RoundedCorners.BR) ? new Rectangle(texSize - hdRadius, texSize - hdRadius, hdRadius, hdRadius) : srcSolid;
-        SpriteBatch.Draw(tex, new Rectangle(bx + bw - radius, by + bh - radius, radius, radius), srcBR, color);
+        SpriteBatch.Draw(tex, new Rectangle(bx + bw - radius, by + bh - radius, radius, radius).ToNative(), srcBR.ToNative(), color.ToNative());
 
         if (innerW > 0)
         {
-            SpriteBatch.Draw(tex, new Rectangle(bx + radius, by, innerW, radius), new Rectangle(hdRadius, 0, 2, hdRadius), color);
-            SpriteBatch.Draw(tex, new Rectangle(bx + radius, by + bh - radius, innerW, radius), new Rectangle(hdRadius, texSize - hdRadius, 2, hdRadius), color);
+            SpriteBatch.Draw(tex, new Rectangle(bx + radius, by, innerW, radius).ToNative(), new Rectangle(hdRadius, 0, 2, hdRadius).ToNative(), color.ToNative());
+            SpriteBatch.Draw(tex, new Rectangle(bx + radius, by + bh - radius, innerW, radius).ToNative(), new Rectangle(hdRadius, texSize - hdRadius, 2, hdRadius).ToNative(), color.ToNative());
         }
 
         if (innerH > 0)
         {
-            SpriteBatch.Draw(tex, new Rectangle(bx, by + radius, radius, innerH), new Rectangle(0, hdRadius, hdRadius, 2), color);
-            SpriteBatch.Draw(tex, new Rectangle(bx + bw - radius, by + radius, radius, innerH), new Rectangle(texSize - hdRadius, hdRadius, hdRadius, 2), color);
+            SpriteBatch.Draw(tex, new Rectangle(bx, by + radius, radius, innerH).ToNative(), new Rectangle(0, hdRadius, hdRadius, 2).ToNative(), color.ToNative());
+            SpriteBatch.Draw(tex, new Rectangle(bx + bw - radius, by + radius, radius, innerH).ToNative(), new Rectangle(texSize - hdRadius, hdRadius, hdRadius, 2).ToNative(), color.ToNative());
         }
 
-        if (innerW > 0 && innerH > 0)
-            SpriteBatch.Draw(tex, new Rectangle(bx + radius, by + radius, innerW, innerH), srcSolid, color);
+        if (innerW > 0 && innerH > 0) SpriteBatch.Draw(tex, new Rectangle(bx + radius, by + radius, innerW, innerH).ToNative(), srcSolid.ToNative(), color.ToNative());
     }
 
     /// <summary>
@@ -271,8 +267,7 @@ public partial class Renderer
     /// <param name="count">Number of elements to upload (0 = all).</param>
     public void UploadToTexture(RenderTarget2D target, Color[] data, int count = 0)
     {
-        if (count <= 0)
-            count = data.Length;
+        if (count <= 0) count = data.Length;
         target.SetData(data, 0, count);
     }
 
@@ -284,7 +279,7 @@ public partial class Renderer
     /// <param name="region">Destination rectangle within the texture.</param>
     public void UploadToTexture(RenderTarget2D target, Color[] data, Rectangle region)
     {
-        target.SetData(0, region, data, 0, region.Width * region.Height);
+        target.SetData(0, region.ToNative(), data, 0, region.Width * region.Height);
     }
 
     /// <summary>
@@ -301,7 +296,7 @@ public partial class Renderer
     public Renderer SetTexture(int slot, Texture2D texture, SamplerState sampler)
     {
         Device.Textures[slot] = texture;
-        Device.SamplerStates[slot] = sampler;
+        Device.SamplerStates[slot] = NativeStates.Get(sampler);
         return this;
     }
 
@@ -319,7 +314,7 @@ public partial class Renderer
         foreach (var (slot, texture, sampler) in textures)
         {
             Device.Textures[slot] = texture;
-            Device.SamplerStates[slot] = sampler;
+            Device.SamplerStates[slot] = NativeStates.Get(sampler);
         }
         return this;
     }
@@ -329,6 +324,7 @@ public partial class Renderer
     {
         for (int i = 0; i < count; i++)
             Device.Textures[i] = null;
+
         return this;
     }
 
@@ -359,16 +355,15 @@ public partial class Renderer
             beforePass?.Invoke(i, input);
 
             Device.SetRenderTarget(output);
-            Device.Clear(clear);
+            Device.Clear(clear.ToNative());
 
-            Device.BlendState = BlendState;
-            Device.DepthStencilState = DepthStencilState;
-            Device.RasterizerState = RasterizerState;
+            Device.BlendState = NativeStates.Get(BlendState);
+            Device.DepthStencilState = NativeStates.Get(DepthStencilState);
+            Device.RasterizerState = NativeStates.Get(RasterizerState);
 
             for (int s = 0; s < SamplerStates.Length; s++)
             {
-                if ((SamplerDirtyMask & (1 << s)) != 0)
-                    Device.SamplerStates[s] = SamplerStates[s];
+                if ((SamplerDirtyMask & (1 << s)) != 0) Device.SamplerStates[s] = NativeStates.Get(SamplerStates[s]);
             }
 
             Device.SetVertexBuffer(QuadVertexBuffer);
@@ -389,6 +384,7 @@ public partial class Renderer
         }
 
         Device.SetRenderTarget(SceneRT);
+
         return input;
     }
 }

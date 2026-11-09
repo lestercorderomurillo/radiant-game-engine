@@ -3,19 +3,24 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Provides seeded gradient noise for procedural world generation.</summary>
 public class PerlinNoise2D : core.System
 {
     private static readonly int[] p = new int[512];
     private static bool initialized = false;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         if (initialized) return;
 
         var r = new Random();
         var perm = new int[256];
+
         for (int i = 0; i < 256; i++) perm[i] = i;
+
         for (int i = 255; i > 0; i--) { int j = r.Next(i + 1); (perm[i], perm[j]) = (perm[j], perm[i]); }
+
         for (int i = 0; i < 256; i++) p[i] = p[i + 256] = perm[i];
 
         initialized = true;
@@ -27,11 +32,13 @@ public class PerlinNoise2D : core.System
     public float Sample(float x, float y)
     {
         int X = (int)Math.Floor(x) & 255, Y = (int)Math.Floor(y) & 255;
-        x -= (float)Math.Floor(x); y -= (float)Math.Floor(y);
+        x -= (float)Math.Floor(x);
+        y -= (float)Math.Floor(y);
 
         float u = Fade(x), v = Fade(y);
-        
+
         int A = p[X] + Y, B = p[X + 1] + Y;
+
         return Lerp(v, Lerp(u, Grad(p[A], x, y), Grad(p[B], x - 1, y)),
                        Lerp(u, Grad(p[A + 1], x, y - 1), Grad(p[B + 1], x - 1, y - 1)));
     }
@@ -52,11 +59,21 @@ public class PerlinNoise2D : core.System
         return Math.Abs(Sample(x, y));
     }
 
+    /// <summary>Applies the smooth interpolation curve used by gradient noise.</summary>
     private static float Fade(float t) => t * t * t * (t * (t * 6 - 15) + 10);
+
+    /// <summary>Interpolates between two noise contributions.</summary>
     private static float Lerp(float t, float a, float b) => a + t * (b - a);
+
+    /// <summary>Computes the selected gradient's contribution at a noise sample.</summary>
     private static float Grad(int hash, float x, float y) => ((hash & 1) == 0 ? x : -x) + ((hash & 2) == 0 ? y : -y);
 
+    /// <inheritdoc/>
     public override void Update() { }
+
+    /// <inheritdoc/>
     public override void Render() { }
+
+    /// <inheritdoc/>
     public override void Dispose() { }
 }

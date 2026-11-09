@@ -19,10 +19,9 @@ public partial class Renderer
     /// </summary>
     public void FitWorld(Vector2 Center, Vector2 Size)
     {
-        if (!float.IsFinite(Center.X) || !float.IsFinite(Center.Y))
-            throw new ArgumentOutOfRangeException(nameof(Center));
-        if (!float.IsFinite(Size.X) || !float.IsFinite(Size.Y) || Size.X <= 0 || Size.Y <= 0)
-            throw new ArgumentOutOfRangeException(nameof(Size));
+        if (!float.IsFinite(Center.X) || !float.IsFinite(Center.Y)) throw new ArgumentOutOfRangeException(nameof(Center));
+        if (!float.IsFinite(Size.X) || !float.IsFinite(Size.Y) || Size.X <= 0 || Size.Y <= 0) throw new ArgumentOutOfRangeException(nameof(Size));
+
         FittedWorldCenter = Center;
         FittedWorldSize = Size;
         UpdateWorldView();
@@ -36,16 +35,19 @@ public partial class Renderer
         return FittedWorldCenter.HasValue;
     }
 
+    /// <summary>Recalculates the world-to-screen transform for the fitted view.</summary>
     private void UpdateWorldView()
     {
         WorldScale = VirtualToScreenScale;
         WorldOffset = Vector2.Zero;
+
         if (FittedWorldCenter.HasValue)
         {
             float Scale = MathF.Min(ScreenWidth / FittedWorldSize.X, ScreenHeight / FittedWorldSize.Y);
             WorldScale = new Vector2(Scale);
             WorldOffset = ScreenSize / 2f - FittedWorldCenter.Value * Scale;
         }
+
         WorldTransform = Matrix.CreateScale(WorldScale.X, WorldScale.Y, 1f)
             * Matrix.CreateTranslation(WorldOffset.X, WorldOffset.Y, 0f);
         ShapeBatch.ViewProjection = WorldTransform

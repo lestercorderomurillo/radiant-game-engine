@@ -5,14 +5,17 @@ using System.Runtime.CompilerServices;
 using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 
+/// <summary>Headless checks for camera discovery, selection, and removal.</summary>
 internal static class CameraControllerRegression
 {
+    /// <summary>Controllable camera-view fixture for the shared camera inspector.</summary>
     private sealed class TestCameraView : com.radiant.engine.core.System, ICameraView
     {
         public Type CameraType { get; set; }
         public int CameraEntity { get; set; }
     }
 
+    /// <summary>Runs the headless camera-controller regression assertions.</summary>
     public static void Run()
     {
         using var fixture = new DisposableScene();
@@ -29,10 +32,13 @@ internal static class CameraControllerRegression
         {
             Refresh();
             Check(Get<int>("ControlledCamera") == -1, "Empty scenes must not select an entity.");
+
             int flat = scene.ECS.CreateEntity();
             scene.ECS.AddComponent<Camera2D>(flat);
+
             int spatial = scene.ECS.CreateEntity();
             scene.ECS.AddComponent<Camera3D>(spatial);
+
             var firstView = scene.ECS.AddSystem(new TestCameraView { CameraType = typeof(Camera2D), CameraEntity = flat });
             var secondView = scene.ECS.AddSystem(new TestCameraView { CameraType = typeof(Camera2D), CameraEntity = flat });
             scene.ECS.AddSystem(new TestCameraView { CameraType = typeof(Camera3D), CameraEntity = spatial });
@@ -67,6 +73,7 @@ internal static class CameraControllerRegression
         {
             typeof(Inspector).GetField("Instance", BindingFlags.Static | BindingFlags.NonPublic)!.SetValue(null, null);
         }
+
         Console.WriteLine("PASS: shared camera discovery, independent selection, search, empty results, deletion and disabled entities.");
     }
 }

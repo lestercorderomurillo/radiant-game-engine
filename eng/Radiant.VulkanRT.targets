@@ -1,0 +1,42 @@
+<Project>
+  <PropertyGroup>
+    <RadiantNativeRoot>$(MSBuildThisFileDirectory)../artifacts/native/installed/</RadiantNativeRoot>
+    <RadiantNativeLibrary Condition="$([MSBuild]::IsOSPlatform('Linux'))">libmgruntime.so</RadiantNativeLibrary>
+    <RadiantNativeLibrary Condition="$([MSBuild]::IsOSPlatform('Windows'))">mgruntime.dll</RadiantNativeLibrary>
+  </PropertyGroup>
+  <Target Name="ValidateRadiantVulkanRuntime" BeforeTargets="Build" Condition="'$(RadiantVulkanRT)' == 'true'">
+    <Error Condition="'$(RadiantNativeLibrary)' == ''" Text="The optional Vulkan RT runtime currently supports Windows and Linux." />
+    <Error Condition="'$(MonoGameVersion)' != '3.8.6'" Text="The optional Vulkan RT runtime is pinned to MonoGame 3.8.6; update and validate the native integration before changing versions." />
+    <Error Condition="!Exists('$(RadiantNativeRoot)$(RadiantNativeLibrary)')" Text="Build the optional runtime first: python eng/build-vulkan-rt.py" />
+    <ReadLinesFromFile File="$(RadiantNativeRoot)runtime-id.txt">
+      <Output TaskParameter="Lines" PropertyName="RadiantNativeRuntimeIdentifier" />
+    </ReadLinesFromFile>
+    <Error Condition="'$(RuntimeIdentifier)' != '' And '$(RuntimeIdentifier)' != '$(RadiantNativeRuntimeIdentifier)'" Text="The Vulkan RT runtime was built for $(RadiantNativeRuntimeIdentifier), but this project targets $(RuntimeIdentifier). Build the native runtime on the target platform." />
+  </Target>
+  <!-- Copy after NuGet runtime assets; the normal build restores the stock runtime. -->
+  <Target Name="CopyRadiantVulkanRuntime" AfterTargets="Build" DependsOnTargets="ValidateRadiantVulkanRuntime" Condition="'$(RadiantVulkanRT)' == 'true' And '$(OutputType)' == 'Exe'">
+    <ItemGroup>
+      <_RadiantRuntimeDestination Include="$(TargetDir)runtimes/$(RadiantNativeRuntimeIdentifier)/native/$(RadiantNativeLibrary)" />
+      <_RadiantRuntimeDestination Include="$(TargetDir)$(RadiantNativeLibrary)" />
+    </ItemGroup>
+    <Copy SourceFiles="$(RadiantNativeRoot)$(RadiantNativeLibrary)" DestinationFiles="%(_RadiantRuntimeDestination.Identity)" />
+  </Target>
+  <Target Name="RestoreStockRadiantVulkanRuntime" AfterTargets="Build" Condition="'$(RadiantVulkanRT)' != 'true' And '$(OutputType)' == 'Exe' And '$(RadiantNativeLibrary)' != ''">
+    <PropertyGroup>
+      <_RadiantStockPlatform Condition="$([MSBuild]::IsOSPlatform('Linux'))">linux</_RadiantStockPlatform>
+      <_RadiantStockPlatform Condition="$([MSBuild]::IsOSPlatform('Windows'))">windows</_RadiantStockPlatform>
+      <_RadiantStockRuntime>$(NuGetPackageRoot)monogame.runtime.$(_RadiantStockPlatform).vulkan/$(MonoGameVersion)/runtimes/$(NETCoreSdkRuntimeIdentifier)/native/$(RadiantNativeLibrary)</_RadiantStockRuntime>
+    </PropertyGroup>
+    <Copy Condition="Exists('$(_RadiantStockRuntime)')" SourceFiles="$(_RadiantStockRuntime)" DestinationFiles="$(TargetDir)$(RadiantNativeLibrary)" SkipUnchangedFiles="true" />
+    <Copy Condition="Exists('$(_RadiantStockRuntime)')" SourceFiles="$(_RadiantStockRuntime)" DestinationFiles="$(TargetDir)runtimes/$(NETCoreSdkRuntimeIdentifier)/native/$(RadiantNativeLibrary)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishRadiantVulkanRuntime" AfterTargets="Publish" DependsOnTargets="ValidateRadiantVulkanRuntime" Condition="'$(RadiantVulkanRT)' == 'true' And '$(OutputType)' == 'Exe'">
+    <ItemGroup>
+      <_RadiantPublishDestination Include="$(PublishDir)runtimes/$(RadiantNativeRuntimeIdentifier)/native/$(RadiantNativeLibrary)" Condition="'$(RuntimeIdentifier)' == ''" />
+      <_RadiantPublishDestination Include="$(PublishDir)$(RadiantNativeLibrary)" />
+      <_RadiantNativeLicense Include="$(RadiantNativeRoot)licenses/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="$(RadiantNativeRoot)$(RadiantNativeLibrary)" DestinationFiles="%(_RadiantPublishDestination.Identity)" />
+    <Copy SourceFiles="@(_RadiantNativeLicense)" DestinationFiles="@(_RadiantNativeLicense->'$(PublishDir)licenses/VulkanRT/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

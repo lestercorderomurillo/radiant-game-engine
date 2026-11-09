@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using com.radiant.engine.bundle;
-using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.core;
 
+/// <summary>Indexes entity positions for exact, regional, and nearest-neighbor queries.</summary>
 public class SpatialIndex
 {
     private readonly ECS Ecs;
@@ -33,11 +33,13 @@ public class SpatialIndex
     private float[] DistanceCache;
     private int[] SortBuffer;
 
+    /// <summary>Entity IDs occupying one spatial grid cell.</summary>
     private struct CellData
     {
         public int[] Entities;
         public int Count;
 
+        /// <summary>Allocates the initial entity storage for a spatial cell.</summary>
         public CellData(int capacity)
         {
             Entities = new int[capacity];
@@ -45,6 +47,7 @@ public class SpatialIndex
         }
     }
 
+    /// <summary>Cached cell and position data used when moving or removing an entity.</summary>
     private struct EntitySpatialData
     {
         public long CellKey;
@@ -53,6 +56,7 @@ public class SpatialIndex
         public long ExactKey;
     }
 
+    /// <summary>Creates the spatial grid with the requested cell dimensions.</summary>
     public SpatialIndex(ECS ecs, float cellSize = 64f)
     {
         Ecs = ecs;
@@ -71,12 +75,14 @@ public class SpatialIndex
         SortBuffer = new int[1024];
     }
 
+    /// <summary>Expands entity-indexed storage to accommodate the requested identifier.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void EnsureEntityCapacity(int entityId)
     {
         if (entityId < EntityCapacity) return;
 
         int newCapacity = EntityCapacity;
+
         while (newCapacity <= entityId)
             newCapacity *= 2;
 
@@ -85,6 +91,7 @@ public class SpatialIndex
         EntityCapacity = newCapacity;
     }
 
+    /// <summary>Combines integer cell coordinates into a spatial hash key.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private long PackCell(int x, int y, int z)
     {
@@ -94,6 +101,7 @@ public class SpatialIndex
         }
     }
 
+    /// <summary>Maps a world coordinate to its grid-cell coordinate.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ToCell(float px, float py, float pz, out int cx, out int cy, out int cz)
     {
@@ -102,6 +110,7 @@ public class SpatialIndex
         cz = (int)MathF.Floor(pz * InverseCellSize);
     }
 
+    /// <summary>Converts a world position into its spatial grid key.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private long ToCellKey(float px, float py, float pz)
     {
@@ -109,6 +118,7 @@ public class SpatialIndex
         return PackCell(cx, cy, cz);
     }
 
+    /// <summary>Builds a lookup key that preserves the exact indexed coordinates.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private long ToExactKey(float px, float py, float pz)
     {
@@ -117,10 +127,12 @@ public class SpatialIndex
             int x = (int)(px * 100f) + 524288;
             int y = (int)(py * 100f) + 524288;
             int z = (int)(pz * 100f) + 524288;
+
             return ((long)x << 40) | ((long)y << 20) | (long)z;
         }
     }
 
+    /// <summary>Expands the reusable spatial-query result buffer.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void EnsureResultCapacity(int required)
     {
@@ -133,12 +145,14 @@ public class SpatialIndex
         }
     }
 
+    /// <summary>Registers an entity's position in both cell and exact-position lookups.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Insert(int entity, Vector3 position)
     {
         Insert(entity, position.X, position.Y, position.Z);
     }
 
+    /// <summary>Registers an entity's position in both cell and exact-position lookups.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Insert(int entity, float px, float py, float pz)
     {
@@ -157,14 +171,15 @@ public class SpatialIndex
                 // Update exact lookup if position changed
                 if (existing.ExactKey != newExactKey)
                 {
-                    if (ExactLookup.TryGetValue(existing.ExactKey, out int e) && e == entity)
-                        ExactLookup.Remove(existing.ExactKey);
+                    if (ExactLookup.TryGetValue(existing.ExactKey, out int e) && e == entity) ExactLookup.Remove(existing.ExactKey);
                     ExactLookup[newExactKey] = entity;
                 }
+
                 existing.PosX = px;
                 existing.PosY = py;
                 existing.PosZ = pz;
                 existing.ExactKey = newExactKey;
+
                 return;
             }
 
@@ -181,8 +196,7 @@ public class SpatialIndex
             Cells[newCellKey] = cell;
         }
 
-        if (cell.Count >= cell.Entities.Length)
-            Array.Resize(ref cell.Entities, cell.Entities.Length * 2);
+        if (cell.Count >= cell.Entities.Length) Array.Resize(ref cell.Entities, cell.Entities.Length * 2);
 
         int indexInCell = cell.Count++;
         cell.Entities[indexInCell] = entity;
@@ -201,11 +215,11 @@ public class SpatialIndex
         ExactLookup[exactKey] = entity;
     }
 
+    /// <summary>Removes an entity from its current spatial grid cell.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void RemoveFromCell(int entity, ref EntitySpatialData data)
     {
-        if (!Cells.TryGetValue(data.CellKey, out var cell))
-            return;
+        if (!Cells.TryGetValue(data.CellKey, out var cell)) return;
 
         int indexInCell = data.IndexInCell;
         int lastIndex = cell.Count - 1;
@@ -220,29 +234,29 @@ public class SpatialIndex
         cell.Count--;
         Cells[data.CellKey] = cell;
 
-        if (cell.Count == 0)
-            Cells.Remove(data.CellKey);
+        if (cell.Count == 0) Cells.Remove(data.CellKey);
     }
 
+    /// <summary>Removes an entity from cell and exact-position lookups.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Remove(int entity)
     {
-        if (entity >= EntityCapacity || !EntityExists[entity])
-            return;
+        if (entity >= EntityCapacity || !EntityExists[entity]) return;
 
         ref var data = ref EntityDataArray[entity];
         RemoveFromCell(entity, ref data);
-        if (ExactLookup.TryGetValue(data.ExactKey, out int e) && e == entity)
-            ExactLookup.Remove(data.ExactKey);
+        if (ExactLookup.TryGetValue(data.ExactKey, out int e) && e == entity) ExactLookup.Remove(data.ExactKey);
         EntityExists[entity] = false;
     }
 
+    /// <summary>Moves an indexed entity, updating cell membership when necessary.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Update(int entity, Vector3 position)
     {
         Insert(entity, position.X, position.Y, position.Z);
     }
 
+    /// <summary>Removes all indexed entities and clears cached spatial results.</summary>
     public void Clear()
     {
         Cells.Clear();
@@ -250,13 +264,14 @@ public class SpatialIndex
         Array.Clear(EntityExists, 0, EntityCapacity);
     }
 
-
+    /// <summary>Looks up an entity at the exact indexed coordinates.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int? AtExact(Vector3 position)
     {
         return AtExact(position.X, position.Y, position.Z);
     }
 
+    /// <summary>Looks up an entity at the exact indexed coordinates.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int? AtExact(float x, float y, float z)
     {
@@ -264,29 +279,34 @@ public class SpatialIndex
         return ExactLookup.TryGetValue(exactKey, out int entity) ? entity : null;
     }
 
+    /// <summary>Collects entities assigned to the grid cell containing the query position.</summary>
     public ReadOnlySpan<int> InCell(int cx, int cy, int cz)
     {
         long key = PackCell(cx, cy, cz);
-        if (!Cells.TryGetValue(key, out var cell))
-            return ReadOnlySpan<int>.Empty;
+
+        if (!Cells.TryGetValue(key, out var cell)) return ReadOnlySpan<int>.Empty;
 
         return new ReadOnlySpan<int>(cell.Entities, 0, cell.Count);
     }
 
+    /// <summary>Collects entities assigned to the grid cell containing the query position.</summary>
     public ReadOnlySpan<int> InCell(Vector3 position)
     {
         ToCell(position.X, position.Y, position.Z, out int cx, out int cy, out int cz);
         return InCell(cx, cy, cz);
     }
 
+    /// <summary>Collects entities within the requested distance of a world-space position.</summary>
     public ReadOnlySpan<int> InRadius(Vector3 center, float radius)
     {
         return InRadius(center.X, center.Y, center.Z, radius);
     }
 
+    /// <summary>Collects entities within the requested distance of a world-space position.</summary>
     public ReadOnlySpan<int> InRadius(float cx, float cy, float cz, float radius)
     {
         ResultCount = 0;
+
         float radiusSq = radius * radius;
 
         int minX = (int)MathF.Floor((cx - radius) * InverseCellSize);
@@ -303,6 +323,7 @@ public class SpatialIndex
                 for (int z = minZ; z <= maxZ; z++)
                 {
                     long key = PackCell(x, y, z);
+
                     if (!Cells.TryGetValue(key, out var cell)) continue;
 
                     EnsureResultCapacity(ResultCount + cell.Count);
@@ -317,8 +338,7 @@ public class SpatialIndex
                         float dz = data.PosZ - cz;
                         float distSq = dx * dx + dy * dy + dz * dz;
 
-                        if (distSq <= radiusSq)
-                            ResultArray[ResultCount++] = entity;
+                        if (distSq <= radiusSq) ResultArray[ResultCount++] = entity;
                     }
                 }
             }
@@ -327,11 +347,13 @@ public class SpatialIndex
         return new ReadOnlySpan<int>(ResultArray, 0, ResultCount);
     }
 
+    /// <summary>Collects entities inside the supplied world-space bounds.</summary>
     public ReadOnlySpan<int> InBox(Vector3 min, Vector3 max)
     {
         return InBox(min.X, min.Y, min.Z, max.X, max.Y, max.Z);
     }
 
+    /// <summary>Collects entities inside the supplied world-space bounds.</summary>
     public ReadOnlySpan<int> InBox(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
     {
         ResultCount = 0;
@@ -350,6 +372,7 @@ public class SpatialIndex
                 for (int z = minCZ; z <= maxCZ; z++)
                 {
                     long key = PackCell(x, y, z);
+
                     if (!Cells.TryGetValue(key, out var cell)) continue;
 
                     EnsureResultCapacity(ResultCount + cell.Count);
@@ -373,16 +396,18 @@ public class SpatialIndex
         return new ReadOnlySpan<int>(ResultArray, 0, ResultCount);
     }
 
+    /// <summary>Finds nearby entities ordered by distance from the query position.</summary>
     public ReadOnlySpan<int> Nearest(Vector3 center, int count, float maxRadius = float.MaxValue)
     {
         return Nearest(center.X, center.Y, center.Z, count, maxRadius);
     }
 
+    /// <summary>Finds nearby entities ordered by distance from the query position.</summary>
     public ReadOnlySpan<int> Nearest(float cx, float cy, float cz, int count, float maxRadius = float.MaxValue)
     {
         var candidates = InRadius(cx, cy, cz, maxRadius);
-        if (candidates.Length <= count)
-            return candidates;
+
+        if (candidates.Length <= count) return candidates;
 
         EnsureResultCapacity(candidates.Length);
 
@@ -410,6 +435,7 @@ public class SpatialIndex
         return new ReadOnlySpan<int>(ResultArray, 0, ResultCount);
     }
 
+    /// <summary>Orders the nearest requested results without sorting the entire candidate set.</summary>
     private void PartialSort(int length, int k)
     {
         int left = 0;
@@ -420,6 +446,7 @@ public class SpatialIndex
             int pivotIndex = Partition(left, right);
 
             if (pivotIndex == k - 1) return;
+
             if (pivotIndex < k - 1)
                 left = pivotIndex + 1;
             else
@@ -427,6 +454,7 @@ public class SpatialIndex
         }
     }
 
+    /// <summary>Partitions spatial candidates around a distance pivot for nearest-neighbor selection.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int Partition(int left, int right)
     {
@@ -443,6 +471,7 @@ public class SpatialIndex
         }
 
         (SortBuffer[i + 1], SortBuffer[right]) = (SortBuffer[right], SortBuffer[i + 1]);
+
         return i + 1;
     }
 }

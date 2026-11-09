@@ -355,6 +355,7 @@ float4 CorrectEdgesWithDebug(float3 color, float2 uv)
                 surfaceWeight += 1.0;
             }
         }
+
         if (emissiveR.a > 0.0) {
             float opacityR = AbsorptionTexture.Sample(Sampler, uv + float2(texelSize.x, 0)).a;
             if (opacityR >= OPACITY_THRESHOLD) {
@@ -362,6 +363,7 @@ float4 CorrectEdgesWithDebug(float3 color, float2 uv)
                 surfaceWeight += 1.0;
             }
         }
+
         if (emissiveU.a > 0.0) {
             float opacityU = AbsorptionTexture.Sample(Sampler, uv + float2(0, -texelSize.y)).a;
             if (opacityU >= OPACITY_THRESHOLD) {
@@ -369,6 +371,7 @@ float4 CorrectEdgesWithDebug(float3 color, float2 uv)
                 surfaceWeight += 1.0;
             }
         }
+
         if (emissiveD.a > 0.0) {
             float opacityD = AbsorptionTexture.Sample(Sampler, uv + float2(0, texelSize.y)).a;
             if (opacityD >= OPACITY_THRESHOLD) {
@@ -634,6 +637,7 @@ float4 EdgeSmooth_PS(PixelShaderInput input) : SV_Target0
             totalWeight += weight;
         }
     }
+
     blur /= totalWeight;
 
     float3 result = lerp(colorM, blur, SMOOTH_STRENGTH);

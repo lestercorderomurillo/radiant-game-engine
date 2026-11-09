@@ -2,6 +2,7 @@ using System;
 
 namespace com.radiant.engine.core;
 
+/// <summary>Switches among mutually exclusive systems, initializing and disposing them as needed.</summary>
 public class SystemGroup
 {
     private readonly (string Name, System System)[] Entries;
@@ -13,6 +14,7 @@ public class SystemGroup
     public int ActiveIdx => ActiveIndex;
     public string[] Names => Array.ConvertAll(Entries, e => e.Name);
 
+    /// <summary>Creates a named selection group and locates its initially enabled entry.</summary>
     public SystemGroup(string name, params (string name, System system)[] entries)
     {
         Name = name;
@@ -21,6 +23,7 @@ public class SystemGroup
         if (ActiveIndex < 0) ActiveIndex = 0;
     }
 
+    /// <summary>Activates the next system, cycling through a disabled state after the last entry.</summary>
     public void Toggle()
     {
         int next = ActiveIndex + 1;
@@ -31,6 +34,7 @@ public class SystemGroup
             SetActive(next);
     }
 
+    /// <summary>Disposes the current system and initializes the selected entry.</summary>
     public void SetActive(int index)
     {
         if (index == ActiveIndex || index < 0 || index >= Entries.Length) return;
@@ -49,6 +53,7 @@ public class SystemGroup
         next.Initialize();
     }
 
+    /// <summary>Disposes and disables the active system, leaving the group inactive.</summary>
     public void DisableActive()
     {
         if (ActiveIndex < 0) return;
@@ -59,13 +64,16 @@ public class SystemGroup
         ActiveIndex = -1;
     }
 
+    /// <summary>Returns the entry index for a system, or -1 when it is not in the group.</summary>
     public int IndexOf(System system)
     {
         for (int i = 0; i < Entries.Length; i++)
             if (Entries[i].System == system) return i;
+
         return -1;
     }
 
+    /// <summary>Invokes an action for every system in the group.</summary>
     public void ForEach(Action<System> action)
     {
         for (int i = 0; i < Entries.Length; i++)

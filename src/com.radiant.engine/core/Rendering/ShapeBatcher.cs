@@ -1,3 +1,4 @@
+using com.radiant.engine.runtime;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,6 +18,8 @@ internal class ShapeBatcher : IDisposable
     private const int MaxShapeCapacity = int.MaxValue;
 
     private readonly GraphicsDevice Device;
+    private readonly MonoGameRenderStates NativeStates = new();
+
     public Matrix ViewProjection { get; set; }
 
     private VertexBuffer QuadBuffer;
@@ -44,6 +47,7 @@ internal class ShapeBatcher : IDisposable
     private (float z, int thread)[] MergeHeap;
     private int MergeHeapSize;
 
+    /// <summary>Allocates instance batching resources on the supplied graphics device.</summary>
     public ShapeBatcher(GraphicsDevice device)
     {
         Device = device;
@@ -72,6 +76,7 @@ internal class ShapeBatcher : IDisposable
     public void Add(Shape shape)
     {
         if (Count >= MaxShapeCapacity) return;
+
         EnsureCapacity(Count + 1);
         Shapes[Count++] = shape;
     }
@@ -82,11 +87,11 @@ internal class ShapeBatcher : IDisposable
         if (required <= ShapeCapacity) return;
 
         int newCapacity = ShapeCapacity;
+
         while (newCapacity < required && newCapacity < MaxShapeCapacity)
             newCapacity *= 2;
 
-        if (newCapacity > MaxShapeCapacity)
-            newCapacity = MaxShapeCapacity;
+        if (newCapacity > MaxShapeCapacity) newCapacity = MaxShapeCapacity;
 
         Array.Resize(ref Shapes, newCapacity);
         InstanceBuffer?.Dispose();
@@ -108,16 +113,15 @@ internal class ShapeBatcher : IDisposable
     {
         Device.SetRenderTarget(target);
 
-        if (clearColor.HasValue)
-            Device.Clear(clearColor.Value);
+        if (clearColor.HasValue) Device.Clear(clearColor.Value.ToNative());
 
         if (Count > 0)
         {
             InstanceBuffer.SetData(Shapes, 0, Count, SetDataOptions.Discard);
 
-            Device.BlendState = blendState;
-            Device.DepthStencilState = DepthStencilState.None;
-            Device.RasterizerState = RasterizerState.CullNone;
+            Device.BlendState = NativeStates.Get(blendState);
+            Device.DepthStencilState = NativeStates.Get(DepthStencilState.None);
+            Device.RasterizerState = NativeStates.Get(RasterizerState.CullNone);
 
             Device.SetVertexBuffers(
                 new VertexBufferBinding(QuadBuffer, 0, 0),
@@ -146,18 +150,18 @@ internal class ShapeBatcher : IDisposable
     {
         Device.SetRenderTarget(target);
 
-        if (clearColor.HasValue)
-            Device.Clear(clearColor.Value);
+        if (clearColor.HasValue) Device.Clear(clearColor.Value.ToNative());
 
         if (count > 0)
         {
             if (count > ShapeCapacity)
             {
                 int newCapacity = ShapeCapacity;
+
                 while (newCapacity < count && newCapacity < MaxShapeCapacity)
                     newCapacity *= 2;
-                if (newCapacity > MaxShapeCapacity)
-                    newCapacity = MaxShapeCapacity;
+
+                if (newCapacity > MaxShapeCapacity) newCapacity = MaxShapeCapacity;
 
                 InstanceBuffer?.Dispose();
                 InstanceBuffer = new DynamicVertexBuffer(Device, Shape.Declaration, newCapacity, BufferUsage.WriteOnly);
@@ -169,9 +173,9 @@ internal class ShapeBatcher : IDisposable
             InstanceBuffer.SetData(shapes, 0, uploadCount, SetDataOptions.Discard);
             LastSetDataMs = (float)swSetData.Elapsed.TotalMilliseconds;
 
-            Device.BlendState = blendState;
-            Device.DepthStencilState = DepthStencilState.None;
-            Device.RasterizerState = RasterizerState.CullNone;
+            Device.BlendState = NativeStates.Get(blendState);
+            Device.DepthStencilState = NativeStates.Get(DepthStencilState.None);
+            Device.RasterizerState = NativeStates.Get(RasterizerState.CullNone);
 
             Device.SetVertexBuffers(
                 new VertexBufferBinding(QuadBuffer, 0, 0),
@@ -183,11 +187,13 @@ internal class ShapeBatcher : IDisposable
             shapeShader.Parameters["ViewProjection"]?.SetValue(ViewProjection);
 
             var swDraw = Stopwatch.StartNew();
+
             foreach (var pass in shapeShader.CurrentTechnique.Passes)
             {
                 pass.Apply();
                 Device.DrawInstancedPrimitives(PrimitiveType.TriangleList, 0, 0, 2, uploadCount);
             }
+
             LastDrawMs = (float)swDraw.Elapsed.TotalMilliseconds;
         }
     }
@@ -221,6 +227,7 @@ internal class ShapeBatcher : IDisposable
         if (capacityPerThread <= ParallelCapacityPerThread) return;
 
         ParallelCapacityPerThread = capacityPerThread;
+
         for (int i = 0; i < ParallelThreadCount; i++)
         {
             Array.Resize(ref ParallelShapeBuffers[i], capacityPerThread);
@@ -233,6 +240,7 @@ internal class ShapeBatcher : IDisposable
     public void EnsureParallelCapacityForEntities(int totalEntities)
     {
         EnsureCapacity(totalEntities);
+
         int perThread = (totalEntities + ParallelThreadCount - 1) / ParallelThreadCount;
         EnsureParallelCapacity(perThread);
     }
@@ -280,6 +288,7 @@ internal class ShapeBatcher : IDisposable
         EnsureCapacity(totalCount);
 
         int offset = 0;
+
         for (int threadIndex = 0; threadIndex < ParallelThreadCount; threadIndex++)
         {
             var buffer = ParallelShapeBuffers[threadIndex];
@@ -308,6 +317,7 @@ internal class ShapeBatcher : IDisposable
     public void SortBufferByZ(int threadIndex)
     {
         int count = ParallelShapeCounts[threadIndex];
+
         if (count <= 1) return;
 
         var shapes = ParallelShapeBuffers[threadIndex];
@@ -339,6 +349,7 @@ internal class ShapeBatcher : IDisposable
     public void CollectParallelSorted()
     {
         int totalCount = 0;
+
         for (int i = 0; i < ParallelThreadCount; i++)
             totalCount += ParallelShapeCounts[i];
 
@@ -353,19 +364,20 @@ internal class ShapeBatcher : IDisposable
         Array.Clear(ParallelMergeIndices, 0, ParallelThreadCount);
 
         MergeHeapSize = 0;
+
         for (int threadIndex = 0; threadIndex < ParallelThreadCount; threadIndex++)
         {
-            if (ParallelShapeCounts[threadIndex] > 0)
-            {
-                MergeHeap[MergeHeapSize++] = (ParallelZBuffers[threadIndex][0], threadIndex);
-            }
+            if (ParallelShapeCounts[threadIndex] > 0) MergeHeap[MergeHeapSize++] = (ParallelZBuffers[threadIndex][0], threadIndex);
         }
+
         HeapifyAll();
 
         int outputIndex = 0;
+
         while (MergeHeapSize > 0)
         {
             var (_, bestThread) = MergeHeap[0];
+
             int idx = ParallelMergeIndices[bestThread]++;
             Shapes[outputIndex++] = ParallelShapeBuffers[bestThread][idx];
 
@@ -387,12 +399,14 @@ internal class ShapeBatcher : IDisposable
         Count = totalCount;
     }
 
+    /// <summary>Builds the priority heap used to merge ordered shape batches.</summary>
     private void HeapifyAll()
     {
         for (int i = MergeHeapSize / 2 - 1; i >= 0; i--)
             HeapSiftDown(i);
     }
 
+    /// <summary>Restores heap ordering after advancing one shape batch.</summary>
     private void HeapSiftDown(int i)
     {
         while (true)
@@ -401,10 +415,8 @@ internal class ShapeBatcher : IDisposable
             int left = 2 * i + 1;
             int right = 2 * i + 2;
 
-            if (left < MergeHeapSize && MergeHeap[left].z < MergeHeap[smallest].z)
-                smallest = left;
-            if (right < MergeHeapSize && MergeHeap[right].z < MergeHeap[smallest].z)
-                smallest = right;
+            if (left < MergeHeapSize && MergeHeap[left].z < MergeHeap[smallest].z) smallest = left;
+            if (right < MergeHeapSize && MergeHeap[right].z < MergeHeap[smallest].z) smallest = right;
 
             if (smallest == i) break;
 
@@ -416,6 +428,7 @@ internal class ShapeBatcher : IDisposable
     /// <summary>Disposes GPU buffers and releases parallel buffer arrays.</summary>
     public void Dispose()
     {
+        NativeStates.Dispose();
         QuadBuffer?.Dispose();
         IndexBuffer?.Dispose();
         InstanceBuffer?.Dispose();

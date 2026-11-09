@@ -1,10 +1,11 @@
 using com.radiant.engine.core;
 using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Input;
+using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Paints ECS geometry along mouse strokes in world coordinates.</summary>
 public class PaintBrush : core.System
 {
     public float PaintRadius { get; set; } = 8f;
@@ -18,11 +19,12 @@ public class PaintBrush : core.System
     private Vector2 LastRightPaintPos;
     private bool HasLastRightPaintPos;
 
+    /// <inheritdoc/>
     public override void Update()
     {
         if (!Renderer.IsActive) return;
 
-        var mouse = Mouse.GetState();
+        var mouse = Controls.Mouse;
         var mousePos = Renderer.ScreenToWorld(new Vector2(mouse.X, mouse.Y));
 
         bool leftDown = mouse.LeftButton == ButtonState.Pressed;
@@ -39,6 +41,7 @@ public class PaintBrush : core.System
             HasLastRightPaintPos = false;
     }
 
+    /// <summary>Samples cursor movement and places evenly spaced brush marks.</summary>
     private void HandlePaintStroke(ref Vector2 lastPos, ref bool hasLast, Vector2 currentPos, bool rainbow)
     {
         if (!hasLast)
@@ -46,10 +49,12 @@ public class PaintBrush : core.System
             PaintAt(currentPos, rainbow);
             lastPos = currentPos;
             hasLast = true;
+
             return;
         }
 
         float distance = Vector2.Distance(lastPos, currentPos);
+
         if (distance < PaintSpacing) return;
 
         Vector2 direction = Vector2.Normalize(currentPos - lastPos);
@@ -64,12 +69,14 @@ public class PaintBrush : core.System
         lastPos = currentPos;
     }
 
+    /// <summary>Creates a brush mark at the supplied world position.</summary>
     private void PaintAt(Vector2 position, bool rainbow)
     {
         var color = rainbow ? LightFactory.HueToRGB(RainbowHue) : Color.Black;
         if (rainbow) RainbowHue = (RainbowHue + HueSpeed) % 1f;
 
         var nearby = Scene.ECS.InRadius(new Vector3(position, 0), PaintRadius);
+
         foreach (int entityId in nearby)
         {
             if (Scene.ECS.HasComponent<Circle2D>(entityId) && entityId != ExcludeEntityId)
@@ -77,6 +84,7 @@ public class PaintBrush : core.System
                 ref var material = ref Scene.ECS.GetComponent<Material>(entityId);
                 material.Albedo = color;
                 material.Emissive = color;
+
                 return;
             }
         }

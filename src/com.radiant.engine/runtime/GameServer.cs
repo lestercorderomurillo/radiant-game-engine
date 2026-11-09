@@ -8,6 +8,7 @@ using com.radiant.engine.mplay;
 
 namespace com.radiant.engine.runtime;
 
+/// <summary>Accepts TCP clients and dispatches or broadcasts game messages.</summary>
 public class GameServer
 {
     private readonly string ServerName;
@@ -27,7 +28,8 @@ public class GameServer
     private bool IsRunning;
 
     private string ServerId;
-    
+
+    /// <summary>Configures the listening endpoint and metadata for a game server.</summary>
     public GameServer(string serverName, string serverIp, int serverPort, NetworkManager lobbyManager)
     {
         ServerName = serverName;
@@ -36,6 +38,7 @@ public class GameServer
         LobbyManager = lobbyManager;
     }
 
+    /// <summary>Registers this server and stores its assigned directory identifier.</summary>
     public async Task<bool> RegisterWithDirectoryAsync()
     {
         var serverInfo = new GameServerDescriptor
@@ -60,6 +63,7 @@ public class GameServer
         return false;
     }
 
+    /// <summary>Starts accepting client connections on the configured TCP endpoint.</summary>
     public void Start()
     {
         TcpListener = new TcpListener(IPAddress.Any, ServerPort);
@@ -69,6 +73,7 @@ public class GameServer
         Task.Run(() => AcceptClientsAsync());
     }
 
+    /// <summary>Stops listening, disconnects clients, and unregisters the server.</summary>
     public async Task StopAsync()
     {
         await LobbyManager.UnregisterServerAsync(ServerId);
@@ -82,10 +87,12 @@ public class GameServer
             {
                 client.Disconnect();
             }
+
             Clients.Clear();
         }
     }
 
+    /// <summary>Accepts TCP clients until server shutdown cancels the listener.</summary>
     private async Task AcceptClientsAsync()
     {
         while (IsRunning)
@@ -114,6 +121,7 @@ public class GameServer
         }
     }
 
+    /// <summary>Removes a disconnected client from the server's active connections.</summary>
     public void RemoveClient(NetworkClient client)
     {
         lock (Lock)
@@ -124,6 +132,7 @@ public class GameServer
         }
     }
 
+    /// <summary>Routes a received client message to the server's message handlers.</summary>
     public void HandleMessage(NetworkClient client, NetworkMessage message)
     {
         switch (message.Type)
@@ -140,6 +149,7 @@ public class GameServer
         }
     }
 
+    /// <summary>Sends a message to the client with the specified identifier.</summary>
     public void SendToClient(NetworkClient client, NetworkMessage message)
     {
         try
@@ -153,9 +163,11 @@ public class GameServer
         }
     }
 
+    /// <summary>Sends a message to connected clients, optionally excluding one sender.</summary>
     public void BroadcastMessage(NetworkMessage message, NetworkClient exclude = null)
     {
         NetworkClient[] snapshot;
+
         lock (Lock)
         {
             snapshot = Clients.ToArray();
@@ -163,8 +175,7 @@ public class GameServer
 
         foreach (var client in snapshot)
         {
-            if (client != exclude)
-                SendToClient(client, message);
+            if (client != exclude) SendToClient(client, message);
         }
     }
 }

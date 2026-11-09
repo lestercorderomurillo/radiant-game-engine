@@ -1,0 +1,24 @@
+#version 450
+#extension GL_EXT_samplerless_texture_functions : require
+layout(local_size_x=8,local_size_y=8) in;
+layout(set=0,binding=0) uniform texture2D Filtered;
+layout(set=0,binding=1) uniform texture2D Albedo;
+layout(set=0,binding=2) uniform texture2D Emission;
+layout(set=0,binding=3) uniform texture2D Raw;
+layout(set=0,binding=4,rgba32f) uniform writeonly image2D Output;
+layout(push_constant) uniform Parameters { uint Width; uint Height; uint Mode; };
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+
+    if (pixel.x >= Width || pixel.y >= Height) return;
+
+    vec4 albedo = texelFetch(Albedo, pixel, 0);
+    vec4 raw = texelFetch(Raw, pixel, 0);
+
+    if (albedo.a == 0) { imageStore(Output,pixel,raw); return; }
+
+    vec3 light = texelFetch(Filtered,pixel,0).rgb;
+    if (Mode == 1) light = max(vec3(light.x-light.z+light.y, light.x+light.z, light.x-light.z-light.y),vec3(0));
+    imageStore(Output,pixel,vec4(max(light,vec3(0))*albedo.rgb + texelFetch(Emission,pixel,0).rgb,raw.a));
+}

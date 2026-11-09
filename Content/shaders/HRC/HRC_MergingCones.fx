@@ -69,6 +69,7 @@ float3 MergeCone(float2 probe, float plane, float intrv, float vrays, float inde
 
     float2 vrayLL = (limit * 2.0) + float2(0.0, coneI * 2.0);
     float2 vrayRR = (limit * 2.0) + float2(0.0, (coneI + 1.0) * 2.0);
+
     // This is already the child cone's angular width. The children partition
     // the quadrant; global normalization belongs in HRC_FluenceSum.
     float coneW = atan(vrayRR.y / vrayRR.x) - atan(vrayLL.y / vrayLL.x);

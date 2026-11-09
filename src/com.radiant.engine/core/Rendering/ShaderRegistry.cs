@@ -14,6 +14,7 @@ internal class ShaderRegistry : IDisposable
     private readonly Dictionary<string, Effect> Cache = new();
     private readonly ContentManager Content;
 
+    /// <summary>Binds shader loading and caching to the supplied content manager.</summary>
     public ShaderRegistry(ContentManager content)
     {
         Content = content;
@@ -30,6 +31,7 @@ internal class ShaderRegistry : IDisposable
             shader = Content.Load<Effect>($"shaders/{name}");
             Cache[name] = shader;
         }
+
         return shader;
     }
 
@@ -50,6 +52,7 @@ internal class ShaderRegistry : IDisposable
             Cache.Remove(name);
             return true;
         }
+
         return false;
     }
 
@@ -58,6 +61,7 @@ internal class ShaderRegistry : IDisposable
     {
         foreach (var shader in Cache.Values)
             shader?.Dispose();
+
         Cache.Clear();
     }
 }

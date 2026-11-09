@@ -9,8 +9,14 @@ public interface IDenoisingBackend : IRenderSource, IDisposable
     string Name { get; }
     bool Available { get; }
     string Status { get; }
+
+    /// <summary>Processes the frame's radiance and aligned guides into the backend output.</summary>
     void Render(in DenoisingFrame frame);
+
+    /// <summary>Polls or prepares backend work before rendering the current frame.</summary>
     void Update(in DenoisingFrame frame) { }
+
+    /// <summary>Discards temporal state after a camera cut or input change.</summary>
     void ResetHistory();
 }
 

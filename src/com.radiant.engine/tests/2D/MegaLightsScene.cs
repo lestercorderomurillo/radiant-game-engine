@@ -1,20 +1,19 @@
 using com.radiant.engine.bundle;
 using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
+using com.radiant.engine.input;
 using System;
 using System.Collections.Generic;
 
 namespace com.radiant.engine.core;
 
+/// <summary>Interactive HRC demo with animated lights, occluders, and mouse painting.</summary>
 public class MegaLightsScene : Scene
 {
     private int MouseLightId;
     private int[] RotatingLightIds;
 
     private MouseState PrevMouse;
-    private KeyboardState PrevKeyboard;
     private Random Rng = new();
 
     private float Rotation;
@@ -31,13 +30,7 @@ public class MegaLightsScene : Scene
     private const float RotatingLightZ = 65530f;  // Near top
     private const float MouseLightZ = 65535f;     // Always on top
 
-    private HRCGI HRCGISystem;
-    private Bilinear Bilinear;
-    private UDR1 UDR1System;
-    private UDR2 UDR2System;
-    private UDR3 UDR3System;
-
-    private int UDRMode = 3;  // 0 = Bilinear, 1 = UDR1, 2 = UDR2, 3 = UDR3
+    private Upscaling Upscaler;
 
     private const float RotationSpeed = 0.12f;
     private const float OrbitRadius = 360f;
@@ -47,23 +40,22 @@ public class MegaLightsScene : Scene
     private const float ColumnSpacing = 120f;
     private const int MaxBoxesPerColumn = 10;
 
+    /// <inheritdoc/>
     public override void SetupECS()
     {
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<PerformanceMonitor>();
         ECS.AddSystem<Geometry>();
-        HRCGISystem = ECS.AddSystem<HRCGI>();
 
-        Bilinear = ECS.AddSystem<Bilinear>(enabled: false);
-        UDR1System = ECS.AddSystem<UDR1>(enabled: false);
-        UDR2System = ECS.AddSystem<UDR2>(enabled: false);
-        UDR3System = ECS.AddSystem<UDR3>();
+        var lighting = ECS.AddSystem<HRCGI>();
+        Upscaler = DemoRendering.AddHrc(ECS, lighting);
 
         ECS.AddSystem<GizmosRenderer>();
 
         base.SetupECS();
     }
 
+    /// <inheritdoc/>
     public override void SetupScene()
     {
         Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
@@ -72,11 +64,11 @@ public class MegaLightsScene : Scene
         CreateOccluders();
         CreateMouseLight();
         CreateCenterTriangles();
-        UpdateUDRInput();
 
         base.SetupScene();
     }
 
+    /// <summary>Adds the nested emissive triangles used as central demo geometry.</summary>
     private void CreateCenterTriangles()
     {
         var center = Renderer.VirtualSize / 2;
@@ -90,6 +82,7 @@ public class MegaLightsScene : Scene
         CreateBorderedTriangle(center, sizeInner, new Color(180, 0, 255));
     }
 
+    /// <summary>Creates a triangle with a dark border and emissive interior.</summary>
     private void CreateBorderedTriangle(Vector2 center, float size, Color emissive)
     {
         int id = ECS.CreateEntity();
@@ -114,14 +107,16 @@ public class MegaLightsScene : Scene
         material.Emissive = emissive;
     }
 
+    /// <summary>Spawns the lights that orbit the center of the demo.</summary>
     private void CreateRotatingLights()
     {
         RotatingLightIds = new int[LightCount];
+
         var center = Renderer.VirtualSize / 2;
 
         for (int i = 0; i < LightCount; i++)
         {
-            float angle = i / (float)LightCount * MathHelper.TwoPi;
+            float angle = i / (float)LightCount * (global::System.MathF.PI * 2);
             float x = center.X + OrbitRadius * MathF.Cos(angle);
             float y = center.Y + OrbitRadius * MathF.Sin(angle);
 
@@ -136,6 +131,7 @@ public class MegaLightsScene : Scene
         }
     }
 
+    /// <summary>Populates the demo with light-blocking geometry.</summary>
     private void CreateOccluders()
     {
         var screen = Renderer.VirtualSize;
@@ -153,6 +149,7 @@ public class MegaLightsScene : Scene
             // Farther from center = more alpha, closer = less alpha
             float alpha = (distanceFromCenter / maxDistance) * 1.0f;
             alpha = Math.Clamp(alpha, 0f, 1.0f);
+
             byte alphaByte = (byte)(alpha * 255);
 
             // Each column farther gains +1 top and +1 bottom box
@@ -161,6 +158,7 @@ public class MegaLightsScene : Scene
 
             // Left column
             float leftX = center.X - distanceFromCenter;
+
             for (int row = 0; row < boxesInColumn; row++)
             {
                 float y = center.Y - (boxesInColumn * BoxSize / 2) + row * BoxSize + BoxSize / 2;
@@ -169,6 +167,7 @@ public class MegaLightsScene : Scene
 
             // Right column
             float rightX = center.X + distanceFromCenter;
+
             for (int row = 0; row < boxesInColumn; row++)
             {
                 float y = center.Y - (boxesInColumn * BoxSize / 2) + row * BoxSize + BoxSize / 2;
@@ -178,9 +177,10 @@ public class MegaLightsScene : Scene
 
     }
 
+    /// <summary>Creates the emissive entity that follows the cursor.</summary>
     private void CreateMouseLight()
     {
-        var mouse = Mouse.GetState();
+        var mouse = Controls.Mouse;
         var worldPos = Renderer.ScreenToWorld(new Vector2(mouse.X, mouse.Y));
         MouseLightId = CreateLight(worldPos, 100f, new Color(0, 0, 0, 128), new Color(0, 0, 0, 128));
 
@@ -190,6 +190,7 @@ public class MegaLightsScene : Scene
         PrevMouse = mouse;
     }
 
+    /// <summary>Creates an emissive circle entity with the requested position and material.</summary>
     private int CreateLight(Vector2 position, float radius, Color color, Color emissive, float? z = null)
     {
         int id = ECS.CreateEntity();
@@ -217,6 +218,7 @@ public class MegaLightsScene : Scene
         return id;
     }
 
+    /// <summary>Creates a light-blocking entity with the requested geometry and material.</summary>
     private int CreateOccluder(Vector2 position, float size)
     {
         int id = ECS.CreateEntity();
@@ -241,6 +243,7 @@ public class MegaLightsScene : Scene
         return id;
     }
 
+    /// <summary>Creates a light-blocking entity with the requested geometry and material.</summary>
     private int CreateOccluder(Vector2 position, float size, byte alpha)
     {
         int id = ECS.CreateEntity();
@@ -265,14 +268,14 @@ public class MegaLightsScene : Scene
         return id;
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
-        var keyboard = Keyboard.GetState();
-        var mouse = Mouse.GetState();
+        var mouse = Controls.Mouse;
         var center = Renderer.VirtualSize / 2;
 
         // Space: toggle animation
-        if (keyboard.IsKeyDown(Keys.Space) && PrevKeyboard.IsKeyUp(Keys.Space))
+        if (Controls.WasPressed(Key.Space))
             IsAnimating = !IsAnimating;
 
         // Animate rotating lights
@@ -281,7 +284,7 @@ public class MegaLightsScene : Scene
 
         for (int i = 0; i < RotatingLightIds.Length; i++)
         {
-            float angle = i / (float)LightCount * MathHelper.TwoPi + Rotation;
+            float angle = i / (float)LightCount * (global::System.MathF.PI * 2) + Rotation;
             float x = center.X + OrbitRadius * MathF.Cos(angle);
             float y = center.Y + OrbitRadius * MathF.Sin(angle);
 
@@ -316,6 +319,7 @@ public class MegaLightsScene : Scene
                 else
                 {
                     float distance = Vector2.Distance(LastPaintPos, mousePos);
+
                     if (distance >= PaintSpacing)
                     {
                         Vector2 direction = Vector2.Normalize(mousePos - LastPaintPos);
@@ -348,6 +352,7 @@ public class MegaLightsScene : Scene
                 else
                 {
                     float distance = Vector2.Distance(LastRightPaintPos, mousePos);
+
                     if (distance >= PaintSpacing)
                     {
                         Vector2 direction = Vector2.Normalize(mousePos - LastRightPaintPos);
@@ -370,95 +375,25 @@ public class MegaLightsScene : Scene
         }
 
         // F11 to toggle UDR mode
-        if (keyboard.IsKeyDown(Keys.F11) && PrevKeyboard.IsKeyUp(Keys.F11))
-            ToggleUDRSystem();
+        if (Controls.WasPressed(Key.F11))
+            Upscaler.Select((UpscalingMode)(((int)Upscaler.Mode + 1) % 5));
 
         // X to spawn 100,000 random debug entities
-        if (keyboard.IsKeyDown(Keys.X) && PrevKeyboard.IsKeyUp(Keys.X))
+        if (Controls.WasPressed(Key.X))
             SpawnDebugEntities(100_000);
 
-        PrevKeyboard = keyboard;
         PrevMouse = mouse;
 
     }
 
-    private void UpdateUDRInput()
-    {
-        var inputSource = new Func<Texture2D>(HRCGISystem.GetOutput);
-        Bilinear.SetInputSource(inputSource);
-        UDR1System.SetInputSource(inputSource);
-        UDR2System.SetInputSource(inputSource);
-        UDR3System.SetInputSource(inputSource);
-    }
-
-    private void ToggleUDRSystem()
-    {
-        // Disable current UDR system
-        switch (UDRMode)
-        {
-            case 0:
-                Bilinear.Dispose();
-                Bilinear.Enabled = false;
-                break;
-            case 1:
-                UDR1System.Dispose();
-                UDR1System.Enabled = false;
-                break;
-            case 2:
-                UDR2System.Dispose();
-                UDR2System.Enabled = false;
-                break;
-            case 3:
-                UDR3System.Dispose();
-                UDR3System.Enabled = false;
-                break;
-        }
-
-        // Cycle to next mode (0 = Bilinear, 1 = UDR1, 2 = UDR2, 3 = UDR3)
-        UDRMode = (UDRMode + 1) % 4;
-
-        // Enable new UDR system
-        switch (UDRMode)
-        {
-            case 0:
-                Bilinear.Initialize();
-                Bilinear.Enabled = true;
-                break;
-            case 1:
-                UDR1System.Initialize();
-                UDR1System.Enabled = true;
-                break;
-            case 2:
-                UDR2System.Initialize();
-                UDR2System.Enabled = true;
-                break;
-            case 3:
-                UDR3System.Initialize();
-                UDR3System.Enabled = true;
-                break;
-        }
-
-        UpdateUDRInput();
-    }
-
-    private string GetUDRName()
-    {
-        return UDRMode switch
-        {
-            0 => "Bilinear",
-            1 => "UDR1 (Spatial)",
-            2 => "UDR2 (Spatial + Temporal)",
-            3 => "UDR3 (Lanczos + Temporal)",
-            _ => "Unknown"
-        };
-    }
-
+    /// <summary>Adds a colored emissive mark at the world-space brush position.</summary>
     private void PaintLightAt(Vector2 position)
     {
         var color = HueToRGB(RainbowHue);
         RainbowHue = (RainbowHue + HueSpeed) % 1f;
 
         var nearby = ECS.InRadius(new Vector3(position, 0), PaintRadius);
+
         foreach (int entityId in nearby)
         {
             if (ECS.HasComponent<Circle2D>(entityId) && entityId != MouseLightId)
@@ -466,6 +401,7 @@ public class MegaLightsScene : Scene
                 ref var material = ref ECS.GetComponent<Material>(entityId);
                 material.Albedo = color;
                 material.Emissive = color;
+
                 return;
             }
         }
@@ -474,11 +410,13 @@ public class MegaLightsScene : Scene
         CreateLight(position, PaintRadius, color, color);
     }
 
+    /// <summary>Adds a dark occluding mark at the world-space brush position.</summary>
     private void PaintBlackDotAt(Vector2 position)
     {
         var color = Color.Black;
 
         var nearby = ECS.InRadius(new Vector3(position, 0), PaintRadius);
+
         foreach (int entityId in nearby)
         {
             if (ECS.HasComponent<Circle2D>(entityId) && entityId != MouseLightId)
@@ -486,6 +424,7 @@ public class MegaLightsScene : Scene
                 ref var material = ref ECS.GetComponent<Material>(entityId);
                 material.Albedo = color;
                 material.Emissive = color;
+
                 return;
             }
         }
@@ -493,11 +432,13 @@ public class MegaLightsScene : Scene
         CreateLight(position, PaintRadius, color, Color.Black);
     }
 
+    /// <summary>Converts a normalized hue into a fully saturated RGB color.</summary>
     private static Color HueToRGB(float hue)
     {
         float r = MathF.Abs(hue * 6f - 3f) - 1f;
         float g = 2f - MathF.Abs(hue * 6f - 2f);
         float b = 2f - MathF.Abs(hue * 6f - 4f);
+
         return new Color(
             (byte)(Math.Clamp(r, 0f, 1f) * 255),
             (byte)(Math.Clamp(g, 0f, 1f) * 255),
@@ -505,6 +446,7 @@ public class MegaLightsScene : Scene
         );
     }
 
+    /// <summary>Adds a batch of entities for inspector and performance experiments.</summary>
     private void SpawnDebugEntities(int count)
     {
         var screen = Renderer.VirtualSize;
@@ -520,6 +462,7 @@ public class MegaLightsScene : Scene
         }
     }
 
+    /// <inheritdoc/>
     public override void Render()
     {
         base.Render();

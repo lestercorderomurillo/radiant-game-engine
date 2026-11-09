@@ -1,5 +1,5 @@
-using System;
 using com.radiant.engine.runtime;
+using System;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -190,6 +190,7 @@ public partial class Renderer : IDisposable
         UpdateScaledScreenInfo();
     }
 
+    /// <summary>Loads the font families used by renderer text commands.</summary>
     private void InitializeFonts()
     {
         Fonts.Load("Inter", "fonts/Inter-Regular.ttf");
@@ -219,6 +220,7 @@ public partial class Renderer : IDisposable
         UpdateWorldView();
     }
 
+    /// <summary>Refreshes screen dimensions derived from the current render scale.</summary>
     private void UpdateScaledScreenInfo()
     {
         ScaledWidth = Math.Max(1, (int)(ScreenWidth * RenderScaleValue));
@@ -229,21 +231,29 @@ public partial class Renderer : IDisposable
         ScaledHigherPowerOfTwo = GetHigherPowerOfTwo(scaledMax);
     }
 
+    /// <summary>Returns the largest power of two no greater than the supplied value.</summary>
     private static int GetLowerPowerOfTwo(int value)
     {
         if (value <= 0) return 1;
+
         int power = 1;
+
         while (power * 2 <= value)
             power *= 2;
+
         return power;
     }
 
+    /// <summary>Returns the smallest power of two no less than the supplied value.</summary>
     private static int GetHigherPowerOfTwo(int value)
     {
         if (value <= 0) return 1;
+
         int power = 1;
+
         while (power < value)
             power *= 2;
+
         return power;
     }
 
@@ -276,6 +286,7 @@ public partial class Renderer : IDisposable
         int py = (int)MathF.Round(Start.Y);
         int pr = (int)MathF.Round(End.X);
         int pb = (int)MathF.Round(End.Y);
+
         return new Rectangle(px, py, pr - px, pb - py);
     }
 
@@ -325,7 +336,7 @@ public partial class Renderer : IDisposable
     public runtime.GameLoop GameLoop => Window.GameLoop;
 
     /// <summary>Current viewport bounds rectangle.</summary>
-    public Rectangle ViewportBounds => Device.Viewport.Bounds;
+    public Rectangle ViewportBounds => Device.Viewport.Bounds.ToRadiant();
 
     /// <summary>Whether the window has a pending resize that needs handling.</summary>
     public bool HasPendingResize => Window.ResizePending;
@@ -347,17 +358,19 @@ public partial class Renderer : IDisposable
             SceneRT = new RenderTarget2D(Device, ScreenWidth, ScreenHeight, false,
                 SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         }
+
         Device.SetRenderTarget(SceneRT);
-        Device.Clear(color);
+        Device.Clear(color.ToNative());
     }
 
     /// <summary>Copies SceneRT to the actual backbuffer for presentation.</summary>
     public void PresentToBackBuffer()
     {
         if (SceneRT == null) return;
+
         Device.SetRenderTarget(null);
-        SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp);
-        SpriteBatch.Draw(SceneRT, Device.Viewport.Bounds, Color.White);
+        SpriteBatch.Begin(MonoGameRenderStates.ToNative(SpriteSortMode.Deferred), NativeStates.Get(BlendState.Opaque), NativeStates.Get(SamplerState.PointClamp));
+        SpriteBatch.Draw(SceneRT, Device.Viewport.Bounds, Color.White.ToNative());
         SpriteBatch.End();
     }
 
@@ -371,6 +384,7 @@ public partial class Renderer : IDisposable
         return new RenderTarget2D(Device, width, height, false, format, depth, samples, usage);
     }
 
+    /// <summary>Finds a supported multisample count for the requested render-target format.</summary>
     public int GetSupportedSamples(int requested, SurfaceFormat format = SurfaceFormat.Color, DepthFormat depth = DepthFormat.None)
     {
         Device.Adapter.QueryRenderTargetFormat(Device.GraphicsProfile, format, depth, requested, out _, out _, out int selected);
@@ -460,8 +474,10 @@ public partial class Renderer : IDisposable
         Textures.RegisterShape(name, (device, size) =>
         {
             var (width, height, pixels) = generator(size);
+
             var texture = new Texture2D(device, width, height);
             texture.SetData(pixels);
+
             return texture;
         }, minSize);
     }
@@ -472,7 +488,6 @@ public partial class Renderer : IDisposable
     /// <param name="name">Shape name as registered via RegisterShapeTexture.</param>
     /// <param name="size">Requested size (clamped to the shape's minimum).</param>
     public Texture2D GetShapeTexture(string name, int size) => Textures.GetShape(name, size);
-
 
     /// <summary>
     /// Supersample multiplier for font rendering. Fonts rasterize at size * FontRenderScale
@@ -513,13 +528,14 @@ public partial class Renderer : IDisposable
     {
         float scale = 1f / Fonts.FontRenderScale;
         var font = Fonts.GetFont(fontName, size * Fonts.FontRenderScale);
-        SpriteBatch.DrawString(font, text, position, color, scale: new Vector2(scale));
-        if (bold) SpriteBatch.DrawString(font, text, position + Vector2.UnitX, color, scale: new Vector2(scale));
+        SpriteBatch.DrawString(font, text, position, color.ToNative(), scale: new Vector2(scale));
+        if (bold) SpriteBatch.DrawString(font, text, position + Vector2.UnitX, color.ToNative(), scale: new Vector2(scale));
     }
 
     /// <summary>Disposes all cached resources (shaders, textures, buffers).</summary>
     public void Dispose()
     {
+        NativeStates.Dispose();
         QuadVertexBuffer?.Dispose();
         QuadIndexBuffer?.Dispose();
         SpriteBatch?.Dispose();

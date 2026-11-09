@@ -6,9 +6,56 @@ using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 using Radiant.Testing;
 
+if (Array.IndexOf(args, "--render-state-regression") >= 0)
+{
+    using var window = new RenderStateRegressionWindow();
+    window.Run();
+    return;
+}
+
+if (Array.IndexOf(args, "--compute-regression") >= 0)
+{
+    using var window = new ComputeRegressionWindow(Array.IndexOf(args, "--expect-unavailable") >= 0);
+    window.Run();
+    return;
+}
+
+DenoiserMode? requestedDenoiser = null;
+
+foreach (var argument in args)
+    if (argument.StartsWith("--denoiser=", StringComparison.Ordinal))
+        requestedDenoiser = argument["--denoiser=".Length..].ToLowerInvariant() switch
+        {
+            "nrd.reblur" => DenoiserMode.NrdReblur, "nrd.relax" => DenoiserMode.NrdRelax,
+            "none" => DenoiserMode.None, "atrous" => DenoiserMode.Atrous, "svgf" => DenoiserMode.Svgf,
+            "oidn" => DenoiserMode.OpenImageDenoise, "bilateral" => DenoiserMode.Bilateral,
+            _ => throw new ArgumentException("Unknown --denoiser value.")
+        };
+
+if (Array.IndexOf(args, "--nrd-regression") >= 0)
+{
+    using var window = new NrdRegressionWindow(Array.IndexOf(args, "--expect-unavailable") >= 0);
+    window.Run();
+    return;
+}
+
+if (Array.IndexOf(args, "--vulkan-rt-regression") >= 0)
+{
+    using var window = new VulkanRTRegressionWindow(Array.IndexOf(args, "--expect-software") >= 0);
+    window.Run();
+    return;
+}
+
+if (Array.IndexOf(args, "--upscaling-regression") >= 0)
+{
+    using var window = new UpscalingRegressionWindow(Array.IndexOf(args, "--2d") >= 0 ? new Rendering2DScene() : new CornellBoxScene());
+    window.Run();
+    return;
+}
+
 if (Array.IndexOf(args, "--capture") >= 0)
 {
-    using var captureWindow = new ShowcaseCaptureWindow();
+    using var captureWindow = new ShowcaseCaptureWindow(requestedDenoiser ?? DenoiserMode.Atrous);
     captureWindow.Run();
     return;
 }
@@ -86,18 +133,27 @@ if (Array.IndexOf(args, "--mixed-regression") >= 0)
 if (Array.IndexOf(args, "--pipeline-regression") >= 0)
 {
     Scene pipelineScene = Array.IndexOf(args, "--2d") >= 0 ? new Rendering2DScene() : new CornellBoxScene();
-    using var pipelineWindow = new PipelineRegressionWindow(pipelineScene);
+    using var pipelineWindow = new PipelineRegressionWindow(pipelineScene, requestedDenoiser);
     pipelineWindow.Run();
+
     return;
 }
 
 bool regression = Array.IndexOf(args, "--regression") >= 0;
-Scene scene = regression ? new Geometry3DRegressionScene() : new CornellBoxScene { InitialRenderMethod = Array.IndexOf(args, "--smoke") >= 0 ? 0 : 2, InitialDenoiser = Array.IndexOf(args, "--smoke") >= 0 ? DenoiserMode.None : DenoiserMode.Atrous };
+var traceBackend = PathTracingBackend.Auto;
+
+foreach (var argument in args)
+    if (argument.StartsWith("--path-backend=", StringComparison.Ordinal))
+        traceBackend = Enum.Parse<PathTracingBackend>(argument["--path-backend=".Length..], true);
+
+Scene scene = regression ? new Geometry3DRegressionScene() : new CornellBoxScene { InitialTraceBackend = traceBackend, InitialRenderMethod = Array.IndexOf(args, "--smoke") >= 0 ? 0 : 2, InitialDenoiser = requestedDenoiser ?? (Array.IndexOf(args, "--smoke") >= 0 ? DenoiserMode.None : DenoiserMode.Atrous) };
+
 if (regression || Array.IndexOf(args, "--smoke") >= 0)
 {
     using var window = new SmokeWindow(scene, "artifacts/smoke", (active, frame) =>
     {
         var geometry = active.ECS.GetSystem<Geometry3D>();
+
         if (frame is 9 or 89)
         {
             if (!regression && (active.ECS.GetSystem<Inspector>() == null ||
@@ -108,14 +164,17 @@ if (regression || Array.IndexOf(args, "--smoke") >= 0)
                 geometry.DepthTexture.Height != active.Renderer.ScreenHeight ||
                 geometry.NormalTexture.Height != active.Renderer.ScreenHeight)
                 throw new Exception("3D targets did not resize with the window.");
+
             foreach (var (name, target) in new[] { ("color", geometry.ColorTexture),
                 ("normals", geometry.NormalTexture), ("depth", geometry.DepthTexture) })
             {
                 Directory.CreateDirectory("artifacts/smoke");
+
                 using var stream = File.Create($"artifacts/smoke/3d-{name}-{frame}.png");
                 target.SaveAsPng(stream, target.Width, target.Height);
             }
         }
+
         if (regression && frame is 9 or 30 or 89)
         {
             int width = geometry.ColorTexture.Width, height = geometry.ColorTexture.Height;
@@ -126,25 +185,38 @@ if (regression || Array.IndexOf(args, "--smoke") >= 0)
             geometry.ColorTexture.GetData(colors);
             geometry.NormalTexture.GetData(normals);
             geometry.DepthTexture.GetData(depths);
+
             var expected = frame == 30 ? Color.OrangeRed : Color.CornflowerBlue;
+
             if (colors[center] != expected) throw new Exception($"Occlusion/disabled entity failed: {colors[center]}, expected {expected}.");
+
             float expectedDepth = (frame == 30 ? 6.5f : 4.5f) / 20;
+
             if (MathF.Abs(depths[center] - expectedDepth) > 0.002f)
                 throw new Exception($"Linear depth is incorrect: {depths[center]} instead of {expectedDepth}.");
             if (normals[center].B < 250 || Math.Abs(normals[center].R - 128) > 1 || Math.Abs(normals[center].G - 128) > 1)
                 throw new Exception($"World normal encoding is incorrect: {normals[center]}.");
             if (colors[0].A != 0 || depths[0] != 0) throw new Exception("3D buffers retain stale background geometry.");
+
             Console.WriteLine($"PASS: 3D color, normals, linear depth, occlusion at frame {frame}.");
         }
+
         if (regression && frame == 20) active.ECS.DisableEntity(((Geometry3DRegressionScene)active).NearCube);
         if (regression && frame == 40) active.ECS.EnableEntity(((Geometry3DRegressionScene)active).NearCube);
         if (regression && frame == 50) geometry.Channels = GeometryChannels.Color;
+
         if (regression && frame == 55 && (geometry.NormalTexture != null || geometry.DepthTexture != null)) throw new Exception("Color-only geometry allocated optional buffers.");
+
         if (regression && frame == 60) geometry.Channels = GeometryChannels.Color | GeometryChannels.Normals;
+
         if (regression && frame == 65 && (geometry.NormalTexture == null || geometry.DepthTexture != null)) throw new Exception("Normal-only MRT selection failed.");
+
         if (regression && frame == 70) geometry.Channels = GeometryChannels.Color | GeometryChannels.Depth;
+
         if (regression && frame == 75 && (geometry.NormalTexture != null || geometry.DepthTexture == null)) throw new Exception("Depth-only MRT selection failed.");
+
         if (regression && frame == 80) geometry.Channels = GeometryChannels.All;
+
         if (active is CornellBoxScene cornell)
         {
             if (frame == 50) cornell.Pipeline.SelectBuffer(2);

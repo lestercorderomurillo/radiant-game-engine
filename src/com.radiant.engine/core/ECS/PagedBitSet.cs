@@ -24,6 +24,7 @@ public sealed class PagedBitSet
 
     public int Count => EntityCount;
 
+    /// <summary>Allocates the initial page lookup for sparse entity membership.</summary>
     public PagedBitSet(int initialCapacity = 65536)
     {
         int requiredPages = Math.Max(1, (initialCapacity + BitsPerPage - 1) / BitsPerPage);
@@ -31,6 +32,7 @@ public sealed class PagedBitSet
         PageCount = 0;
     }
 
+    /// <summary>Allocates enough storage to represent the requested entity ID.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void EnsureCapacity(int entityId)
     {
@@ -48,15 +50,18 @@ public sealed class PagedBitSet
         }
     }
 
+    /// <summary>Reports whether the entity's membership bit is set.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Contains(int entityId)
     {
         if (entityId < 0) return false;
 
         int pageIndex = entityId / BitsPerPage;
+
         if (pageIndex >= PageCount) return false;
 
         var page = Pages[pageIndex];
+
         if (page == null) return false;
 
         int localBit = entityId % BitsPerPage;
@@ -66,6 +71,7 @@ public sealed class PagedBitSet
         return (page[ulongIndex] & (1UL << bitIndex)) != 0;
     }
 
+    /// <summary>Sets the entity's membership bit, allocating its page if needed.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Add(int entityId)
     {
@@ -80,22 +86,27 @@ public sealed class PagedBitSet
         ulong mask = 1UL << bitIndex;
 
         ref ulong slot = ref Pages[pageIndex][ulongIndex];
+
         if ((slot & mask) != 0) return false;
 
         slot |= mask;
         EntityCount++;
+
         return true;
     }
 
+    /// <summary>Clears the entity's membership bit when its page exists.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Remove(int entityId)
     {
         if (entityId < 0) return false;
 
         int pageIndex = entityId / BitsPerPage;
+
         if (pageIndex >= PageCount) return false;
 
         var page = Pages[pageIndex];
+
         if (page == null) return false;
 
         int localBit = entityId % BitsPerPage;
@@ -104,20 +115,23 @@ public sealed class PagedBitSet
         ulong mask = 1UL << bitIndex;
 
         ref ulong slot = ref page[ulongIndex];
+
         if ((slot & mask) == 0) return false;
 
         slot &= ~mask;
         EntityCount--;
+
         return true;
     }
 
+    /// <summary>Clears all allocated membership pages.</summary>
     public void Clear()
     {
         for (int i = 0; i < PageCount; i++)
         {
-            if (Pages[i] != null)
-                Array.Clear(Pages[i], 0, PageSize);
+            if (Pages[i] != null) Array.Clear(Pages[i], 0, PageSize);
         }
+
         EntityCount = 0;
     }
 
@@ -126,6 +140,7 @@ public sealed class PagedBitSet
     /// </summary>
     public EntityEnumerator GetEnumerator() => new EntityEnumerator(this);
 
+    /// <summary>Iterates the set entity IDs in a paged bit set.</summary>
     public ref struct EntityEnumerator
     {
         private readonly PagedBitSet Bitset;
@@ -134,6 +149,7 @@ public sealed class PagedBitSet
         private ulong CurrentBits;
         private int CurrentEntity;
 
+        /// <summary>Starts iteration over the supplied membership pages.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal EntityEnumerator(PagedBitSet bitset)
         {
@@ -144,6 +160,7 @@ public sealed class PagedBitSet
             CurrentEntity = -1;
         }
 
+        /// <summary>Advances to the next set entity ID and reports whether one was found.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()
         {
@@ -154,6 +171,7 @@ public sealed class PagedBitSet
                     int bit = BitOperations.TrailingZeroCount(CurrentBits);
                     CurrentBits &= CurrentBits - 1;
                     CurrentEntity = PageIdx * BitsPerPage + UlongIdx * BitsPerUlong + bit;
+
                     return true;
                 }
 
@@ -163,6 +181,7 @@ public sealed class PagedBitSet
                 {
                     PageIdx++;
                     UlongIdx = 0;
+
                     if (PageIdx >= Bitset.PageCount) return false;
                 }
 

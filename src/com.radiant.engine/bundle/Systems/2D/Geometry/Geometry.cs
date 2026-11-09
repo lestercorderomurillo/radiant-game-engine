@@ -10,6 +10,7 @@ using RendererShape = com.radiant.engine.core.Shape;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Builds 2D material, motion, and distance-field buffers from ECS shapes.</summary>
 [CoreSystem]
 public class Geometry : core.System
 {
@@ -29,6 +30,7 @@ public class Geometry : core.System
 
     private RenderTarget2D JFAResult;
     private RenderTarget2D JFAResultInterior;
+
     public RenderTarget2D EmissiveTexture { get; private set; }
     public RenderTarget2D AbsorptionTexture { get; private set; }
     public RenderTarget2D SDFTexture { get; private set; }
@@ -36,6 +38,7 @@ public class Geometry : core.System
     /// <summary>Signed, unquantized world displacement for temporal reconstruction.</summary>
     public RenderTarget2D TemporalMotionTexture { get; private set; }
     public bool TemporalMotionEnabled { get; set; }
+
     private readonly List<(float z, RendererShape shape)> TemporalMotionShapes = new();
 
     public RenderTarget2D BackgroundEmissive { get; set; }
@@ -47,8 +50,10 @@ public class Geometry : core.System
     // Motion vector tracking with N-frame history (weighted: recent frames have more influence)
     public int MotionHistoryFrames = 2;
 
+    /// <summary>Selects which geometry buffer is shown for diagnostics.</summary>
     private enum DebugMode { None, Emissive, Absorption, SDF, JFADirection, JFARaw, MotionVectors }
     private DebugMode CurrentDebug = DebugMode.None;
+
     public bool IsDebugging => CurrentDebug != DebugMode.None;
     public bool IsDebugHidingGameplay => CurrentDebug != DebugMode.None
         && CurrentDebug != DebugMode.Emissive
@@ -70,7 +75,7 @@ public class Geometry : core.System
     private int ThreadCount;
     private int BucketCount;
 
-    // Double-buffered shape storage in GPU-ready format
+    /// <summary>Double-buffered shape storage in GPU-ready format</summary>
     private struct BufferSet
     {
         // Shapes in GPU-ready format (no conversion needed at render time)
@@ -122,6 +127,7 @@ public class Geometry : core.System
     // Initial render array capacity
     private const int InitialRenderCapacity = 65536;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         WorldBounds = Renderer.VirtualSize;
@@ -146,6 +152,7 @@ public class Geometry : core.System
 
         // Initialize double buffers
         Buffers = new BufferSet[2];
+
         for (int b = 0; b < 2; b++)
         {
             Buffers[b].EmissiveBuffers = new RendererShape[BucketCount][];
@@ -158,6 +165,7 @@ public class Geometry : core.System
             Buffers[b].MotionShapesByThread = new List<(Vector2, Vector2, Vector2, bool, float)>[ThreadCount];
             Buffers[b].TemporalMotionByThread = new List<(float, RendererShape)>[ThreadCount];
             Buffers[b].TextureDrawsByThread = new List<(Vector2, Vector2, Texture2D, Color, Color)>[ThreadCount];
+
             for (int t = 0; t < ThreadCount; t++)
             {
                 Buffers[b].MotionShapesByThread[t] = new();
@@ -172,6 +180,7 @@ public class Geometry : core.System
 
             Buffers[b].OccupiedLayers = new int[ThreadCount][];
             Buffers[b].OccupiedLayerCount = new int[ThreadCount];
+
             for (int t = 0; t < ThreadCount; t++)
                 Buffers[b].OccupiedLayers[t] = new int[256];
 
@@ -197,13 +206,16 @@ public class Geometry : core.System
 
         Inspector.CreateWindow("pipeline", "Pipeline", Visible: false);
         Inspector.AddSectionLabel("pipeline", "outputHeader", "Output");
+
         string[] debugModeNames = ["Composite", "Emissive", "Absorption", "Signed Distance Field", "JFA Direction", "JFA Raw", "Motion Vectors"];
         Inspector.AddDropdown("pipeline", "debugMode", "Buffer", debugModeNames, 0, (index) => CurrentDebug = (DebugMode)index);
+
         var gameLoop = Renderer.GameLoop;
         Inspector.AddDropdown("pipeline", "fpsCap", "FPS Limit", GameLoop.FpsOptionNames, 2, (index) => gameLoop?.SetTargetFps(GameLoop.FpsOptions[index]));
         Inspector.AddToggle("pipeline", "throttleUnfocused", "Limit FPS when unfocused", true, (enabled) => { if (gameLoop != null) gameLoop.ThrottleUnfocused = enabled; });
     }
 
+    /// <summary>Allocates resources for jump-flood distance-field generation.</summary>
     private void InitializeJFA()
     {
         Renderer
@@ -233,6 +245,7 @@ public class Geometry : core.System
             .SetTarget(null);
     }
 
+    /// <summary>Allocates the geometry stage's material and motion targets.</summary>
     private void InitializeGeometryBuffers()
     {
         // Render targets use actual screen size for pixel quality matching the display.
@@ -262,6 +275,7 @@ public class Geometry : core.System
             (int)SDFBounds.X, (int)SDFBounds.Y, SurfaceFormat.Vector4);
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         int collectBuffer = WriteBuffer;
@@ -288,12 +302,12 @@ public class Geometry : core.System
             CurrentDebug == DebugMode.JFADirection ||
             CurrentDebug == DebugMode.JFARaw;
 
-        if (needsSDF)
-            RenderSDFTexture();
+        if (needsSDF) RenderSDFTexture();
 
         UpdateGizmos();
     }
 
+    /// <summary>Extracts renderable ECS shapes into worker-local buffers.</summary>
     private void CollectShapes(int bufferIdx)
     {
         var swCollect = Stopwatch.StartNew();
@@ -308,6 +322,7 @@ public class Geometry : core.System
                 buf.EmissiveCounts[bucketIndex] = 0;
                 buf.AbsorptionCounts[bucketIndex] = 0;
             }
+
             buf.OccupiedLayerCount[t] = 0;
 
             buf.EmissiveMinLayerByThread[t] = MaxZLayers;
@@ -337,6 +352,7 @@ public class Geometry : core.System
         {
 
             Vector2 position = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
+
             if (position.X + rectangle.Size.X < 0 || position.X >= WorldBounds.X ||
                 position.Y + rectangle.Size.Y < 0 || position.Y >= WorldBounds.Y) return;
 
@@ -359,8 +375,7 @@ public class Geometry : core.System
             if (emissiveIndex == 0)
             {
                 int occIdx = occupiedLayerCount[threadIndex]++;
-                if (occIdx >= occupiedLayers[threadIndex].Length)
-                    Array.Resize(ref occupiedLayers[threadIndex], occIdx * 2);
+                if (occIdx >= occupiedLayers[threadIndex].Length) Array.Resize(ref occupiedLayers[threadIndex], occIdx * 2);
                 occupiedLayers[threadIndex][occIdx] = layer;
             }
 
@@ -390,6 +405,7 @@ public class Geometry : core.System
         {
 
             Vector2 center = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
+
             if (center.X + circle.Radius < 0 || center.X - circle.Radius >= WorldBounds.X ||
                 center.Y + circle.Radius < 0 || center.Y - circle.Radius >= WorldBounds.Y) return;
 
@@ -416,13 +432,13 @@ public class Geometry : core.System
             if (emissiveIndex == 0)
             {
                 int occIdx = occupiedLayerCount[threadIndex]++;
-                if (occIdx >= occupiedLayers[threadIndex].Length)
-                    Array.Resize(ref occupiedLayers[threadIndex], occIdx * 2);
+                if (occIdx >= occupiedLayers[threadIndex].Length) Array.Resize(ref occupiedLayers[threadIndex], occIdx * 2);
                 occupiedLayers[threadIndex][occIdx] = layer;
             }
 
             if (emissiveBuffers[bucketIndex] == null || emissiveIndex >= emissiveBuffers[bucketIndex].Length)
                 EnsureBuffer(ref emissiveBuffers[bucketIndex], emissiveIndex);
+
             ref var emissiveShape = ref emissiveBuffers[bucketIndex][emissiveIndex];
             emissiveShape.Position = cornerPos;
             emissiveShape.Size = diameter;
@@ -433,6 +449,7 @@ public class Geometry : core.System
             int absorptionIndex = absorptionCounts[bucketIndex];
             if (absorptionBuffers[bucketIndex] == null || absorptionIndex >= absorptionBuffers[bucketIndex].Length)
                 EnsureBuffer(ref absorptionBuffers[bucketIndex], absorptionIndex);
+
             ref var absorptionShape = ref absorptionBuffers[bucketIndex][absorptionIndex];
             absorptionShape.Position = cornerPos;
             absorptionShape.Size = diameter;
@@ -445,6 +462,7 @@ public class Geometry : core.System
         {
 
             Vector2 position = new Vector2(MathF.Round(transform.Position.X), MathF.Round(transform.Position.Y));
+
             if (position.X + triangle.Size.X < 0 || position.X >= WorldBounds.X ||
                 position.Y + triangle.Size.Y < 0 || position.Y >= WorldBounds.Y) return;
 
@@ -468,13 +486,13 @@ public class Geometry : core.System
             if (emissiveIndex == 0)
             {
                 int occIdx = occupiedLayerCount[threadIndex]++;
-                if (occIdx >= occupiedLayers[threadIndex].Length)
-                    Array.Resize(ref occupiedLayers[threadIndex], occIdx * 2);
+                if (occIdx >= occupiedLayers[threadIndex].Length) Array.Resize(ref occupiedLayers[threadIndex], occIdx * 2);
                 occupiedLayers[threadIndex][occIdx] = layer;
             }
 
             if (emissiveBuffers[bucketIndex] == null || emissiveIndex >= emissiveBuffers[bucketIndex].Length)
                 EnsureBuffer(ref emissiveBuffers[bucketIndex], emissiveIndex);
+
             ref var emissiveShape = ref emissiveBuffers[bucketIndex][emissiveIndex];
             emissiveShape.Position = position;
             emissiveShape.Size = triangle.Size;
@@ -485,6 +503,7 @@ public class Geometry : core.System
             int absorptionIndex = absorptionCounts[bucketIndex];
             if (absorptionBuffers[bucketIndex] == null || absorptionIndex >= absorptionBuffers[bucketIndex].Length)
                 EnsureBuffer(ref absorptionBuffers[bucketIndex], absorptionIndex);
+
             ref var absorptionShape = ref absorptionBuffers[bucketIndex][absorptionIndex];
             absorptionShape.Position = position;
             absorptionShape.Size = triangle.Size;
@@ -498,6 +517,7 @@ public class Geometry : core.System
         buf.EmissiveMaxLayer = -1;
         buf.AbsorptionMinLayer = MaxZLayers;
         buf.AbsorptionMaxLayer = -1;
+
         for (int t = 0; t < ThreadCount; t++)
         {
             if (emissiveMaxByThread[t] >= 0)
@@ -505,12 +525,14 @@ public class Geometry : core.System
                 if (emissiveMinByThread[t] < buf.EmissiveMinLayer) buf.EmissiveMinLayer = emissiveMinByThread[t];
                 if (emissiveMaxByThread[t] > buf.EmissiveMaxLayer) buf.EmissiveMaxLayer = emissiveMaxByThread[t];
             }
+
             if (absorptionMaxByThread[t] >= 0)
             {
                 if (absorptionMinByThread[t] < buf.AbsorptionMinLayer) buf.AbsorptionMinLayer = absorptionMinByThread[t];
                 if (absorptionMaxByThread[t] > buf.AbsorptionMaxLayer) buf.AbsorptionMaxLayer = absorptionMaxByThread[t];
             }
         }
+
         CollectMs = (float)swCollect.Elapsed.TotalMilliseconds;
 
         // Flatten buckets into render arrays (Z-ordered)
@@ -528,8 +550,7 @@ public class Geometry : core.System
             var temporalShape = RendererShape.Rect(position, rectangle.Size, Color.White);
             temporalShape.Motion = motion.RenderedDisplacement(transform.Position);
             temporalByThread[threadIndex].Add((transform.Layer, temporalShape));
-            if (velocity.LengthSquared() > 0.0001f)
-                motionByThread[threadIndex].Add((position, rectangle.Size, velocity, false, 0));
+            if (velocity.LengthSquared() > 0.0001f) motionByThread[threadIndex].Add((position, rectangle.Size, velocity, false, 0));
             motion.Push(transform.Position);
         });
 
@@ -541,8 +562,7 @@ public class Geometry : core.System
             var temporalShape = RendererShape.Circle(center, circle.Radius, Color.White);
             temporalShape.Motion = motion.RenderedDisplacement(transform.Position);
             temporalByThread[threadIndex].Add((transform.Layer, temporalShape));
-            if (velocity.LengthSquared() > 0.0001f)
-                motionByThread[threadIndex].Add((center, Vector2.Zero, velocity, true, circle.Radius));
+            if (velocity.LengthSquared() > 0.0001f) motionByThread[threadIndex].Add((center, Vector2.Zero, velocity, true, circle.Radius));
             motion.Push(transform.Position);
         });
 
@@ -557,6 +577,7 @@ public class Geometry : core.System
         });
     }
 
+    /// <summary>Combines worker-local shape buffers into the render submission array.</summary>
     private void FlattenToRenderArray(ref BufferSet buf, bool isEmissive)
     {
         var buckets = isEmissive ? buf.EmissiveBuffers : buf.AbsorptionBuffers;
@@ -564,11 +585,11 @@ public class Geometry : core.System
 
         // Collect all occupied layers from all threads into scratch buffer
         int scratchCount = 0;
+
         for (int t = 0; t < ThreadCount; t++)
         {
             int layerCount = buf.OccupiedLayerCount[t];
-            if (scratchCount + layerCount > FlattenScratch.Length)
-                Array.Resize(ref FlattenScratch, (scratchCount + layerCount) * 2);
+            if (scratchCount + layerCount > FlattenScratch.Length) Array.Resize(ref FlattenScratch, (scratchCount + layerCount) * 2);
             Array.Copy(buf.OccupiedLayers[t], 0, FlattenScratch, scratchCount, layerCount);
             scratchCount += layerCount;
         }
@@ -582,40 +603,49 @@ public class Geometry : core.System
 
         // Sort and deduplicate to get unique layers in Z-order
         Array.Sort(FlattenScratch, 0, scratchCount);
+
         int uniqueCount = 1;
+
         for (int i = 1; i < scratchCount; i++)
         {
-            if (FlattenScratch[i] != FlattenScratch[i - 1])
-                FlattenScratch[uniqueCount++] = FlattenScratch[i];
+            if (FlattenScratch[i] != FlattenScratch[i - 1]) FlattenScratch[uniqueCount++] = FlattenScratch[i];
         }
 
         // Count total shapes across only occupied layers
         int totalCount = 0;
+
         for (int i = 0; i < uniqueCount; i++)
         {
             int layer = FlattenScratch[i];
+
             for (int t = 0; t < ThreadCount; t++)
                 totalCount += counts[t * MaxZLayers + layer];
         }
 
         // Ensure render array capacity
         ref var renderArray = ref (isEmissive ? ref buf.EmissiveRenderArray : ref buf.AbsorptionRenderArray);
+
         if (totalCount > renderArray.Length)
         {
             int newCapacity = renderArray.Length;
+
             while (newCapacity < totalCount) newCapacity *= 2;
+
             renderArray = new RendererShape[newCapacity];
         }
 
         // Copy buckets to render array in Z-order (only occupied layers)
         int offset = 0;
+
         for (int i = 0; i < uniqueCount; i++)
         {
             int layer = FlattenScratch[i];
+
             for (int t = 0; t < ThreadCount; t++)
             {
                 int bucketIndex = t * MaxZLayers + layer;
                 int count = counts[bucketIndex];
+
                 if (count > 0)
                 {
                     Array.Copy(buckets[bucketIndex], 0, renderArray, offset, count);
@@ -628,12 +658,14 @@ public class Geometry : core.System
         else buf.AbsorptionRenderCount = totalCount;
     }
 
+    /// <summary>Draws collected shapes into the geometry targets.</summary>
     private void RenderFromBuffer(int bufferIdx)
     {
         var sw = Stopwatch.StartNew();
         ref var buf = ref Buffers[bufferIdx];
 
         bool hasTextures = false;
+
         for (int t = 0; t < ThreadCount; t++)
         {
             if (buf.TextureDrawsByThread[t].Count > 0) { hasTextures = true; break; }
@@ -641,6 +673,7 @@ public class Geometry : core.System
 
         // Emissive: flush shapes then immediately draw textures (before switching target)
         EmissiveCount = buf.EmissiveRenderCount;
+
         if (BackgroundEmissive != null)
         {
             Renderer.Blit(BackgroundEmissive, EmissiveTexture, Color.Transparent, BlendState.Opaque);
@@ -656,16 +689,19 @@ public class Geometry : core.System
         if (hasTextures)
         {
             Renderer.Reset().Configure(BlendState.AlphaBlend).SetTarget(EmissiveTexture);
+
             for (int t = 0; t < ThreadCount; t++)
                 foreach (var (pos, size, texture, emissive, _) in buf.TextureDrawsByThread[t])
                     Renderer.DrawTexture(texture,
                         Renderer.VirtualToScreenRect(pos.X, pos.Y, size.X, size.Y),
                         emissive);
+
             Renderer.Commit();
         }
 
         // Absorption: flush shapes then immediately draw textures (before switching target)
         AbsorptionCount = buf.AbsorptionRenderCount;
+
         if (BackgroundAbsorption != null)
         {
             Renderer.Blit(BackgroundAbsorption, AbsorptionTexture, Color.Transparent, BlendState.Opaque);
@@ -681,11 +717,13 @@ public class Geometry : core.System
         if (hasTextures)
         {
             Renderer.Reset().Configure(BlendState.AlphaBlend).SetTarget(AbsorptionTexture);
+
             for (int t = 0; t < ThreadCount; t++)
                 foreach (var (pos, size, texture, _, absorption) in buf.TextureDrawsByThread[t])
                     Renderer.DrawTexture(texture,
                         Renderer.VirtualToScreenRect(pos.X, pos.Y, size.X, size.Y),
                         absorption);
+
             Renderer.Commit();
         }
 
@@ -696,6 +734,7 @@ public class Geometry : core.System
         RenderMs = (float)sw.Elapsed.TotalMilliseconds;
     }
 
+    /// <summary>Expands reusable shape storage for the next geometry submission.</summary>
     private static void EnsureBuffer(ref RendererShape[] buffer, int currentCount)
     {
         if (buffer == null)
@@ -703,11 +742,13 @@ public class Geometry : core.System
             buffer = new RendererShape[InitialBucketCapacity];
             return;
         }
+
         var newBuffer = new RendererShape[buffer.Length * 2];
         Array.Copy(buffer, newBuffer, currentCount);
         buffer = newBuffer;
     }
 
+    /// <summary>Draws motion vectors from collected shape history.</summary>
     private void RenderMotionFromBuffer(ref BufferSet buf)
     {
         Renderer.ClearShapes();
@@ -740,14 +781,19 @@ public class Geometry : core.System
         TemporalMotionTexture ??= Renderer.CreateRenderTarget(Renderer.ScreenWidth,
             Renderer.ScreenHeight, SurfaceFormat.Vector2);
         TemporalMotionShapes.Clear();
+
         for (int threadIndex = 0; threadIndex < ThreadCount; threadIndex++)
             TemporalMotionShapes.AddRange(buf.TemporalMotionByThread[threadIndex]);
+
         TemporalMotionShapes.Sort((left, right) => left.z.CompareTo(right.z));
+
         foreach (var entry in TemporalMotionShapes)
             Renderer.DrawShape(entry.shape);
+
         Renderer.Configure(BlendState.Opaque).FlushShapes(TemporalMotionTexture, Color.Transparent, "Motion");
     }
 
+    /// <summary>Builds the signed distance texture used by HRC lighting.</summary>
     private void RenderSDFTexture()
     {
         InitializeJFA();
@@ -756,6 +802,7 @@ public class Geometry : core.System
         GenerateFinalSDF();
     }
 
+    /// <summary>Propagates nearest shape seeds through the jump-flood buffers.</summary>
     private void RunJFAPasses()
     {
         Renderer
@@ -779,6 +826,7 @@ public class Geometry : core.System
         );
     }
 
+    /// <summary>Propagates interior seeds for signed distance-field reconstruction.</summary>
     private void RunJFAPassesInterior()
     {
         Renderer
@@ -802,6 +850,7 @@ public class Geometry : core.System
         );
     }
 
+    /// <summary>Combines flood results into the final signed distance field.</summary>
     private void GenerateFinalSDF()
     {
         Renderer
@@ -820,11 +869,13 @@ public class Geometry : core.System
             .SetTarget(null);
     }
 
+    /// <summary>Refreshes diagnostic overlays for the selected geometry debug mode.</summary>
     private void UpdateGizmos()
     {
         Inspector.SetDropdownValue("pipeline", "debugMode", (int)CurrentDebug);
 
         var perfMonitor = Scene.ECS.GetSystem<PerformanceMonitor>();
+
         if (perfMonitor != null && !perfMonitor.Enabled) return;
 
         Inspector.SetLabel("perf", "emissive", $"Emissive Entities: {EmissiveCount:N0}");
@@ -848,6 +899,7 @@ public class Geometry : core.System
         }
     }
 
+    /// <inheritdoc/>
     public override void LateRender()
     {
         if (CurrentDebug == DebugMode.None) return;
@@ -936,6 +988,7 @@ public class Geometry : core.System
         }
     }
 
+    /// <inheritdoc/>
     public override void OnResize()
     {
         // WorldBounds stays at VirtualSize (constant) — culling uses virtual coordinates.
@@ -967,6 +1020,7 @@ public class Geometry : core.System
         BackgroundAbsorption = null;
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         CollectionTask?.Wait();

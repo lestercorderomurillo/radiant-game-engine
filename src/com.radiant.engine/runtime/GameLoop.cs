@@ -4,16 +4,18 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
+using com.radiant.engine.input;
 
 namespace com.radiant.engine.runtime;
 
+/// <summary>Coordinates scene transitions, fixed updates, rendering, and frame pacing.</summary>
 public partial class GameLoop : IGameObject
 {
+    /// <summary>Requests finer Windows timer resolution for frame pacing.</summary>
     [LibraryImport("winmm.dll")]
     private static partial uint timeBeginPeriod(uint period);
 
+    /// <summary>Releases the Windows timer-resolution request.</summary>
     [LibraryImport("winmm.dll")]
     private static partial uint timeEndPeriod(uint period);
 
@@ -25,11 +27,16 @@ public partial class GameLoop : IGameObject
 
     private int NextSceneId = NoScene;
 
-    private Window Window;
+    private IRuntimeHost Host;
+    private bool Initialized;
+    private bool Disposed;
+    private TimeSpan TotalTime;
+    private TimeSpan FixedTime;
 
-    public SpriteBatch SpriteBatch { get; set; }
-
-    public GameTime GameTime { get; set; }
+    public FrameTime Time { get; private set; }
+    /// <summary>Optional caller-owned input source for replay, tests or custom devices; otherwise uses the host.</summary>
+    public IInputSource InputSource { get; set; }
+    public InputFrame Controls { get; private set; } = InputFrame.Empty;
 
     // Timing configuration
     public static readonly int[] FpsOptions = [60, 120, 144, 0];
@@ -70,19 +77,25 @@ public partial class GameLoop : IGameObject
     private double LastFpsUpdate;
     private const float FrameTimeSmoothing = 0.9f; // EMA smoothing factor
 
-    public void Initialize(Window window)
+    /// <summary>Starts frame timing and prepares the loop's update intervals.</summary>
+    public void Initialize(IRuntimeHost host)
     {
-        Window = window;
+        ArgumentNullException.ThrowIfNull(host);
+        if (Initialized) throw new InvalidOperationException("The loop is already initialized.");
+        Host = host;
         Initialize();
     }
 
+    /// <summary>Starts frame timing and prepares the loop's update intervals.</summary>
     public void Initialize()
     {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+        if (Initialized) throw new InvalidOperationException("The loop is already initialized.");
+        Initialized = true;
         UpdateInterval = 1.0 / TargetUpdatesPerSecond;
         FrameInterval = TargetFramesPerSecond > 0 ? 1.0 / TargetFramesPerSecond : 0;
 
-        if (OperatingSystem.IsWindows())
-            timeBeginPeriod(1);
+        if (OperatingSystem.IsWindows()) timeBeginPeriod(1);
         GlobalTimer.Start();
         LastUpdateTicks = GlobalTimer.ElapsedTicks;
         LastFrameTicks = GlobalTimer.ElapsedTicks;
@@ -90,40 +103,54 @@ public partial class GameLoop : IGameObject
         LastFpsUpdate = GlobalTimer.Elapsed.TotalSeconds;
     }
 
+    /// <summary>Changes the frame-rate cap and recalculates the render interval.</summary>
     public void SetTargetFps(int fps)
     {
         TargetFramesPerSecond = fps;
         FrameInterval = fps > 0 ? 1.0 / fps : 0;
     }
 
+    /// <summary>Disposes active scene resources and releases platform timing resources.</summary>
     public void Dispose()
     {
-        if (SceneId != NoScene)
+        if (Disposed) return;
+        Disposed = true;
+        try { ReleaseActiveScene(); }
+        finally
         {
-            Scenes[SceneId].Dispose();
-            Scenes[SceneId].Renderer?.Dispose();
-            SceneId = NoScene;
+            if (Initialized && OperatingSystem.IsWindows()) timeEndPeriod(1);
+            GlobalTimer.Stop();
+            GC.SuppressFinalize(this);
         }
-        if (OperatingSystem.IsWindows())
-            timeEndPeriod(1);
-        GC.SuppressFinalize(this);
     }
 
-    public void AddScene(Scene scene) => Scenes = [.. Scenes, scene];
+    private void ReleaseActiveScene()
+    {
+        if (SceneId == NoScene) return;
+        var scene = Scenes[SceneId];
+        SceneId = NoScene;
+        try { scene.Dispose(); }
+        finally { Host?.ReleaseScene(scene); }
+    }
 
+    /// <summary>Appends a scene to the game loop's registered scene list.</summary>
+    public void AddScene(Scene scene)
+    {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+        ArgumentNullException.ThrowIfNull(scene);
+        Scenes = [.. Scenes, scene];
+    }
+
+    /// <summary>Disposes the previous scene and initializes the requested scene and renderer.</summary>
     private void TransitionScene(int id)
     {
-        if (SceneId != NoScene)
-        {
-            Scenes[SceneId].Dispose();
-            Scenes[SceneId].Renderer?.Dispose();
-        }
-
+        ReleaseActiveScene();
         SceneId = id;
 
         if (SceneId != NoScene)
         {
-            Scenes[SceneId].Renderer = new Renderer(Window);
+            Scenes[SceneId].Controls = Controls;
+            Host?.PrepareScene(Scenes[SceneId]);
             Scenes[SceneId].Initialize();
             Scenes[SceneId].SetupECS();
             Scenes[SceneId].SetupScene();
@@ -132,31 +159,47 @@ public partial class GameLoop : IGameObject
         NextSceneId = NoScene;
     }
 
-    public void SetActiveSceneId(int id) => NextSceneId = id;
+    /// <summary>Queues a scene change for the next update boundary.</summary>
+    public void SetActiveSceneId(int id)
+    {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+        if ((uint)id >= (uint)Scenes.Length) throw new ArgumentOutOfRangeException(nameof(id));
+        NextSceneId = id;
+    }
 
+    /// <summary>Processes scene updates and fixed ticks, then applies a pending scene transition.</summary>
     public void Update()
     {
-        // Auto-start first scene if no active scene
-        if (SceneId == NoScene && Scenes.Length > 0)
-        {
-            TransitionScene(0);
-        }
-
-        // Calculate delta time using high-precision timer
         long currentTicks = GlobalTimer.ElapsedTicks;
-        double deltaTime = (currentTicks - LastUpdateTicks) / (double)Stopwatch.Frequency;
-
+        var elapsed = TimeSpan.FromSeconds((currentTicks - LastUpdateTicks) / (double)Stopwatch.Frequency);
         LastUpdateTicks = currentTicks;
+        Update(elapsed);
+    }
+
+    /// <summary>Advances simulation by an explicit duration, useful for headless hosts and replay.</summary>
+    public void Update(TimeSpan Elapsed)
+    {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+        if (!Initialized) throw new InvalidOperationException("Initialize the loop before updating.");
+        if (Elapsed < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(Elapsed));
+        Controls = new InputFrame((InputSource ?? Host?.Input ?? NullInputSource.Instance).Capture(), Controls.Current);
+        if (SceneId == NoScene && Scenes.Length > 0) TransitionScene(0);
+        if (SceneId != NoScene) Scenes[SceneId].Controls = Controls;
+        TotalTime += Elapsed;
+        Time = new FrameTime(TotalTime, Elapsed);
+        double deltaTime = Elapsed.TotalSeconds;
 
         // Process fixed updates with cap to prevent spiral of death
         FixedUpdateAccumulator += deltaTime;
 
         int iterations = 0;
+
         while (FixedUpdateAccumulator >= UpdateInterval && iterations++ < MaxFixedUpdatesPerFrame)
         {
+            FixedTime += TimeSpan.FromSeconds(UpdateInterval);
             if (SceneId != NoScene)
             {
-                Scenes[SceneId].GameTime = GameTime;
+                Scenes[SceneId].Time = new FrameTime(FixedTime, TimeSpan.FromSeconds(UpdateInterval), true);
                 Scenes[SceneId].DeltaTime = (float)(1.0 / TargetUpdatesPerSecond);
                 Scenes[SceneId].InternalFixedUpdate();
             }
@@ -171,22 +214,25 @@ public partial class GameLoop : IGameObject
         // Variable update with precise delta time
         if (SceneId != NoScene)
         {
-            Scenes[SceneId].GameTime = GameTime;
+            Scenes[SceneId].Time = Time;
             Scenes[SceneId].DeltaTime = (float)deltaTime;
             Scenes[SceneId].InternalUpdate();
         }
 
-        if (NextSceneId != NoScene && NextSceneId != SceneId)
-            TransitionScene(NextSceneId);
+        if (NextSceneId != NoScene && NextSceneId != SceneId) TransitionScene(NextSceneId);
     }
 
+    /// <summary>Paces the frame, draws the active scene, and updates frame-rate measurements.</summary>
     public void Render()
     {
+        ObjectDisposedException.ThrowIf(Disposed, this);
+        if (!Initialized) throw new InvalidOperationException("Initialize the loop before rendering.");
         long frameStartTicks = GlobalTimer.ElapsedTicks;
 
         // Frame pacing at START — waits for ideal target, accounts for all inter-frame overhead
-        bool focused = Window.IsActive;
+        bool focused = Host?.IsActive ?? true;
         double activeInterval = (!focused && ThrottleUnfocused) ? UnfocusedFrameInterval : FrameInterval;
+
         if (activeInterval > 0)
         {
             long targetTicks = LastFrameTicks + (long)(activeInterval * Stopwatch.Frequency);
@@ -227,7 +273,9 @@ public partial class GameLoop : IGameObject
 
         // FPS calculation (0.5s window)
         FrameCount++;
+
         double now = GlobalTimer.Elapsed.TotalSeconds;
+
         if (now - LastFpsUpdate >= 0.5)
         {
             FramesPerSecond = (float)(FrameCount / (now - LastFpsUpdate));
@@ -237,13 +285,14 @@ public partial class GameLoop : IGameObject
 
         // Actual rendering
         long renderStartTicks = GlobalTimer.ElapsedTicks;
+
         if (SceneId != NoScene)
         {
-            Scenes[SceneId].Renderer.ClearBackBuffer(Color.Black);
-            Scenes[SceneId].GameTime = GameTime;
+            Host?.BeginFrame(Scenes[SceneId]);
+            Scenes[SceneId].Time = Time;
             Scenes[SceneId].InternalRender();
             Scenes[SceneId].InternalLateRender();
-            Scenes[SceneId].Renderer.PresentToBackBuffer();
+            Host?.EndFrame(Scenes[SceneId]);
         }
 
         long renderEndTicks = GlobalTimer.ElapsedTicks;
@@ -251,6 +300,9 @@ public partial class GameLoop : IGameObject
         RenderTimeSmoothed = RenderTimeSmoothed * FrameTimeSmoothing + RenderTimeMs * (1f - FrameTimeSmoothing);
     }
 
+    /// <summary>Reserved loop-level fixed-update hook.</summary>
     public void FixedUpdate() { }
+
+    /// <summary>Reserved loop-level overlay hook.</summary>
     public void LateRender() { }
 }

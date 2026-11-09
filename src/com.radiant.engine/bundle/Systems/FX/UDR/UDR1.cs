@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Spatial reconstruction stage for reduced-resolution HRC lighting.</summary>
 public class UDR1 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
@@ -19,6 +20,7 @@ public class UDR1 : core.System
     private Func<Texture2D> InputSource;
     private Geometry Geometry;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Geometry = Scene.ECS.GetSystem<Geometry>();
@@ -37,11 +39,13 @@ public class UDR1 : core.System
         Inspector.AddToggle("udr1", "debugRays", "Debug Edges", DebugRays, V => DebugRays = V);
     }
 
+    /// <summary>Sets the live image provider consumed by this stage.</summary>
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;
     }
 
+    /// <summary>Allocates the image targets required by this rendering stage.</summary>
     private void CreateRenderTargets()
     {
         OutputTexture = Renderer.CreateRenderTarget(
@@ -51,26 +55,27 @@ public class UDR1 : core.System
             (int)OutputSize.X, (int)OutputSize.Y, SurfaceFormat.HalfVector4);
     }
 
+    /// <summary>Applies the selected reconstruction quality and refreshes dependent resources.</summary>
     private void OnQualityChanged(int index)
     {
         ApplyRenderScale();
         Inspector.SetDropdownValue("udr1", "qualityDrop", index);
     }
 
+    /// <summary>Updates the renderer scale to match the selected reconstruction quality.</summary>
     private void ApplyRenderScale()
     {
         Renderer.RenderScale = UDRQuality.ScaleNormalized;
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
-        if (InputSource == null)
-            return;
+        if (InputSource == null) return;
 
         var input = InputSource();
 
-        if (input == null)
-            return;
+        if (input == null) return;
 
         Vector2 inputSize = new Vector2(input.Width, input.Height);
 
@@ -78,8 +83,7 @@ public class UDR1 : core.System
         Inspector.SetLabel("udr1", "input", $"Input Size: {input.Width}x{input.Height}");
         Inspector.SetLabel("udr1", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
 
-        if (UDRQuality.ScaleFactor == 100)
-            return;
+        if (UDRQuality.ScaleFactor == 100) return;
 
         Renderer
             .Reset()
@@ -116,21 +120,23 @@ public class UDR1 : core.System
             .SetTarget(null);
     }
 
+    /// <inheritdoc/>
     public override void Render()
     {
-        if (InputSource == null || UDRQuality.ScaleFactor == 100)
-            return;
+        if (InputSource == null || UDRQuality.ScaleFactor == 100) return;
 
         Renderer.Blit(SmoothTexture, BlendState.AlphaBlend, SamplerState.LinearClamp);
     }
 
+    /// <summary>Returns the stage's current output image, or its input when processing is bypassed.</summary>
     public RenderTarget2D GetOutput() => SmoothTexture;
 
+    /// <inheritdoc/>
     public override void OnResize()
     {
         Vector2 newSize = Renderer.ScreenSize;
-        if (OutputSize == newSize)
-            return;
+
+        if (OutputSize == newSize) return;
 
         OutputTexture?.Dispose();
         SmoothTexture?.Dispose();
@@ -138,6 +144,7 @@ public class UDR1 : core.System
         CreateRenderTargets();
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         UDRQuality.Changed -= OnQualityChanged;

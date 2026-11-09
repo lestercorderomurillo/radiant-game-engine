@@ -27,6 +27,7 @@ PixelInput MainVS(VertexInput input)
     output.Depth = -viewPosition.z / FarPlane;
     return output;
 }
+
 struct GeometryOutput
 {
     float4 Color : SV_Target0;
@@ -41,6 +42,7 @@ GeometryOutput MainPS(PixelInput input)
     output.Depth = float4(input.Depth.xxx, 1);
     return output;
 }
+
 technique Default
 {
     pass P0
@@ -59,6 +61,7 @@ technique ColorNormals { pass P0 { VertexShader = compile vs_6_0 MainVS(); Pixel
 technique ColorDepth { pass P0 { VertexShader = compile vs_6_0 MainVS(); PixelShader = compile ps_6_0 DepthPS(); } }
 
 float4 NormalOnlyPS(PixelInput input) : SV_Target { return float4(normalize(input.Normal) * 0.5 + 0.5, 1); }
+
 float4 DepthOnlyPS(PixelInput input) : SV_Target { return float4(input.Depth.xxx, 1); }
 technique NormalsOnly { pass P0 { VertexShader = compile vs_6_0 MainVS(); PixelShader = compile ps_6_0 NormalOnlyPS(); } }
 technique DepthOnly { pass P0 { VertexShader = compile vs_6_0 MainVS(); PixelShader = compile ps_6_0 DepthOnlyPS(); } }

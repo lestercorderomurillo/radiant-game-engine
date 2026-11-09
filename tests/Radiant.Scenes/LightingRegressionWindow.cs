@@ -10,7 +10,7 @@ using Microsoft.Xna.Framework.Graphics.PackedVector;
 
 namespace Radiant.Testing;
 
-// Read linear GPU output so tone mapping cannot hide direction-dependent errors.
+/// <summary>Read linear GPU output so tone mapping cannot hide direction-dependent errors.</summary>
 sealed class LightingRegressionWindow : Window
 {
     private readonly LightingReferenceScene Scene = new();
@@ -26,6 +26,7 @@ sealed class LightingRegressionWindow : Window
     private int CalibrationCase = -1;
     private static readonly Color[] CalibrationColors = [Color.White, new Color(128, 64, 192), Color.Black];
 
+    /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public LightingRegressionWindow()
         : base(new GameLoop(), new() { Title = "HRC lighting regression", Width = 960, Height = 540 })
     {
@@ -34,14 +35,17 @@ sealed class LightingRegressionWindow : Window
         GameLoop.SetTargetFps(0);
     }
 
+    /// <inheritdoc/>
     protected override void Draw(GameTime gameTime)
     {
         base.Draw(gameTime);
+
         if (++Frame % 8 != 0) return;
 
         if (CalibrationCase >= 0)
         {
             CheckCalibration();
+
             if (++CalibrationCase == CalibrationColors.Length * 4)
             {
                 Console.WriteLine("PASS: HRC radial symmetry, output resolution, resize, all render/probe qualities, four shadow directions, RGB transmission, and absolute radiance calibration.");
@@ -49,12 +53,14 @@ sealed class LightingRegressionWindow : Window
             }
             else
                 SetCalibration();
+
             return;
         }
 
         if (BlockerCase >= 0)
         {
             CheckBlocker();
+
             if (++BlockerCase == 5)
             {
                 CalibrationCase = 0;
@@ -62,10 +68,12 @@ sealed class LightingRegressionWindow : Window
             }
             else
                 Scene.SetBlocker(BlockerCase);
+
             return;
         }
 
         CheckLighting();
+
         if (++CaseIndex == Cases.Length)
         {
             BlockerCase = 0;
@@ -81,6 +89,7 @@ sealed class LightingRegressionWindow : Window
         SetProbeQuality(testCase.probeQuality);
     }
 
+    /// <summary>Applies the probe quality used by the next lighting regression case.</summary>
     private void SetProbeQuality(int quality)
     {
         var inspector = Scene.ECS.GetSystem<Inspector>();
@@ -90,12 +99,14 @@ sealed class LightingRegressionWindow : Window
         window.Widgets[window.WidgetIndex["quality"]].DropdownCallback(quality);
     }
 
+    /// <summary>Selects the lighting calibration fixture and its reference settings.</summary>
     private void SetCalibration()
     {
         SetProbeQuality(CalibrationCase % 4);
         Scene.SetCalibration(CalibrationColors[CalibrationCase / 4]);
     }
 
+    /// <summary>Checks rendered calibration values against the expected lighting response.</summary>
     private void CheckCalibration()
     {
         // A uniform opaque emitting medium has the same radiance in every
@@ -106,25 +117,31 @@ sealed class LightingRegressionWindow : Window
         var target = Scene.ECS.GetSystem<HRCGI>().GetOutput();
         var pixels = new HalfVector4[target.Width * target.Height];
         target.GetData(pixels);
+
         float maximumError = 0;
+
         for (int y = 4; y <= 6; y++)
             for (int x = 4; x <= 6; x++)
             {
-                var pixel = pixels[(target.Height * y / 10) * target.Width + target.Width * x / 10].ToVector4();
+                var pixel = pixels[(target.Height * y / 10) * target.Width + target.Width * x / 10].ToVector4().ToNumerics();
                 var error = new Vector3(pixel.X, pixel.Y, pixel.Z) - expected;
                 maximumError = MathF.Max(maximumError, MathF.Max(MathF.Abs(error.X), MathF.Max(MathF.Abs(error.Y), MathF.Abs(error.Z))));
             }
+
         if (!float.IsFinite(maximumError) || maximumError > 0.005f)
             throw new Exception($"HRC radiance normalization failed: case {CalibrationCase}, expected {expected}, maximum error {maximumError}.");
+
         Console.WriteLine($"PASS calibration {CalibrationCase}: expected {expected}, maximum error {maximumError:F6}.");
     }
 
+    /// <summary>Checks that the configured blocker occludes the expected lighting samples.</summary>
     private void CheckBlocker()
     {
         var renderer = Scene.Renderer;
         var target = Scene.ECS.GetSystem<HRCGI>().GetOutput();
         var pixels = new HalfVector4[target.Width * target.Height];
         target.GetData(pixels);
+
         var center = renderer.VirtualSize / 2;
         var direction = LightingReferenceScene.BlockerDirection(BlockerCase);
 
@@ -133,27 +150,30 @@ sealed class LightingRegressionWindow : Window
             var screenPosition = renderer.WorldToScreen(worldPosition);
             int pixelX = (int)(screenPosition.X / renderer.ScreenWidth * target.Width);
             int pixelY = (int)(screenPosition.Y / renderer.ScreenHeight * target.Height);
-            var value = pixels[pixelY * target.Width + pixelX].ToVector4();
+            var value = pixels[pixelY * target.Width + pixelX].ToVector4().ToNumerics();
+
             return new Vector3(value.X, value.Y, value.Z);
         }
 
         var blocked = Sample(center + direction * 600);
         var unblocked = Sample(center - direction * 600);
+
         if (unblocked.X < 0.02f || blocked.X > unblocked.X * 0.05f || blocked.Z > unblocked.Z * 0.05f)
             throw new Exception($"Light leaked through blocker {BlockerCase}: {blocked} versus {unblocked}.");
-        if (BlockerCase < 4 && blocked.Y > unblocked.Y * 0.05f)
-            throw new Exception("Opaque blocker transmitted green light.");
-        if (BlockerCase == 4 && blocked.Y < unblocked.Y * 0.6f)
-            throw new Exception("Green glass did not transmit green light.");
+        if (BlockerCase < 4 && blocked.Y > unblocked.Y * 0.05f) throw new Exception("Opaque blocker transmitted green light.");
+        if (BlockerCase == 4 && blocked.Y < unblocked.Y * 0.6f) throw new Exception("Green glass did not transmit green light.");
+
         Console.WriteLine($"PASS blocker {BlockerCase}: {blocked} versus unblocked {unblocked}.");
     }
 
+    /// <summary>Checks rendered lighting against the current regression case's expected values.</summary>
     private void CheckLighting()
     {
         var renderer = Scene.Renderer;
         var target = Scene.ECS.GetSystem<HRCGI>().GetOutput();
         var pixels = new HalfVector4[target.Width * target.Height];
         target.GetData(pixels);
+
         var center = renderer.WorldToScreen(renderer.VirtualSize / 2);
         float radius = Vector2.Distance(center,
             renderer.WorldToScreen(renderer.VirtualSize / 2 + new Vector2(LightingReferenceScene.Radius, 0)));
@@ -166,7 +186,7 @@ sealed class LightingRegressionWindow : Window
 
             for (int direction = 0; direction < 16; direction++)
             {
-                float angle = direction * MathHelper.TwoPi / 16;
+                float angle = direction * (global::System.MathF.PI * 2) / 16;
                 var screenPosition = center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (radius * ring);
                 int pixelX = (int)(screenPosition.X / renderer.ScreenWidth * target.Width);
                 int pixelY = (int)(screenPosition.Y / renderer.ScreenHeight * target.Height);
@@ -175,11 +195,11 @@ sealed class LightingRegressionWindow : Window
                 for (int offsetY = -1; offsetY <= 1; offsetY++)
                 {
                     for (int offsetX = -1; offsetX <= 1; offsetX++)
-                        value += pixels[(pixelY + offsetY) * target.Width + pixelX + offsetX].ToVector4().X / 9;
+                        value += pixels[(pixelY + offsetY) * target.Width + pixelX + offsetX].ToVector4().ToNumerics().X / 9;
                 }
 
-                if (!float.IsFinite(value) || value <= 0)
-                    throw new Exception("Nonfinite or missing light outside the emitter.");
+                if (!float.IsFinite(value) || value <= 0) throw new Exception("Nonfinite or missing light outside the emitter.");
+
                 minimum = MathF.Min(minimum, value);
                 maximum = MathF.Max(maximum, value);
             }
@@ -190,23 +210,29 @@ sealed class LightingRegressionWindow : Window
         }
 
         Directory.CreateDirectory("artifacts/lighting");
+
         using (var output = File.Create($"artifacts/lighting/case-{CaseIndex}.png"))
             renderer.SceneRT.SaveAsPng(output, renderer.ScreenWidth, renderer.ScreenHeight);
-        if (maximumSpread > 0.20f)
-            throw new Exception($"Asymmetric radial light: {maximumSpread:P1} spread at {Cases[CaseIndex]}.");
+
+        if (maximumSpread > 0.20f) throw new Exception($"Asymmetric radial light: {maximumSpread:P1} spread at {Cases[CaseIndex]}.");
         if (target.Width != renderer.ScaledWidth || target.Height != renderer.ScaledHeight)
             throw new Exception($"Lighting output must match the scaled viewport: {target.Width}x{target.Height} versus {renderer.ScaledSize}.");
     }
 }
 
+/// <summary>Configurable lighting fixture with calibration surfaces and a movable blocker.</summary>
 sealed class LightingReferenceScene : Scene
 {
     public const float Radius = 100;
+
     private HRCGI Lighting;
     private Bilinear Upscaler;
     private int Blocker;
+
+    /// <summary>Selects the lighting calibration fixture and its reference settings.</summary>
     public void SetCalibration(Color emission) => ECS.GetSystem<UniformLightingInput>().Emission = emission;
 
+    /// <summary>Returns the direction used to place the lighting-test blocker.</summary>
     public static Vector2 BlockerDirection(int index) => (index % 4) switch
     {
         0 => Vector2.UnitX,
@@ -215,6 +241,7 @@ sealed class LightingReferenceScene : Scene
         _ => -Vector2.UnitY
     };
 
+    /// <summary>Moves or enables the blocker for the next lighting regression case.</summary>
     public void SetBlocker(int index)
     {
         if (index == 0)
@@ -234,6 +261,7 @@ sealed class LightingReferenceScene : Scene
         ECS.GetComponent<Material>(Blocker).Emissive = Color.Black;
     }
 
+    /// <inheritdoc/>
     public override void SetupECS()
     {
         ECS.AddSystem<Inspector>();
@@ -244,6 +272,7 @@ sealed class LightingReferenceScene : Scene
         base.SetupECS();
     }
 
+    /// <inheritdoc/>
     public override void SetupScene()
     {
         Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
@@ -253,17 +282,18 @@ sealed class LightingReferenceScene : Scene
     }
 }
 
-// Supply independently controlled emission and absorption for absolute calibration;
-// scene materials normally couple the two for colored emitters.
+/// <summary>Supply independently controlled emission and absorption for absolute calibration; scene materials normally couple the two for colored emitters.</summary>
 [RunAfter(typeof(Geometry))]
 [RunBefore(typeof(HRCGI))]
 sealed class UniformLightingInput : com.radiant.engine.core.System
 {
     public Color? Emission;
 
+    /// <inheritdoc/>
     public override void Update()
     {
         if (Emission is not Color emission) return;
+
         var geometry = Scene.ECS.GetSystem<Geometry>();
         Renderer.PushTargets();
         Renderer.SetTarget(geometry.EmissiveTexture).Clear(emission);

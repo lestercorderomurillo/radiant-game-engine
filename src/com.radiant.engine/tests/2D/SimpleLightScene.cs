@@ -3,32 +3,34 @@ using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.core;
 
+/// <summary>Minimal HRC scene with a warm light centered in the fitted world.</summary>
 public class SimpleLightScene : Scene
 {
-    private HRCGI HRCGISystem;
-    private Bilinear BilinearSystem;
-
+    /// <inheritdoc/>
     public override void SetupECS()
     {
+        ECS.AddSystem<Inspector>();
         ECS.AddSystem<PerformanceMonitor>();
         ECS.AddSystem<Geometry>();
-        HRCGISystem = ECS.AddSystem<HRCGI>();
-        BilinearSystem = ECS.AddSystem<Bilinear>();
+
+        var lighting = ECS.AddSystem<HRCGI>();
+        DemoRendering.AddHrc(ECS, lighting);
         ECS.AddSystem<GizmosRenderer>();
 
         base.SetupECS();
     }
 
+    /// <inheritdoc/>
     public override void SetupScene()
     {
         Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
 
         CreateCenterLight();
-        BilinearSystem.SetInputSource(HRCGISystem.GetOutput);
 
         base.SetupScene();
     }
 
+    /// <summary>Adds the warm emissive light at the fitted world's center.</summary>
     private void CreateCenterLight()
     {
         var center = Renderer.VirtualSize / 2;

@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Lanczos reconstruction stage for reduced-resolution HRC lighting.</summary>
 public class UDR3 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
@@ -25,6 +26,7 @@ public class UDR3 : core.System
 
     private int FrameIndex = 0;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Geometry = Scene.ECS.GetSystem<Geometry>();
@@ -46,12 +48,14 @@ public class UDR3 : core.System
         Inspector.AddToggle("udr3", "debugEdges", "Debug Edges", false, (enabled) => DebugEdges = enabled ? 1 : 0);
     }
 
+    /// <summary>Sets the live image provider consumed by this stage.</summary>
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;
         FrameIndex = 0;
     }
 
+    /// <summary>Allocates the image targets required by this rendering stage.</summary>
     private void CreateRenderTargets()
     {
         SpatialTexture = Renderer.CreateRenderTarget(
@@ -67,6 +71,7 @@ public class UDR3 : core.System
             (int)OutputSize.X, (int)OutputSize.Y, SurfaceFormat.HalfVector4);
     }
 
+    /// <summary>Applies the selected reconstruction quality and refreshes dependent resources.</summary>
     private void OnQualityChanged(int index)
     {
         ApplyRenderScale();
@@ -74,20 +79,20 @@ public class UDR3 : core.System
         Inspector.SetDropdownValue("udr3", "qualityDrop", index);
     }
 
+    /// <summary>Updates the renderer scale to match the selected reconstruction quality.</summary>
     private void ApplyRenderScale()
     {
         Renderer.RenderScale = UDRQuality.ScaleNormalized;
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
-        if (InputSource == null)
-            return;
+        if (InputSource == null) return;
 
         var input = InputSource();
 
-        if (input == null)
-            return;
+        if (input == null) return;
 
         Vector2 inputSize = new Vector2(input.Width, input.Height);
 
@@ -95,8 +100,7 @@ public class UDR3 : core.System
         Inspector.SetLabel("udr3", "input", $"Input Size: {input.Width}x{input.Height}");
         Inspector.SetLabel("udr3", "output", $"Output Size: {OutputSize.X}x{OutputSize.Y}");
 
-        if (UDRQuality.ScaleFactor == 100)
-            return;
+        if (UDRQuality.ScaleFactor == 100) return;
 
         // Pass 1: Spatial (bilinear upsampling)
         Renderer
@@ -181,25 +185,26 @@ public class UDR3 : core.System
             .Commit()
             .SetTarget(null);
 
-        if (FrameIndex < FramesToAccumulate)
-            FrameIndex++;
+        if (FrameIndex < FramesToAccumulate) FrameIndex++;
     }
 
+    /// <inheritdoc/>
     public override void Render()
     {
-        if (InputSource == null || UDRQuality.ScaleFactor == 100)
-            return;
+        if (InputSource == null || UDRQuality.ScaleFactor == 100) return;
 
         Renderer.Blit(EdgeTexture, BlendState.AlphaBlend, SamplerState.LinearClamp);
     }
 
+    /// <summary>Returns the stage's current output image, or its input when processing is bypassed.</summary>
     public RenderTarget2D GetOutput() => EdgeTexture;
 
+    /// <inheritdoc/>
     public override void OnResize()
     {
         Vector2 newSize = Renderer.ScreenSize;
-        if (OutputSize == newSize)
-            return;
+
+        if (OutputSize == newSize) return;
 
         DisposeRenderTargets();
         OutputSize = newSize;
@@ -207,6 +212,7 @@ public class UDR3 : core.System
         FrameIndex = 0;
     }
 
+    /// <summary>Releases render targets owned by this stage.</summary>
     private void DisposeRenderTargets()
     {
         SpatialTexture?.Dispose();
@@ -215,6 +221,7 @@ public class UDR3 : core.System
         LastFrameTexture?.Dispose();
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         UDRQuality.Changed -= OnQualityChanged;

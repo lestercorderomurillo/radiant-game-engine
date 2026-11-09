@@ -195,6 +195,7 @@ float3 PBRNeutral(float3 color)
     color -= offset;
 
     float peak = max(color.r, max(color.g, color.b));
+
     if (peak < startCompression) return color;
 
     float d = 1.0 - startCompression;
@@ -215,14 +216,19 @@ float3 Map_PBRNeutral(float3 color)
 float3 Encode(float3 color)
 {
     color = max(color, 0);
+
     if (Transfer == 2) return pow(color, 1.0 / 2.2);
     if (Transfer == 1) return lerp(1.055 * pow(color, 1.0 / 2.4) - 0.055, 12.92 * color, step(color, 0.0031308));
+
     return color;
 }
+
 float4 ColorPS(PixelShaderInput input) : SV_Target0
 {
     float4 pixel = InputTexture.Sample(Sampler0, input.UV);
+
     if (pixel.a <= 0) return 0;
+
     float3 color = max(pixel.rgb / max(pixel.a, 1e-6) * Exposure, 0);
     if (Mapper == 1) color = Map_Reinhard(color);
     else if (Mapper == 2) color = Map_ACES(color);
@@ -233,6 +239,7 @@ float4 ColorPS(PixelShaderInput input) : SV_Target0
     else if (Mapper == 7) color = Map_PBRNeutral(color);
     return float4(Encode(color) * pixel.a, pixel.a);
 }
+
 technique Color
 {
     pass P0

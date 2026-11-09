@@ -5,12 +5,22 @@ using com.radiant.engine.core;
 using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
+using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Renders and edits a tiled world with viewport caching and propagated lighting.</summary>
 public class Tileset : core.System
 {
+    public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Use an explicit image pipeline instead of presenting the viewport directly.</summary>
+    public bool Present = true;
+
+    private RenderTarget2D ViewportOutput;
+
+    /// <summary>Returns the stage's current output image, or its input when processing is bypassed.</summary>
+    public Texture2D GetOutput() => ViewportOutput;
+
     private int WorldWidth;
     private int WorldHeight;
     private int TileSize;
@@ -20,6 +30,7 @@ public class Tileset : core.System
     private Vector3 SunColor = new Vector3(1.0f, 1.0f, 1.00f);
 
     public Vector2 CameraPosition { get; set; } = Vector2.Zero;
+
     private float CameraSpeed = 1000f;
     private const int Padding = 18;
 
@@ -62,16 +73,19 @@ public class Tileset : core.System
 
     private const int LightingIntervalMs = 50;
 
+    /// <summary>Converts a world position into integer tile coordinates.</summary>
     private int WorldToTile(float worldCoord)
     {
         return (int)Math.Floor(worldCoord / TileSize);
     }
 
+    /// <summary>Converts tile coordinates into their world-space position.</summary>
     private float TileToWorld(int tile)
     {
         return tile * TileSize;
     }
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         MultiplyBlend = new BlendState
@@ -85,6 +99,7 @@ public class Tileset : core.System
         };
     }
 
+    /// <summary>Loads generated ECS tiles into the tileset's rendering and lighting caches.</summary>
     public void LoadWorld(WorldGen worldGen)
     {
         WorldWidth = worldGen.WorldWidth;
@@ -98,6 +113,7 @@ public class Tileset : core.System
         RebuildViewport();
     }
 
+    /// <summary>Refreshes visible tile geometry for the current camera bounds.</summary>
     private void RebuildViewport()
     {
         IsRunning = false;
@@ -135,6 +151,7 @@ public class Tileset : core.System
         LightingThread.Start();
     }
 
+    /// <summary>Propagates sky and emissive light through the tile grid.</summary>
     private void ProcessLighting()
     {
         Stopwatch timer = Stopwatch.StartNew();
@@ -150,6 +167,7 @@ public class Tileset : core.System
             long startTick = timer.ElapsedMilliseconds;
 
             Vector2 cam;
+
             lock (SwapLock) { cam = CameraPosition; }
 
             lock (SkyLock) { Array.Copy(SkyLevels, SkyLevelsLighting, WorldWidth); }
@@ -162,6 +180,7 @@ public class Tileset : core.System
             for (int gx = 0; gx < GridWidth; gx++)
             {
                 int worldTileX = startX + gx;
+
                 for (int gy = 0; gy < GridHeight; gy++)
                 {
                     int worldTileY = startY + gy;
@@ -216,6 +235,7 @@ public class Tileset : core.System
         }
     }
 
+    /// <summary>Spreads one light contribution through neighboring tile cells.</summary>
     private void Propagate(int gx, int gy, int startX, int startY)
     {
         int idx = gy * GridWidth + gx;
@@ -237,6 +257,7 @@ public class Tileset : core.System
         WorkingBuffer[idx] = Vector3.Max(current, MinLight);
     }
 
+    /// <summary>Uploads the current tile lighting values to the renderer.</summary>
     private void UpdateLightTexture()
     {
         if (!NewBufferReady) return;
@@ -257,9 +278,11 @@ public class Tileset : core.System
             Vector3 l = DisplayBuffer[i];
             LightData[i] = new Color(l.X, l.Y, l.Z);
         }
+
         LightTexture.SetData(LightData);
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         if (!IsWorldLoaded) return;
@@ -270,12 +293,14 @@ public class Tileset : core.System
         UpdateMaterials();
     }
 
+    /// <inheritdoc/>
     public override void Render()
     {
         if (!IsWorldLoaded) return;
 
         // === GET LIGHT GRID POSITION (this is our authoritative grid origin) ===
         int gridStartX, gridStartY;
+
         lock (SwapLock)
         {
             gridStartX = DisplayTileX;
@@ -303,7 +328,9 @@ public class Tileset : core.System
         foreach (int id in Scene.ECS.InBox(bMin, bMax))
         {
             if (!Scene.ECS.HasComponent<TileData>(id)) continue;
+
             ref var m = ref Scene.ECS.GetComponent<Material>(id);
+
             if (m.Albedo.A == 0) continue;
 
             ref var t = ref Scene.ECS.GetComponent<Transform2D>(id);
@@ -328,7 +355,14 @@ public class Tileset : core.System
         Renderer.EndDraw();
 
         // === FINAL OUTPUT TO SCREEN ===
-        Renderer.SetTarget(null).Clear(Color.Red);
+        if (!Present && (ViewportOutput?.Width != Renderer.ScaledWidth || ViewportOutput.Height != Renderer.ScaledHeight))
+        {
+            Renderer.SetTarget(null);
+            ViewportOutput?.Dispose();
+            ViewportOutput = Renderer.CreateRenderTarget(Renderer.ScaledWidth, Renderer.ScaledHeight);
+        }
+
+        Renderer.SetTarget(Present ? null : ViewportOutput).Clear(SkyColor);
 
         Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp);
 
@@ -376,12 +410,17 @@ public class Tileset : core.System
         if (srcW > 0 && srcH > 0)
         {
             Rectangle sourceRect = new Rectangle(srcX, srcY, srcW, srcH);
-            Rectangle screenRect = new Rectangle(dstX, dstY, srcW, srcH);
+            float scaleX = Present ? 1 : (float)ViewportOutput.Width / Renderer.ScreenWidth;
+            float scaleY = Present ? 1 : (float)ViewportOutput.Height / Renderer.ScreenHeight;
+            Rectangle screenRect = new Rectangle((int)(dstX * scaleX), (int)(dstY * scaleY), Math.Max(1, (int)(srcW * scaleX)), Math.Max(1, (int)(srcH * scaleY)));
             Renderer.DrawSprite(TileRenderTarget, screenRect, sourceRect, Color.White);
         }
 
         Renderer.EndDraw();
+        Renderer.SetTarget(null);
     }
+
+    /// <summary>Finds the sky-exposed boundary in each tile column.</summary>
     private void CalculateSkyLevels()
     {
         lock (SkyLock)
@@ -389,6 +428,7 @@ public class Tileset : core.System
             for (int x = 0; x < WorldWidth; x++)
             {
                 SkyLevels[x] = WorldHeight;
+
                 for (int y = 0; y < WorldHeight; y++)
                 {
                     if (GetTileType(x, y, 0).Id != TileType.Air.Id) { SkyLevels[x] = y; break; }
@@ -397,6 +437,7 @@ public class Tileset : core.System
         }
     }
 
+    /// <summary>Refreshes sky exposure for columns affected by tile edits.</summary>
     private void RecalculateSkyColumns(Point center)
     {
         int h = BrushSize / 2;
@@ -408,6 +449,7 @@ public class Tileset : core.System
             for (int x = minX; x <= maxX; x++)
             {
                 SkyLevels[x] = WorldHeight;
+
                 for (int y = 0; y < WorldHeight; y++)
                 {
                     if (GetTileType(x, y, 0).Id != TileType.Air.Id) { SkyLevels[x] = y; break; }
@@ -416,22 +458,30 @@ public class Tileset : core.System
         }
     }
 
+    /// <summary>Looks up the tile definition associated with the supplied identifier or cell.</summary>
     private TileType GetTileType(int tileX, int tileY, int layer)
     {
         if (tileX < 0 || tileX >= WorldWidth || tileY < 0 || tileY >= WorldHeight) return TileType.Air;
+
         var e = Scene.ECS.AtExact(TileToWorld(tileX), TileToWorld(tileY), layer);
         return e.HasValue ? TileTypeRegistry.GetTileType(Scene.ECS.GetComponent<TileData>(e.Value).TileTypeId) : TileType.Air;
     }
 
+    /// <summary>Returns the light contribution emitted by the tile at the requested cell.</summary>
     private (bool IsSource, Vector3 Color, float Intensity) GetLightSource(int tileX, int tileY)
     {
         var fg = GetTileType(tileX, tileY, 0);
+
         if (fg.IsLightSource) return (true, fg.LightColor, fg.LightIntensity);
+
         var bg = GetTileType(tileX, tileY, 1);
+
         if (bg.IsLightSource && fg.Id == TileType.Air.Id) return (true, bg.LightColor, bg.LightIntensity);
+
         return (false, Vector3.Zero, 0f);
     }
 
+    /// <summary>Refreshes rendered tile materials after lighting or tile data changes.</summary>
     private void UpdateMaterials()
     {
         int camTileX = WorldToTile(CameraPosition.X);
@@ -448,6 +498,7 @@ public class Tileset : core.System
         foreach (var id in Scene.ECS.InBox(bMin, bMax))
         {
             if (!Scene.ECS.HasComponent<TileData>(id)) continue;
+
             ref var d = ref Scene.ECS.GetComponent<TileData>(id);
             ref var m = ref Scene.ECS.GetComponent<Material>(id);
             TileType t = TileTypeRegistry.GetTileType(d.TileTypeId);
@@ -464,19 +515,20 @@ public class Tileset : core.System
         }
     }
 
+    /// <summary>Applies viewport movement and zoom from the current input state.</summary>
     private void HandleCameraInput()
     {
-        var ks = Keyboard.GetState();
+        var ks = Controls.Keyboard;
         Vector2 dir = Vector2.Zero;
 
-        if (ks.IsKeyDown(Keys.W)) dir.Y -= 1;
-        if (ks.IsKeyDown(Keys.S)) dir.Y += 1;
-        if (ks.IsKeyDown(Keys.A)) dir.X -= 1;
-        if (ks.IsKeyDown(Keys.D)) dir.X += 1;
+        if (ks.IsKeyDown(Key.W)) dir.Y -= 1;
+        if (ks.IsKeyDown(Key.S)) dir.Y += 1;
+        if (ks.IsKeyDown(Key.A)) dir.X -= 1;
+        if (ks.IsKeyDown(Key.D)) dir.X += 1;
 
         if (dir != Vector2.Zero)
         {
-            dir.Normalize();
+            dir = Vector2.Normalize(dir);
             CameraPosition += dir * CameraSpeed * Scene.DeltaTime;
         }
 
@@ -485,13 +537,15 @@ public class Tileset : core.System
         float maxY = (WorldHeight * TileSize) - ViewportHeight;
 
         CameraPosition = new Vector2(
-            MathHelper.Clamp(CameraPosition.X, 0, maxX),
-            MathHelper.Clamp(CameraPosition.Y, 0, maxY));
+            global::System.Math.Clamp(CameraPosition.X, 0, maxX),
+            global::System.Math.Clamp(CameraPosition.Y, 0, maxY));
     }
 
+    /// <summary>Converts mouse input into world-space tile editing actions.</summary>
     private void HandleMouseInput()
     {
-        CurrentMouseState = Mouse.GetState();
+        CurrentMouseState = Controls.Mouse;
+
         Point tp = new Point(
             WorldToTile(CurrentMouseState.X + CameraPosition.X),
             WorldToTile(CurrentMouseState.Y + CameraPosition.Y));
@@ -502,6 +556,7 @@ public class Tileset : core.System
         if (leftPressed)
         {
             if (tp == LastModifiedTile && LastActionWasPlace) return;
+
             ModifyTiles(tp, TileType.Torch);
             RecalculateSkyColumns(tp);
             LastModifiedTile = tp;
@@ -510,6 +565,7 @@ public class Tileset : core.System
         else if (rightPressed)
         {
             if (tp == LastModifiedTile && !LastActionWasPlace) return;
+
             ModifyTiles(tp, TileType.Air);
             RecalculateSkyColumns(tp);
             LastModifiedTile = tp;
@@ -521,9 +577,11 @@ public class Tileset : core.System
         }
     }
 
+    /// <summary>Applies the selected edit to tiles covered by the brush.</summary>
     private void ModifyTiles(Point c, TileType t)
     {
         int h = BrushSize / 2;
+
         for (int tx = c.X - h; tx <= c.X + h; tx++)
             for (int ty = c.Y - h; ty <= c.Y + h; ty++)
             {
@@ -532,17 +590,19 @@ public class Tileset : core.System
             }
     }
 
+    /// <inheritdoc/>
     public override void OnResize()
     {
         if (IsWorldLoaded) RebuildViewport();
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         IsRunning = false;
         LightingThread?.Join();
         LightTexture?.Dispose();
         TileRenderTarget?.Dispose();
-        MultiplyBlend?.Dispose();
+        ViewportOutput?.Dispose();
     }
 }

@@ -53,6 +53,7 @@ float4 MainPS(PSInput input) : SV_Target
     if (type == 1) // Circle
     {
         float dist = length(center);
+
         // Screen-space anti-aliasing using derivatives
         float pixelWidth = fwidth(dist);
         alpha = 1.0 - smoothstep(0.5 - pixelWidth, 0.5, dist);
@@ -98,6 +99,7 @@ float4 MainPS(PSInput input) : SV_Target
         if (alpha < 0.001)
             discard;
     }
+
     // type == 0: Rectangle - no SDF needed, full quad
 
     float4 color = input.Color;

@@ -9,5 +9,7 @@ public interface IRasterGeometry
     Point Size { get; }
     int RequestedSamples { get; }
     DepthFormat VisibilityFormat { get; }
+
+    /// <summary>Submits geometry using the supplied rendering parameters.</summary>
     void Draw(Renderer renderer);
 }

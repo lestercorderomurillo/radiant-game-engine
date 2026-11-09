@@ -1,9 +1,9 @@
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
+/// <summary>Surface color, emission and texture for rendering.</summary>
 [ComponentDescription("Surface color, emission and texture for rendering.")]
 public struct Material : Component
 {
@@ -31,6 +31,7 @@ public struct Material : Component
     /// <summary>Auto-calculated: Emissive RGB scaled by intensity (A), with alpha=255 for rendering.</summary>
     public Color EmissiveScaled { get; private set; }
 
+    /// <summary>Creates material data and initializes its cached rendering values.</summary>
     public Material()
     {
         AlbedoColor = Color.White;
@@ -39,6 +40,7 @@ public struct Material : Component
         EmissiveScaled = Color.Black;
     }
 
+    /// <summary>Refreshes material values cached for rendering.</summary>
     private void UpdateCached()
     {
         float intensity = EmissiveColor.A / 255f;
@@ -49,6 +51,7 @@ public struct Material : Component
             EmissiveColor.A);
 
         bool isEmissive = EmissiveColor.R > 0 || EmissiveColor.G > 0 || EmissiveColor.B > 0;
+
         if (isEmissive)
         {
             Absorption = new Color(

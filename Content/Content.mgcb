@@ -134,6 +134,18 @@
 /processorParam:DebugMode=Auto
 /build:shaders/PathTracer.fx
 
+#begin PathSurfaces.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/PathSurfaces.fx
+
+#begin PathLighting.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/PathLighting.fx
+
 #begin ScalarPreview.fx
 /importer:EffectImporter
 /processor:EffectProcessor

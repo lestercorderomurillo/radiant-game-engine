@@ -2,7 +2,7 @@ using System;
 using com.radiant.engine.core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
+using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
 
@@ -31,16 +31,18 @@ public partial class Inspector
             Renderer.ScreenHeight / Renderer.VirtualHeight * UIScale,
             1f);
 
-        var currentMouse = Mouse.GetState();
+        var currentMouse = Controls.Mouse;
         var virtualMouse = ScreenToVirtual(new Vector2(currentMouse.X, currentMouse.Y));
 
         string hoveredWindowId = null;
         bool menuBlocking = OpenMenuId != null || MenuBarBounds.Contains((int)virtualMouse.X, (int)virtualMouse.Y);
+
         if (!Dragging && !DraggingSlider && OpenDropdownWindowId == null && !menuBlocking)
         {
             for (int i = RenderOrder.Count - 1; i >= 0; i--)
             {
                 var win = RenderOrder[i];
+
                 if (!win.Visible) continue;
                 if (win.WindowBounds.Contains((int)virtualMouse.X, (int)virtualMouse.Y))
                 {
@@ -58,8 +60,7 @@ public partial class Inspector
 
             DrawWindowShadow(window);
 
-            if (BlurResult != null)
-                DrawWindowBlurQuad(window);
+            if (BlurResult != null) DrawWindowBlurQuad(window);
 
             Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: scale);
             DrawWindow(window, virtualMouse, window.Id != hoveredWindowId);
@@ -70,14 +71,12 @@ public partial class Inspector
         DrawDropdownPopup(virtualMouse);
         Renderer.EndDraw();
 
-        if (BlurResult != null)
-            DrawBlurQuad(MenuBarBounds, 0);
+        if (BlurResult != null) DrawBlurQuad(MenuBarBounds, 0);
 
         if (OpenMenuId != null)
         {
             DrawShadowQuad(OpenMenuDropdownBounds, CornerRadius);
-            if (BlurResult != null)
-                DrawBlurQuad(OpenMenuDropdownBounds, CornerRadius);
+            if (BlurResult != null) DrawBlurQuad(OpenMenuDropdownBounds, CornerRadius);
         }
 
         Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: scale);
@@ -93,12 +92,14 @@ public partial class Inspector
     private string TruncateText(string text, float maxWidth)
     {
         if (MeasureText(text).X <= maxWidth) return text;
+
         float ellipsisWidth = MeasureText("...").X;
+
         for (int i = text.Length - 1; i > 0; i--)
         {
-            if (MeasureText(text[..i]).X + ellipsisWidth <= maxWidth)
-                return text[..i] + "...";
+            if (MeasureText(text[..i]).X + ellipsisWidth <= maxWidth) return text[..i] + "...";
         }
+
         return "...";
     }
 
@@ -126,6 +127,7 @@ public partial class Inspector
 
         bool closeHovered = !HoverBlocked && Window.CloseBounds.Contains((int)Mouse.X, (int)Mouse.Y);
         Renderer.DrawRoundedRect(Window.CloseBounds, closeHovered ? CloseHover : CloseColor, CornerRadius);
+
         const float closeFontSize = FontSize * 0.8f;
         var closeTextSize = Renderer.MeasureString("Inter-Bold", closeFontSize, "X");
         var closeTextPos = new Vector2(
@@ -136,17 +138,25 @@ public partial class Inspector
         for (int i = 0; i < Window.Widgets.Count; i++)
         {
             var widget = Window.Widgets[i];
+
             if (!widget.Visible) continue;
 
             switch (widget.Type)
             {
-                case WidgetType.Label: DrawLabel(widget); break;
-                case WidgetType.Button: DrawButton(widget, Mouse, HoverBlocked); break;
-                case WidgetType.Toggle: DrawToggle(widget); break;
-                case WidgetType.Slider: DrawSlider(widget); break;
-                case WidgetType.TextInput: DrawTextInput(widget, Mouse, HoverBlocked, Window.Id); break;
-                case WidgetType.ListBox: DrawListBox(widget); break;
-                case WidgetType.Dropdown: DrawDropdown(widget, Mouse, HoverBlocked, Window.Id); break;
+                case WidgetType.Label: DrawLabel(widget);
+                break;
+                case WidgetType.Button: DrawButton(widget, Mouse, HoverBlocked);
+                break;
+                case WidgetType.Toggle: DrawToggle(widget);
+                break;
+                case WidgetType.Slider: DrawSlider(widget);
+                break;
+                case WidgetType.TextInput: DrawTextInput(widget, Mouse, HoverBlocked, Window.Id);
+                break;
+                case WidgetType.ListBox: DrawListBox(widget);
+                break;
+                case WidgetType.Dropdown: DrawDropdown(widget, Mouse, HoverBlocked, Window.Id);
+                break;
             }
         }
 
@@ -180,10 +190,12 @@ public partial class Inspector
             int lineY = Widget.Bounds.Y + Widget.Bounds.Height / 2;
             var lineRect = new Rectangle(textRight, lineY, Widget.Bounds.Right - textRight, 1);
             Renderer.DrawSprite(solid, lineRect, TextColor, 0.20f);
+
             return;
         }
 
         int maxWidth = Widget.Bounds.Width - 8;
+
         if (MeasureText(Widget.Text).X <= maxWidth)
         {
             var textPos = new Vector2(Widget.Bounds.X + 4, Widget.Bounds.Y + (Widget.Bounds.Height - LineHeight) / 2);
@@ -198,6 +210,7 @@ public partial class Inspector
         for (int i = 0; i < words.Length; i++)
         {
             string testLine = currentLine.Length == 0 ? words[i] : currentLine + " " + words[i];
+
             if (MeasureText(testLine).X > maxWidth && currentLine.Length > 0)
             {
                 DrawText(currentLine, new Vector2(Widget.Bounds.X + 4, currentY), labelColor);
@@ -210,8 +223,7 @@ public partial class Inspector
             }
         }
 
-        if (currentLine.Length > 0)
-            DrawText(currentLine, new Vector2(Widget.Bounds.X + 4, currentY), labelColor);
+        if (currentLine.Length > 0) DrawText(currentLine, new Vector2(Widget.Bounds.X + 4, currentY), labelColor);
     }
 
     /// <summary> Draws a button widget with centered text/icon and hover highlight. </summary>
@@ -224,6 +236,7 @@ public partial class Inspector
         {
             int iconSize = Math.Min(Widget.Bounds.Width, Widget.Bounds.Height) - 20;
             if (iconSize < 4) iconSize = 4;
+
             var iconTex = Widget.Text == "trash"
                 ? Renderer.GetTrashTexture(iconSize * 4)
                 : Renderer.GetSearchTexture(iconSize * 4);
@@ -232,6 +245,7 @@ public partial class Inspector
                 Widget.Bounds.Y + (Widget.Bounds.Height - iconSize) / 2,
                 iconSize, iconSize);
             Renderer.DrawSprite(iconTex, iconRect, Widget.Text == "trash" ? CloseHover : TextColor);
+
             return;
         }
 
@@ -337,9 +351,11 @@ public partial class Inspector
         {
             string placeholder = Widget.TextInputPlaceholder ?? "";
             placeholder = TruncateText(placeholder, maxTextWidth);
+
             var placeholderSize = MeasureText(placeholder);
             var placeholderPos = new Vector2(Widget.Bounds.X + leftPadding, Widget.Bounds.Y + (Widget.Bounds.Height - placeholderSize.Y) / 2);
             DrawText(placeholder, placeholderPos, LabelDim);
+
             return;
         }
 
@@ -380,6 +396,7 @@ public partial class Inspector
             float headerMaxWidth = Widget.Bounds.Width - Padding * 2;
             string headerText = Widget.ListBoxHeader;
             int sepIdx = headerText.IndexOf("  |  ", StringComparison.Ordinal);
+
             if (sepIdx < 0)
             {
                 DrawTextBold(TruncateText(headerText, headerMaxWidth), headerPos, LabelDim);
@@ -389,6 +406,7 @@ public partial class Inspector
                 string headerPrimary = headerText[..sepIdx];
                 string headerSecondary = headerText[(sepIdx + 5)..];
                 DrawTextBold(headerPrimary, headerPos, LabelDim);
+
                 float headerPrimaryWidth = MeasureText(headerPrimary + "  ").X;
                 float headerRemaining = headerMaxWidth - headerPrimaryWidth;
                 if (headerRemaining > 20)
@@ -404,6 +422,7 @@ public partial class Inspector
         }
 
         string[] items = Widget.ListBoxItems;
+
         if (items == null || items.Length == 0)
         {
             string emptyText = "No results";
@@ -412,6 +431,7 @@ public partial class Inspector
                 Widget.Bounds.X + (Widget.Bounds.Width - emptySize.X) / 2,
                 Widget.Bounds.Y + headerOffset + (Widget.Bounds.Height - headerOffset - emptySize.Y) / 2);
             DrawText(emptyText, emptyPos, LabelDim);
+
             return;
         }
 
@@ -428,6 +448,7 @@ public partial class Inspector
             string fullText = items[itemIndex];
 
             bool isSeparator = fullText.Length > 0 && fullText[0] == '\x03';
+
             if (isSeparator)
             {
                 string headerText = fullText[1..];
@@ -435,8 +456,10 @@ public partial class Inspector
                 float textY = itemY + (itemHeight - headerSize.Y) / 2;
                 float textX = Widget.Bounds.X + Padding;
                 Renderer.DrawString("Inter-Bold", FontSize, headerText, new Vector2(textX, textY), LabelDim);
+
                 int lineStartX = (int)(textX + headerSize.X + Padding);
                 int lineEndX = Widget.Bounds.Right - Padding;
+
                 if (lineStartX < lineEndX)
                 {
                     int lineY = itemY + itemHeight / 2;
@@ -445,6 +468,7 @@ public partial class Inspector
                     var lineColor = new Color((byte)(TextColor.R * lineFactor), (byte)(TextColor.G * lineFactor), (byte)(TextColor.B * lineFactor), lineAlpha);
                     Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), new Rectangle(lineStartX, lineY, lineEndX - lineStartX, 1), lineColor);
                 }
+
                 continue;
             }
 
@@ -463,6 +487,7 @@ public partial class Inspector
             Color primaryColor = isSelected ? CloseText : TextColor;
 
             bool hasEye = fullText.Length > 0 && (fullText[0] == '\x06' || fullText[0] == '\x07');
+
             if (hasEye)
             {
                 bool isEntityVisible = fullText[0] == '\x06';
@@ -478,6 +503,7 @@ public partial class Inspector
             }
 
             bool hasStatus = fullText.Length > 0 && (fullText[0] == '\x01' || fullText[0] == '\x02' || fullText[0] == '\x04' || fullText[0] == '\x05');
+
             if (hasStatus)
             {
                 bool isItemEnabled = fullText[0] == '\x01' || fullText[0] == '\x04';
@@ -489,9 +515,11 @@ public partial class Inspector
                 {
                     var circleTex = Renderer.GetCircleTexture(controlSize * 4);
                     Renderer.DrawSprite(circleTex, new Rectangle((int)itemPos.X, controlY, controlSize, controlSize), isItemEnabled ? ToggleOn : ToggleOff);
+
                     int hollowSize = controlSize - 4;
                     Color hollowColor = isSelected ? SliderFill : ButtonColor;
                     Renderer.DrawSprite(circleTex, new Rectangle((int)itemPos.X + 2, controlY + 2, hollowSize, hollowSize), hollowColor);
+
                     if (isItemEnabled)
                     {
                         int dotSize = controlSize - 8;
@@ -502,6 +530,7 @@ public partial class Inspector
                 {
                     var boxRect = new Rectangle((int)itemPos.X, controlY, controlSize, controlSize);
                     Renderer.DrawRoundedRect(boxRect, isItemEnabled ? ToggleOn : ToggleOff, 4);
+
                     if (isItemEnabled)
                     {
                         int checkSize = controlSize - 4;
@@ -516,6 +545,7 @@ public partial class Inspector
             }
 
             int separatorIdx = fullText.IndexOf("  |  ", StringComparison.Ordinal);
+
             if (separatorIdx < 0)
             {
                 DrawText(TruncateText(fullText, maxWidth), itemPos, primaryColor);
@@ -525,8 +555,10 @@ public partial class Inspector
                 string primary = fullText[..separatorIdx];
                 string secondary = fullText[(separatorIdx + 5)..];
                 DrawText(primary, itemPos, primaryColor);
+
                 float primaryWidth = MeasureText(primary + "  ").X;
                 float remainingWidth = maxWidth - primaryWidth;
+
                 if (remainingWidth > 20)
                 {
                     Color dimColor = isSelected ? new Color(CloseText.R, CloseText.G, CloseText.B, (byte)(CloseText.A * 0.6f)) : LabelDim;
@@ -594,6 +626,7 @@ public partial class Inspector
         if (!window.WidgetIndex.TryGetValue(OpenDropdownWidgetId, out int index)) return;
 
         var widget = window.Widgets[index];
+
         if (widget.DropdownOptions == null) return;
 
         var popupBorderRect = new Rectangle(OpenDropdownPopupBounds.X - 1, OpenDropdownPopupBounds.Y, OpenDropdownPopupBounds.Width + 2, OpenDropdownPopupBounds.Height + 1);

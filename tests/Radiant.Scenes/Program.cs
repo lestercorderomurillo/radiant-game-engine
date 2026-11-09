@@ -25,6 +25,7 @@ if (args.Length >= 2 && args[0] == "--lighting-captures")
         ? new FrozenMegaLightsScene() : new LightingReferenceScene();
     using var window = new LightingCaptureWindow(captureScene, args[1]);
     window.Run();
+
     return;
 }
 
@@ -40,7 +41,13 @@ Scene Scene = args.Length == 0 || args[0] == "lights" ? new SimpleLightScene()
     : args[0] == "tiles" ? new TilesetScene()
     : args[0] == "triangles" ? new MegaLightsScene()
     : throw new ArgumentException("Choose a test scene: lights, tiles, triangles, or rendering2d.");
-if (args.Length > 1 && args[1] == "--smoke")
+
+if (Array.IndexOf(args, "--upscaling-regression") >= 0)
+{
+    using var window = new UpscalingRegressionWindow(Scene);
+    window.Run();
+}
+else if (args.Length > 1 && args[1] == "--smoke")
 {
     using var Window = new SmokeWindow(Scene, "artifacts/smoke", (ActiveScene, Frame) =>
     {
@@ -51,6 +58,7 @@ if (args.Length > 1 && args[1] == "--smoke")
             var projectedCenter = renderer.WorldToScreen(center);
             float horizontalScale = Vector2.Distance(projectedCenter, renderer.WorldToScreen(center + Vector2.UnitX));
             float verticalScale = Vector2.Distance(projectedCenter, renderer.WorldToScreen(center + Vector2.UnitY));
+
             if (MathF.Abs(horizontalScale - verticalScale) > 0.001f || Vector2.Distance(projectedCenter, renderer.ScreenSize / 2) > 0.01f)
                 throw new Exception("Lighting demo is stretched or off-center.");
             if (Vector2.Distance(renderer.ScreenToWorld(projectedCenter), center) > 0.01f)

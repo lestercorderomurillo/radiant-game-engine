@@ -154,6 +154,7 @@ float WalkToEdge(float2 uv, float2 texelSize, bool onSurface)
             }
         }
     }
+
     return minDist;
 }
 
@@ -195,6 +196,7 @@ float4 EdgeReconstruct_PS(PixelShaderInput input) : SV_Target0
     if (onSurface)
     {
         edgeColor = emissive.rgb;
+
         // Transparent surfaces: reduce blend by absorption alpha to avoid darkening inside
         blendFactor *= absorption;
     }
@@ -223,6 +225,7 @@ float4 EdgeReconstruct_PS(PixelShaderInput input) : SV_Target0
                 }
             }
         }
+
         edgeColor = surfaceWeight > 0.0 ? surfaceColor / surfaceWeight : upsampled;
 
         // Transparent nearby surfaces: reduce outer edge correction

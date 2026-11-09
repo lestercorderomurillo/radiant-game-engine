@@ -15,12 +15,18 @@ public class RenderPresentation : core.System
     public Rectangle? Destination;
     public Color? ClearColor;
     public BlendState Blend = BlendState.Opaque;
+
+    /// <inheritdoc/>
     public override void Render()
     {
         var input = Input?.Invoke();
+
         if (input == null) return;
+
         var target = Target?.Invoke();
+
         if (ReferenceEquals(input, target ?? Renderer.SceneRT)) throw new InvalidOperationException("Presentation cannot sample its render destination.");
+
         Renderer.Reset().SetTarget(target);
         if (ClearColor.HasValue) Renderer.Clear(ClearColor);
         Renderer.Configure(Blend).Configure(SamplerState.LinearClamp).DrawTexture(input, Destination ?? Renderer.ViewportBounds, Color.White).Commit().SetTarget(null);
