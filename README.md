@@ -8,15 +8,22 @@
 
 [![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.3.1/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1)
 
-A C# framework for 2D and 3D games with real-time global illumination, built on MonoGame and Vulkan.
+A general-purpose C# engine for games, simulations and interactive experiences.
+
+Build in 2D or 3D, compose the systems your project needs and extend the engine with your own. Radiant brings
+together entities, scenes, rendering, input, runtime services and development tools, with MonoGame and Vulkan
+powering the desktop backend.
+
+The ambition is a complete toolkit for interactive development, from the first prototype to a finished project.
+The capabilities below are available today; the toolkit will continue to grow across the engine.
 
 ## Features
 
 - **Entities and components**: plain-struct components, fast parallel queries, spatial lookups and tags.
 - **Systems and scenes**: lifecycle callbacks, dependency ordering, pausing and switchable system groups.
+- **Composable rendering**: flat, lit or path-traced images in 2D and 3D, with optional hardware ray tracing.
 - **2D global illumination**: glowing shapes light the scene, solid shapes cast soft shadows and colored glass
   tints the light, with no light lists or shadow maps.
-- **Composable rendering**: flat, lit or path-traced images in 2D and 3D, with optional hardware ray tracing.
 - **Image quality**: tone mapping, MSAA, SSAA, FXAA, SMAA, TAA, denoising and UDR upscaling.
 - **In-game inspector**: debug panels in a few lines, live entity editing and a free-flying camera.
 - **Runtime**: keyboard, mouse and text input, frame-rate independent timing, headless simulation and compute
@@ -81,5 +88,5 @@ feature and the complete C# API reference.
 - [Getting started](docs/GettingStarted.md)
 - [Entities and components](docs/ECS.md) and [systems and scenes](docs/Systems.md)
 - [Input](docs/Input.md) and [inspector](docs/Inspector.md)
-- [Renderer](docs/Renderer.md) and [2D global illumination](docs/HRC.md)
+- [Renderer](docs/Renderer.md) and [lighting](docs/HRC.md)
 - [Rendering pipelines](docs/Rendering.md) and [3D rendering](docs/3D.md)

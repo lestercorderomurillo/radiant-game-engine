@@ -1,6 +1,7 @@
 # Getting started
 
-Add Radiant to a game project and open a window with your own lit scene in about twenty lines of code.
+Add Radiant to your C# project, register systems and run your first scene. The same foundation supports games,
+simulations and interactive experiences; this guide starts with a small visual example.
 
 ## Requirements
 

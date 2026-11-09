@@ -26,7 +26,7 @@
 }
 
 .radiant-hero__scrim {
-  background: linear-gradient(90deg, rgb(0 0 0 / 55%) 0%, rgb(0 0 0 / 22%) 45%, transparent 75%);
+  background: linear-gradient(90deg, rgb(0 0 0 / 30%) 0%, rgb(0 0 0 / 12%) 38%, transparent 60%);
 }
 
 .radiant-hero__inner {
@@ -42,7 +42,7 @@
 .radiant-hero__copy { width: min(100%, 560px); }
 
 .radiant-hero h1 {
-  max-width: 7.5ch;
+  max-width: 9ch;
   font-size: clamp(64px, 7.8vw, 112px);
   font-weight: 550;
   line-height: .98;

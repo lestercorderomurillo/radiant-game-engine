@@ -4,7 +4,7 @@ import { ArrowRightIcon, BlocksIcon, BoxesIcon, CpuIcon, LayoutPanelTopIcon, Pal
 import { CodeBlock } from "@/common/components/CodeBlock"
 import { t, type MessageKey } from "@/common/i18n/t"
 import { getGuide, orderedGuides } from "@/features/guides/guides"
-import { useApiIndex } from "@/features/reference/useApiIndex"
+import { HomeFooter } from "./HomeFooter"
 
 interface Feature {
   icon: LucideIcon
@@ -52,7 +52,6 @@ public class Campfire : Scene
 const featureCardClass = "group flex flex-col gap-2 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/20 hover:bg-accent/40"
 
 export function HomePage() {
-  const index = useApiIndex()
   const firstGuide = getGuide("getting-started") ?? orderedGuides[0]
 
   return (
@@ -60,7 +59,7 @@ export function HomePage() {
       <section className="radiant-hero" aria-labelledby="radiant-hero-title">
         <img
           className="radiant-hero__image"
-          src={`${import.meta.env.BASE_URL}images/radiant-sky-cube.webp`}
+          src={`${import.meta.env.BASE_URL}images/radiant-prism-studio.webp`}
           alt=""
           width="1672"
           height="941"
@@ -69,7 +68,7 @@ export function HomePage() {
         <div className="radiant-hero__scrim" aria-hidden="true" />
         <div className="radiant-hero__inner">
           <div className="radiant-hero__copy">
-            <h1 id="radiant-hero-title">{t("home.title")}</h1>
+            <h1 id="radiant-hero-title">{t("home.headline")}</h1>
             <p>{t("home.tagline")}</p>
             <div className="radiant-hero__actions">
               {firstGuide && (
@@ -110,7 +109,7 @@ export function HomePage() {
       </section>
 
       <section className="border-t">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:px-6 lg:grid-cols-[1fr_1.4fr] lg:items-center">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-8 px-4 py-14 md:px-6">
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold tracking-tight">{t("home.firstScene.title")}</h2>
             <p className="text-muted-foreground">{t("home.firstScene.body")}</p>
@@ -124,31 +123,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="border-t bg-muted/30">
-        <div className="mx-auto max-w-6xl px-4 py-14 md:px-6">
-          <h2 className="text-2xl font-semibold tracking-tight">{t("home.apiTitle")}</h2>
-          <p className="mt-2 text-muted-foreground">{index ? t("home.apiBody") : t("home.noData")}</p>
-          {index && (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {index.groups.map((group) => (
-                <Link key={group.id} to="/api" hash={group.id} className="flex flex-col gap-3 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/20">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="font-medium">{group.title}</h3>
-                    <span className="text-xs text-muted-foreground">{t("home.typeCount", { count: group.areas.reduce((total, area) => total + area.types.length, 0) })}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {group.areas.flatMap((area) => area.types).slice(0, 6).map((typeId) => (
-                      <span key={typeId} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                        {index.types.find((type) => type.id === typeId)?.name ?? typeId}
-                      </span>
-                    ))}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+      <HomeFooter />
     </div>
   )
 }
