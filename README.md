@@ -1,6 +1,24 @@
-# Radiant
+<h1 align="center">Radiant</h1>
 
-A C# 2D and 3D game engine for experimenting with real-time lighting, built on MonoGame and Vulkan. Includes an archetype ECS, instanced geometry, radiance-cascade global illumination, and an in-game inspector.
+<p align="center">
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1"><img src="https://img.shields.io/badge/release-v0.3.1-E73C00?style=flat-square" alt="Release v0.3.1"></a>
+  <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
+  <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
+</p>
+
+[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.3.1/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1)
+
+A C# 2D and 3D game engine for experimenting with real-time lighting, built on MonoGame and Vulkan.
+
+- **2D and 3D rendering:** instanced geometry, radiance-cascade global illumination, raster lighting, and progressive path tracing.
+- **Scene tools:** an archetype ECS, in-game inspector, shared camera controls, and rendering settings.
+- **Playable examples:** a Cornell Box, interactive lighting scenes, [Pac-Man](https://github.com/lestercorderomurillo/raytracing-pacman), and [Zuma](https://github.com/lestercorderomurillo/raytracing-zuma).
+
+## Get Radiant
+
+**[Download v0.3.1 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.3.1.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1)
+
+Radiant is an engine library built from source. Use the **v0.3.1 tag** for the branded borderless loader and About panel; those runtime changes are not yet on `main`. See [startup and future updater integration](https://github.com/lestercorderomurillo/radiant-game-engine/blob/v0.3.1/docs/Startup.md).
 
 ## Cornell Box (3D)
 
