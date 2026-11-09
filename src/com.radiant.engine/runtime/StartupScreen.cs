@@ -78,4 +78,45 @@ internal sealed class StartupScreen : IDisposable
         Artwork.Dispose();
         Batch.Dispose();
     }
+
+    internal static NativeRectangle AboutBounds(int Width, int Height)
+    {
+        float Scale = Math.Min(0.6f, Math.Min(Width * 0.9f / 1536, Height * 0.9f / 1024));
+        int PanelWidth = Math.Max(1, (int)(1536 * Scale));
+        int PanelHeight = Math.Max(1, (int)(1024 * Scale));
+        return new NativeRectangle((Width - PanelWidth) / 2, (Height - PanelHeight) / 2, PanelWidth, PanelHeight);
+    }
+
+    internal static NativeRectangle AboutCloseBounds(NativeRectangle Bounds)
+    {
+        int Size = Math.Min(28, Math.Max(12, Bounds.Width / 20));
+        int Inset = Math.Min(12, Math.Max(2, Bounds.Width / 60));
+        return new NativeRectangle(Bounds.Right - Size - Inset, Bounds.Top + Inset, Size, Size);
+    }
+
+    public void DrawAbout(NativeRectangle Bounds, string Version, NativeColor CloseColor, NativeColor CloseText,
+        RenderTarget2D Target = null)
+    {
+        Device.SetRenderTarget(Target);
+        Batch.Begin(blendState: Microsoft.Xna.Framework.Graphics.BlendState.AlphaBlend,
+            samplerState: Microsoft.Xna.Framework.Graphics.SamplerState.LinearClamp);
+        Batch.Draw(Pixel, Device.Viewport.Bounds, new NativeColor(0, 0, 0, 170));
+        Batch.Draw(Pixel, Bounds, NativeColor.Black);
+        float Scale = Bounds.Width / 1536f;
+        Batch.Draw(Artwork, new NativeRectangle(Bounds.X, Bounds.Y, Bounds.Width, (int)(870 * Scale)),
+            new NativeRectangle(0, 0, 1536, 870), NativeColor.White);
+        var Font = Fonts.GetFont(Math.Max(10, 24 * Scale));
+        string Footer = Version + "  ·  Developed by Lester Cordero Murillo";
+        while (Footer.Length > 1 && Font.MeasureString(Footer).X > Bounds.Width - 120 * Scale)
+            Footer = Footer[..^2] + "…";
+        Batch.DrawString(Font, Footer,
+            new NativeVector(Bounds.X + 60 * Scale, Bounds.Y + 930 * Scale), new NativeColor(175, 175, 175));
+        var Close = AboutCloseBounds(Bounds);
+        Batch.Draw(Pixel, Close, CloseColor);
+        var Center = new NativeVector(Close.Center.X, Close.Center.Y);
+        foreach (float Angle in new[] { MathF.PI / 4, -MathF.PI / 4 })
+            Batch.Draw(Pixel, Center, null, CloseText, Angle, new NativeVector(0.5f, 0.5f),
+                new NativeVector(Close.Width * 0.45f, 1.5f), Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0);
+        Batch.End();
+    }
 }

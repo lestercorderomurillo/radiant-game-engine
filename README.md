@@ -1,7 +1,7 @@
 <h1 align="center">Radiant</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.0"><img src="https://img.shields.io/badge/release-v0.3.0-E73C00?style=flat-square" alt="Release v0.3.0"></a>
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1"><img src="https://img.shields.io/badge/release-v0.3.1-E73C00?style=flat-square" alt="Release v0.3.1"></a>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
   <img src="https://img.shields.io/badge/renderer-Vulkan-8B5CF6?style=flat-square" alt="Vulkan renderer">
   <a href="https://github.com/lestercorderomurillo/radiant-game-engine/actions/workflows/build.yml"><img src="https://github.com/lestercorderomurillo/radiant-game-engine/actions/workflows/build.yml/badge.svg" alt="Build engine"></a>
@@ -13,8 +13,9 @@ A C# 2D and 3D game engine for experimenting with real-time lighting, built on M
 
 ## Startup
 
-Desktop games show the official Radiant loader while the engine prepares the renderer,
+Desktop games open a temporary, borderless Radiant loader while the engine prepares the renderer,
 systems and first scene. The white bar and status text reflect live loading stages.
+**Help → About Radiant** opens the same artwork inside the engine, with a small themed close button.
 The same screen accepts cancellable asynchronous preparation for future update checks
 or downloads. [Startup options and updater integration](docs/Startup.md).
 

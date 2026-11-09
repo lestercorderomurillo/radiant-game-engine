@@ -711,3 +711,10 @@ prevent scene startup; hidden loaders throw. Closing cancels pending work and ob
 Subclass update/draw hooks must avoid scene access until `IsLoading` is false.
 See `docs/Startup.md`. Headless startup regressions are in `Radiant.Tests`; the real Vulkan
 fixture is `Radiant.Scenes --startup-regression` (success, resize, failure, cancel, hidden).
+
+The v0.3.1 loader opens in a 768×512 borderless non-resizable window; after startup `Window`
+restores the requested game size, native decorations and maximization. `Inspector.ShowAbout()`
+and Help → About Radiant reuse `StartupScreen` as a centered modal artwork panel, with a
+small theme-colored X, version footer, paused simulation and Escape/click dismissal.
+`Window.IsAboutVisible` and `CloseAbout()` expose modal state; dismissing it resets timing
+and consumes Escape until release. No merge is required to publish the source release tag.

@@ -23,6 +23,14 @@ public class Window : Game, IRuntimeHost
     private StartupSession Startup;
     private StartupScreen LoadingScreen;
     private bool LoadingFramePresented;
+    private bool MainWindowRestored;
+    private bool AboutVisible;
+    private bool AboutMouseDown;
+    private bool SuppressEscape;
+    private bool WaitForAboutRelease;
+    private Color AboutCloseColor, AboutCloseHover, AboutCloseText;
+    /// <summary>Whether the branded About panel is currently open.</summary>
+    public bool IsAboutVisible => AboutVisible;
     /// <summary>True until application preparation and initial scene loading have completed.</summary>
     public bool IsLoading => Startup is { Finished: false };
     /// <summary>The current startup/update status, or null after startup resources have been released.</summary>
@@ -44,8 +52,8 @@ public class Window : Game, IRuntimeHost
 
         GraphicsDeviceManager = new GraphicsDeviceManager(this);
 
-        Window.AllowUserResizing = true;
-        Window.IsBorderless = false;
+        Window.AllowUserResizing = !Options.ShowLoader;
+        Window.IsBorderless = Options.ShowLoader;
         Window.Title = Options.Title;
 
         IsMouseVisible = true;
@@ -53,8 +61,8 @@ public class Window : Game, IRuntimeHost
         InactiveSleepTime = TimeSpan.Zero;
 
         GraphicsDeviceManager.PreferredDepthStencilFormat = DepthFormat.None;
-        GraphicsDeviceManager.PreferredBackBufferWidth = Options.Width;
-        GraphicsDeviceManager.PreferredBackBufferHeight = Options.Height;
+        GraphicsDeviceManager.PreferredBackBufferWidth = Options.ShowLoader ? 768 : Options.Width;
+        GraphicsDeviceManager.PreferredBackBufferHeight = Options.ShowLoader ? 512 : Options.Height;
         GraphicsDeviceManager.GraphicsProfile = GraphicsProfile.HiDef;
         GraphicsDeviceManager.IsFullScreen = false;
         GraphicsDeviceManager.HardwareModeSwitch = true;
@@ -90,6 +98,47 @@ public class Window : Game, IRuntimeHost
         GameLoop.Initialize(this);
         Startup = new StartupSession(GameLoop, Options);
         if (Options.ShowLoader) LoadingScreen = new StartupScreen(GraphicsDevice);
+    }
+
+    /// <summary>Opens the shared Radiant artwork as a modal About panel using the supplied theme colors.</summary>
+    public void ShowAbout(Color CloseColor, Color CloseHover, Color CloseText)
+    {
+        if (Startup != null) return;
+        LoadingScreen ??= new StartupScreen(GraphicsDevice);
+        AboutCloseColor = CloseColor;
+        AboutCloseHover = CloseHover;
+        AboutCloseText = CloseText;
+        AboutMouseDown = Microsoft.Xna.Framework.Input.Mouse.GetState().LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Pressed;
+        AboutVisible = true;
+    }
+
+    /// <summary>Closes the About panel without closing the application or advancing simulation time.</summary>
+    public void CloseAbout()
+    {
+        AboutVisible = false;
+        SuppressEscape = true;
+        WaitForAboutRelease = true;
+        GameLoop.ResetStartupTiming();
+    }
+
+    internal void HandleAboutInput(int X, int Y, bool Pressed, bool Escape)
+    {
+        if (!AboutVisible) return;
+        var Bounds = StartupScreen.AboutBounds(GraphicsDevice.PresentationParameters.BackBufferWidth, GraphicsDevice.PresentationParameters.BackBufferHeight);
+        if (Escape || (Pressed && !AboutMouseDown && StartupScreen.AboutCloseBounds(Bounds).Contains(X, Y))) CloseAbout();
+        AboutMouseDown = Pressed;
+    }
+
+    private void RestoreMainWindow()
+    {
+        if (MainWindowRestored) return;
+        MainWindowRestored = true;
+        Window.IsBorderless = false;
+        Window.AllowUserResizing = true;
+        GraphicsDeviceManager.PreferredBackBufferWidth = Options.Width;
+        GraphicsDeviceManager.PreferredBackBufferHeight = Options.Height;
+        GraphicsDeviceManager.ApplyChanges();
+        if (MaximizeOnShow) { NativeWindow.Maximize(Window.Handle); MaximizeOnShow = false; }
     }
 
     /// <summary>Marks a window resize for deferred renderer updates.</summary>
@@ -139,19 +188,36 @@ public class Window : Game, IRuntimeHost
             Startup = null;
             LoadingScreen?.Dispose();
             LoadingScreen = null;
+            RestoreMainWindow();
+            GameLoop.ResetStartupTiming();
+        }
+
+        if (AboutVisible)
+        {
+            var Mouse = Microsoft.Xna.Framework.Input.Mouse.GetState();
+            bool Pressed = Mouse.LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Pressed;
+            bool Escape = Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(Microsoft.Xna.Framework.Input.Keys.Escape);
+            HandleAboutInput(Mouse.X, Mouse.Y, Pressed, Escape);
+            return;
+        }
+
+        if (WaitForAboutRelease)
+        {
+            if (Microsoft.Xna.Framework.Input.Mouse.GetState().LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Pressed ||
+                Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(Microsoft.Xna.Framework.Input.Keys.Escape)) return;
+            WaitForAboutRelease = false;
             GameLoop.ResetStartupTiming();
         }
 
         GameLoop.Update();
 
-        if (GameLoop.Controls.IsDown(Key.Escape)) Exit();
+        if (!GameLoop.Controls.IsDown(Key.Escape)) SuppressEscape = false;
+        if (!SuppressEscape && GameLoop.Controls.IsDown(Key.Escape)) Exit();
     }
 
     /// <inheritdoc/>
     protected override void Draw(GameTime gameTime)
     {
-        if (MaximizeOnShow) { NativeWindow.Maximize(Window.Handle); MaximizeOnShow = false; }
-
         if (Startup != null)
         {
             if (LoadingScreen != null) LoadingScreen.Draw(Startup.Progress, Startup.Error != null);
@@ -163,6 +229,13 @@ public class Window : Game, IRuntimeHost
         }
 
         GameLoop.Render();
+        if (AboutVisible)
+        {
+            var Bounds = StartupScreen.AboutBounds(GraphicsDevice.PresentationParameters.BackBufferWidth, GraphicsDevice.PresentationParameters.BackBufferHeight);
+            var Mouse = Microsoft.Xna.Framework.Input.Mouse.GetState();
+            bool Hovered = StartupScreen.AboutCloseBounds(Bounds).Contains(Mouse.X, Mouse.Y);
+            LoadingScreen.DrawAbout(Bounds, BuildTag, (Hovered ? AboutCloseHover : AboutCloseColor).ToNative(), AboutCloseText.ToNative());
+        }
     }
 
     /// <inheritdoc/>

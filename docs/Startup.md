@@ -1,6 +1,9 @@
 # Radiant startup
 
-Desktop `Window` / `GameClient` instances show the official Radiant splash by default.
+Desktop `Window` / `GameClient` instances show the official Radiant splash by default
+in a temporary 768×512 borderless, non-resizable window, without native close/minimize/maximize
+buttons. On completion, the same native window restores the requested game size,
+decorations, resizing and maximized state. Escape still cancels startup.
 The artwork is embedded in the engine assembly, together with its status font, so loading
 works from a published application or another working directory. It fits the window without
 stretching and keeps black margins when the aspect ratio differs from 3:2.
@@ -80,3 +83,13 @@ built-in image generator. Its exact generation prompt and reference names are pr
 `Content/branding/radiant-splash.prompt.txt`. The rendering source region ends at y=870;
 keep the logo and tagline above that line when revising the artwork. Status text starts at
 (60, 900), and the progress track occupies (60, 944, 1416, 14) in design coordinates.
+
+## About Radiant
+
+**Help → About Radiant** (or `Inspector.ShowAbout()`) opens the same artwork as a centered
+modal panel over the running engine. It has no title bar; a small X floats inside the upper
+right corner and takes its normal, hover and text colors from the active inspector theme.
+The footer displays the engine assembly version instead of fictitious loading progress.
+Click X or press Escape to dismiss it. Scene updates pause while the panel is open, and
+closing resets frame timing so the pause is not fed into simulation. Escape closes only the
+panel; release and press it again to exit the application. The panel follows window resizing.
