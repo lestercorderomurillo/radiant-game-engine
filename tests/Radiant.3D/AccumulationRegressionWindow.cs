@@ -50,7 +50,6 @@ internal sealed class AccumulationScene : Scene
 
         var tone = ECS.AddSystem(new ToneMapping { Input = Tracer.GetOutput, Mapper = ToneMapper.None, Exposure = 2, After = [Tracer] });
         AA = ECS.AddSystem(new AntiAliasing { Input = tone.GetOutput, Mode = PostAAMode.TAA, Camera = () => Tracer.Geometry.Camera, JitterEnabled = false, After = [tone] });
-        base.SetupECS();
     }
 }
 

@@ -26,7 +26,6 @@ public override void SetupECS()
 {
     ECS.AddSystem<Geometry>();
     ECS.AddSystem<HRCGI>();
-    base.SetupECS();
 }
 
 public override void SetupScene()
@@ -38,7 +37,6 @@ public override void SetupScene()
     int wall = ECS.CreateEntity(new Vector2(1900, 700));
     ECS.AddComponent<Rectangle2D>(wall) = new Rectangle2D(new Vector2(60, 700));
     ECS.AddComponent<Material>(wall).Albedo = Color.Black;
-    base.SetupScene();
 }
 ```
 
@@ -68,7 +66,7 @@ var lighting = ECS.AddSystem<HRCGI>();
 var color = ECS.AddSystem<ColorManagement>();
 var upscaler = ECS.AddSystem<UDR4>();
 
-// Connect providers after base.SetupECS().
+// Connecting providers is fine inside SetupECS; the engine initializes systems afterwards.
 color.SetInputSource(lighting.GetOutput);
 upscaler.SetInputSource(color.GetOutput);
 ```

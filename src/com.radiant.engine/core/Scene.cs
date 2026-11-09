@@ -16,14 +16,12 @@ namespace com.radiant.engine.core;
 ///     {
 ///         ECS.AddSystem&lt;Geometry&gt;();
 ///         ECS.AddSystem&lt;HRCGI&gt;();
-///         base.SetupECS();
 ///     }
 ///
 ///     public override void SetupScene()
 ///     {
 ///         var warm = new Color(255, 170, 90);
 ///         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 80f, warm, warm);
-///         base.SetupScene();
 ///     }
 /// }
 ///
@@ -63,16 +61,11 @@ public class Scene : IGameObject
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Register your systems here, then call <c>base.SetupECS()</c> to sort and initialize them.</summary>
-    public virtual void SetupECS()
-    {
-        ECS.Initialize();
-    }
+    /// <summary>Register your systems here. The engine sorts and initializes them once this returns; no base call is needed.</summary>
+    public virtual void SetupECS() { }
 
-    /// <summary>Create your entities, lights and windows here, then call <c>base.SetupScene()</c>.</summary>
-    public virtual void SetupScene()
-    {
-    }
+    /// <summary>Create your entities, lights and windows here. Systems are already initialized; no base call is needed.</summary>
+    public virtual void SetupScene() { }
 
     /// <summary>Runs every frame before the systems' <c>Update</c>. A good place for scene-wide input such as pausing.</summary>
     public virtual void Update() { }

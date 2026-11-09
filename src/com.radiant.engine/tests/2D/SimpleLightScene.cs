@@ -16,8 +16,6 @@ public class SimpleLightScene : Scene
         var lighting = ECS.AddSystem<HRCGI>();
         DemoRendering.AddHrc(ECS, lighting);
         ECS.AddSystem<GizmosRenderer>();
-
-        base.SetupECS();
     }
 
     /// <inheritdoc/>
@@ -26,8 +24,6 @@ public class SimpleLightScene : Scene
         Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
 
         CreateCenterLight();
-
-        base.SetupScene();
     }
 
     /// <summary>Adds the warm emissive light at the fitted world's center.</summary>

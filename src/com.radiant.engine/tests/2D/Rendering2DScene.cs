@@ -59,8 +59,6 @@ public class Rendering2DScene : Scene
         Pipeline.AddSource("AA", AA);
 
         ECS.AddSystem(new RenderPresentation { Input = Pipeline.GetOutput, ClearColor = new Color(18, 22, 30), Blend = BlendState.AlphaBlend, After = [Pipeline] });
-
-        base.SetupECS();
     }
 
     /// <inheritdoc/>
@@ -118,6 +116,5 @@ public class Rendering2DScene : Scene
 
         if (Renderer.IsActive && Controls.WasPressed(Key.Tab)) Pipeline.SelectNextBuffer();
         if (Renderer.IsActive && Controls.WasPressed(Key.R)) SelectRenderer((RenderMethod + 1) % 3);
-
     }
 }

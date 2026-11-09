@@ -66,8 +66,6 @@ public class CornellBoxScene : Scene
         Pipeline.AddSource("AA", AA);
 
         ECS.AddSystem(new RenderPresentation { Input = Pipeline.GetOutput, ClearColor = new Color(18, 22, 30), Blend = BlendState.AlphaBlend, After = [Pipeline] });
-
-        base.SetupECS();
     }
 
     /// <inheritdoc/>

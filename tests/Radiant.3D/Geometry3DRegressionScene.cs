@@ -14,7 +14,6 @@ internal sealed class Geometry3DRegressionScene : Scene
         var source = ECS.AddSystem<MeshGeometry3D>();
         var geometry = ECS.AddSystem(new Geometry3D { Channels = GeometryChannels.All, Source = source, After = [source] });
         ECS.AddSystem(new RenderPresentation { Input = geometry.GetOutput, ClearColor = new Color(18, 22, 30), After = [geometry] });
-        base.SetupECS();
     }
 
     /// <inheritdoc/>

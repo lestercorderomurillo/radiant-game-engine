@@ -175,6 +175,7 @@ public partial class GameLoop : IGameObject
             Scenes[SceneId].Initialize();
             yield return new LoadingProgress("Loading systems...", 0.6);
             Scenes[SceneId].SetupECS();
+            Scenes[SceneId].ECS.Initialize();
             yield return new LoadingProgress("Loading scene...", 0.8);
             Scenes[SceneId].SetupScene();
         }

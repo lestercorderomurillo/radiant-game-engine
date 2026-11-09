@@ -27,7 +27,6 @@ internal sealed class NrdRegressionScene : Scene
 
         var tone = ECS.AddSystem(new ToneMapping { Input = Denoiser.GetOutput, After = [Denoiser] });
         ECS.AddSystem(new RenderPresentation { Input = tone.GetOutput, After = [tone] });
-        base.SetupECS();
     }
 }
 

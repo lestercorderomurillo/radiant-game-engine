@@ -24,7 +24,7 @@ Scene.Initialize();
 Scene.ECS.AddSystem<PerlinNoise2D>();
 
 var World = Scene.ECS.AddSystem<WorldGen>();
-Scene.SetupECS();
+Scene.ECS.Initialize();
 World.GenerateWorld(8, 128);
 
 var Entities = new List<int>();
@@ -170,7 +170,7 @@ using (var ordering = new DisposableScene())
     var second = new OrderedSystem { Calls = calls, Id = 2, After = [first] };
     ordering.Value.ECS.AddSystem(second);
     ordering.Value.ECS.AddSystem(first);
-    ordering.Value.SetupECS();
+    ordering.Value.ECS.Initialize();
     ordering.Value.ECS.Render();
 
     if (!calls.SequenceEqual(new[] { 1, 2 })) throw new Exception("Per-instance dependencies did not order identical system types.");

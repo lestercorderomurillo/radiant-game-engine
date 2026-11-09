@@ -121,15 +121,15 @@ sealed class TemporalTestScene : Scene
         UDRQuality.Set(1);
         ECS.AddSystem<Geometry>();
 
-        var source = ECS.AddSystem<TemporalTestSource>();
-        var upscaler = ECS.AddSystem<UDR4>();
-        base.SetupECS();
-        upscaler.SetInputSource(() => source.Output);
+        ECS.AddSystem<TemporalTestSource>();
+        ECS.AddSystem<UDR4>();
     }
 
     /// <inheritdoc/>
     public override void SetupScene()
     {
+        var source = ECS.GetSystem<TemporalTestSource>();
+        ECS.GetSystem<UDR4>().SetInputSource(() => source.Output);
         Renderer.FitWorld(new Vector2(160, 90), new Vector2(320, 180));
         Entity = LightFactory.CreateLight(ECS, new Vector2(80, 90), 18, Color.White, Color.White);
         ECS.AddComponent<MotionTrackable>(Entity);

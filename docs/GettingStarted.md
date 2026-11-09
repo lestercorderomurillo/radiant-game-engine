@@ -30,7 +30,9 @@ The following example shows a minimal game project file:
 ## Write your first scene
 
 A [`Scene`](../src/com.radiant.engine/core/Scene.cs) does two things: it registers systems in `SetupECS` and
-creates entities in `SetupScene`.
+creates entities in `SetupScene`. Both are plain hooks: override only the ones you need and never call
+`base`. Between them the engine sorts your systems by their dependencies and initializes them, so everything you
+registered is ready when `SetupScene` runs.
 
 The following example shows a scene with 2D global illumination and one warm light in the middle:
 
@@ -46,14 +48,12 @@ public class MyScene : Scene
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<Geometry>();
         ECS.AddSystem<HRCGI>();
-        base.SetupECS();
     }
 
     public override void SetupScene()
     {
         var warm = new Color(255, 180, 100);
         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 100f, warm, warm);
-        base.SetupScene();
     }
 }
 ```

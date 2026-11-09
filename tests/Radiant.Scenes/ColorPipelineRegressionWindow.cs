@@ -26,7 +26,6 @@ internal sealed class ColorPipelineScene : Scene
         Processor = ECS.AddSystem(new ToneMapping { Input = lighting.GetOutput, After = [Legacy] });
         Upscaler = ECS.AddSystem<UDR4>();
         Upscaler.SetInputSource(Legacy.GetOutput);
-        base.SetupECS();
     }
 
     /// <inheritdoc/>

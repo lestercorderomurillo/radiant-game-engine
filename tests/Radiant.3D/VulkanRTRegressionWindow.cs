@@ -45,7 +45,6 @@ internal sealed class VulkanRTScene : Scene
 
         var tone = ECS.AddSystem(new ToneMapping { Input = Candidate.GetOutput, After = [Candidate] });
         ECS.AddSystem(new RenderPresentation { Input = tone.GetOutput, After = [tone] });
-        base.SetupECS();
     }
 }
 

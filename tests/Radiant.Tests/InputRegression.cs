@@ -64,7 +64,7 @@ internal static class InputRegression
     private sealed class InputScene : Scene
     {
         public InputProbe Probe;
-        public override void SetupECS() { Probe = ECS.AddSystem(new InputProbe()); base.SetupECS(); }
+        public override void SetupECS() { Probe = ECS.AddSystem(new InputProbe()); }
     }
     private sealed class InputProbe : com.radiant.engine.core.System
     {

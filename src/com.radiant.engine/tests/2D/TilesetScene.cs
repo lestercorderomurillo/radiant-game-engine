@@ -19,14 +19,11 @@ public class TilesetScene : Scene
 
         var tiles = ECS.AddSystem(new Tileset { Present = false });
         DemoRendering.AddImage(ECS, tiles, tiles.GetOutput);
-
-        base.SetupECS();
     }
 
     /// <inheritdoc/>
     public override void SetupScene()
     {
-        base.SetupScene();
 
         // Scene is the bridge: generate world first
         var worldGen = ECS.GetSystem<WorldGen>();

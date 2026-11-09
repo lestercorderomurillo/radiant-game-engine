@@ -51,8 +51,6 @@ public class MegaLightsScene : Scene
         Upscaler = DemoRendering.AddHrc(ECS, lighting);
 
         ECS.AddSystem<GizmosRenderer>();
-
-        base.SetupECS();
     }
 
     /// <inheritdoc/>
@@ -64,8 +62,6 @@ public class MegaLightsScene : Scene
         CreateOccluders();
         CreateMouseLight();
         CreateCenterTriangles();
-
-        base.SetupScene();
     }
 
     /// <summary>Adds the nested emissive triangles used as central demo geometry.</summary>
@@ -174,7 +170,6 @@ public class MegaLightsScene : Scene
                 occluderList.Add(CreateOccluder(new Vector2(rightX, y), BoxSize, alphaByte));
             }
         }
-
     }
 
     /// <summary>Creates the emissive entity that follows the cursor.</summary>
@@ -383,7 +378,6 @@ public class MegaLightsScene : Scene
             SpawnDebugEntities(100_000);
 
         PrevMouse = mouse;
-
     }
 
     /// <summary>Adds a colored emissive mark at the world-space brush position.</summary>

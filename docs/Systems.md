@@ -92,7 +92,8 @@ if (Controls.WasPressed(Key.F11)) upscaling.Toggle(); // Bilinear → UDR3 → o
 
 ## Build a scene
 
-A scene registers systems in `SetupECS` and creates content in `SetupScene`. Its own `Update`, `FixedUpdate`,
+A scene registers systems in `SetupECS` and creates content in `SetupScene`; the engine initializes the systems
+between the two, and no `base` call is needed in any scene override. Its own `Update`, `FixedUpdate`,
 `Render` and `LateRender` run just before the systems' callbacks of the same name, which makes them a good place
 for scene-wide logic.
 
@@ -105,14 +106,12 @@ public class Arena : Scene
     {
         ECS.AddSystem<Movement2DSystem>();
         ECS.AddSystem<Spinner>();
-        base.SetupECS();
     }
 
     public override void SetupScene()
     {
         int player = ECS.CreateEntity(new Vector2(400, 300));
         ECS.AddComponent<Movement2D>(player);
-        base.SetupScene();
     }
 
     public override void Update()

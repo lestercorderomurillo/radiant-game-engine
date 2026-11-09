@@ -608,19 +608,19 @@ public class MyScene : Scene
         ECS.AddSystem<Geometry>();
         ECS.AddSystem<HRCGI>();
         // ... register systems (order irrelevant, RunAfter/RunBefore handles it)
-        base.SetupECS(); // topological sort + Initialize()
     }
 
     public override void SetupScene()
     {
         int light = LightFactory.CreateLight(ECS, new Vector2(1920, 1080), 50f,
             Color.White, new Color(255, 200, 100, 200));
-        base.SetupScene();
     }
 
     // Optional: Update(), FixedUpdate(), Render(), LateRender() — called before ECS.*
 }
 ```
+
+Scene hooks are empty virtuals: never call `base.SetupECS()` / `base.SetupScene()`. GameLoop runs `SetupECS()` → `ECS.Initialize()` (idempotent, `ECS.IsInitialized`) → `SetupScene()`. Code that needs initialized systems goes in `SetupScene`. Hand-built scenes in tests call `scene.ECS.Initialize()` directly.
 
 Properties: `ECS`, `Renderer`, `GameTime`, `DeltaTime`.
 

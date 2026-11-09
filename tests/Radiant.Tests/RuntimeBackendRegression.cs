@@ -55,7 +55,6 @@ internal static class RuntimeBackendRegression
         public override void SetupECS()
         {
             Probe = ECS.AddSystem(new Probe(Events));
-            base.SetupECS();
         }
     }
 

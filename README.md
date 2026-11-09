@@ -66,14 +66,12 @@ public class Campfire : Scene
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<Geometry>();
         ECS.AddSystem<HRCGI>();
-        base.SetupECS();
     }
 
     public override void SetupScene()
     {
         var warm = new Color(255, 180, 100);
         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 100f, warm, warm);
-        base.SetupScene();
     }
 }
 ```

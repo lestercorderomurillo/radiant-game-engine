@@ -112,9 +112,14 @@ public class ECS : IGameObject
         InitializeJobSystem();
     }
 
-    /// <summary>Sorts the registered systems by their dependencies and calls their <c>Initialize</c>. <c>Scene.SetupECS</c> calls this for you.</summary>
+    /// <summary>True once the registered systems have been sorted and initialized.</summary>
+    public bool IsInitialized { get; private set; }
+
+    /// <summary>Sorts the registered systems by their dependencies and calls their <c>Initialize</c>. The game loop calls this for you after <c>Scene.SetupECS</c>; later calls do nothing.</summary>
     public void Initialize()
     {
+        if (IsInitialized) return;
+        IsInitialized = true;
         SortSystemsByDependencies();
         BuildRenderOrder();
 
@@ -251,7 +256,6 @@ public class ECS : IGameObject
     ///     ECS.AddSystem&lt;Geometry&gt;();
     ///     var lighting = ECS.AddSystem&lt;HRCGI&gt;();
     ///     lighting.OutputJitter = Vector2.Zero;
-    ///     base.SetupECS();
     /// }
     /// </code>
     /// </example>

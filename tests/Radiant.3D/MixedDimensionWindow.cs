@@ -23,7 +23,6 @@ internal sealed class MixedDimensionScene : Scene
         var aa2D = ECS.AddSystem(new AntiAliasing { Input = ShapeView.GetOutput, After = [ShapeView] });
         var left = ECS.AddSystem(new RenderPresentation { Input = aa3D.GetOutput, Destination = new Rectangle(0, 0, 320, 360), ClearColor = Color.Black, After = [aa3D] });
         ECS.AddSystem(new RenderPresentation { Input = aa2D.GetOutput, Destination = new Rectangle(320, 0, 320, 360), After = [left, aa2D] });
-        base.SetupECS();
     }
 
     /// <inheritdoc/>

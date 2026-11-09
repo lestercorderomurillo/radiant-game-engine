@@ -270,7 +270,6 @@ sealed class LightingReferenceScene : Scene
         ECS.AddSystem<UniformLightingInput>();
         Lighting = ECS.AddSystem<HRCGI>();
         Upscaler = ECS.AddSystem<Bilinear>();
-        base.SetupECS();
     }
 
     /// <inheritdoc/>
@@ -279,7 +278,6 @@ sealed class LightingReferenceScene : Scene
         Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, Radius, Color.Black, Color.White, 0);
         Upscaler.SetInputSource(Lighting.GetOutput);
-        base.SetupScene();
     }
 }
 

@@ -23,7 +23,6 @@ internal sealed class RasterEdgesScene : Scene
         Geometry = ECS.AddSystem(new Geometry3D { Source = meshes, Channels = GeometryChannels.Color | GeometryChannels.Normals, After = [meshes] });
         Raster = ECS.AddSystem(new RasterRenderer { Geometry = Geometry, Input = Geometry.GetOutput, LightDirection = Vector3.Normalize(new Vector3(0, 1, 1)), Ambient = 0.1f, After = [Geometry] });
         ECS.AddSystem(new RenderPresentation { Input = Raster.GetOutput, After = [Raster] });
-        base.SetupECS();
     }
 
     /// <inheritdoc/>

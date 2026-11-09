@@ -83,7 +83,7 @@ internal static class RendererContractRegression
     private sealed class DrawingScene : Scene
     {
         internal DrawingSystem Probe;
-        public override void SetupECS() { Probe = ECS.AddSystem<DrawingSystem>(); base.SetupECS(); }
+        public override void SetupECS() { Probe = ECS.AddSystem<DrawingSystem>(); }
     }
     private sealed class DrawingSystem : com.radiant.engine.core.System
     {
