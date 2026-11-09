@@ -2,3 +2,7 @@ node_modules
 dist/
 public/generated/
 *.tsbuildinfo
+
+# Frontend source helpers are not the engine binary lib directory.
+!src/common/lib/
+!src/common/lib/**
