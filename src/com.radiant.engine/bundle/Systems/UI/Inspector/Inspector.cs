@@ -5,26 +5,11 @@ using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>
-/// In-game debug panels you build in a few lines: sliders, toggles, dropdowns, text fields and lists inside
-/// draggable windows. Press F1 to show or hide them. Every method is static and does nothing when the
-/// inspector isn't in the scene, so tuning code can stay in shipping builds.
-/// </summary>
-/// <example>
-/// The following example shows how to build a small tuning window and keep a label up to date:
-/// <code>
-/// public override void Initialize()
-/// {
-///     Inspector.CreateWindow("player", "Player");
-///     Inspector.AddSlider("player", "speed", "Speed", 50f, 800f, Speed, value => Speed = value);
-///     Inspector.AddToggle("player", "god", "God mode", false, enabled => GodMode = enabled);
-///     Inspector.AddLabel("player", "position", "Position: -");
-/// }
-///
-/// public override void Update() =>
-///     Inspector.SetLabel("player", "position", $"Position: {Position.X:0}, {Position.Y:0}");
-/// </code>
-/// </example>
+/// <summary>Displays in-game diagnostic windows and controls for inspecting and tuning a scene.</summary>
+/// <remarks>Add the system to the scene and use static widget helpers to register panels once, then update values during gameplay.
+/// F1 toggles visibility. Check IsMouseOverUI and IsEditingText before handling overlapping gameplay input.
+/// Use GizmosRenderer for diagnostic shapes drawn over the scene.</remarks>
+/// <seealso cref="GizmosRenderer"/>
 [CoreSystem]
 [RunAfter(typeof(Geometry))]
 [RunBefore(typeof(GizmosRenderer))]

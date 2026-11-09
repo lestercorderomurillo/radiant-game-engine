@@ -3,16 +3,20 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Temporal reconstruction stage that accumulates reduced-resolution HRC lighting.</summary>
+/// <summary>Reconstructs HRC lighting and smooths it through temporal accumulation.</summary>
+/// <remarks>Combines a spatial pass with previous-frame history. Requires matching HRC geometry. Call ResetAccumulation after discontinuous scene changes. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <seealso cref="Upscaling"/>
 public class UDR2 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
     // Spatial parameters
+    /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.5f;
     public bool EdgeCorrection = true;
     public bool DebugRays = false;
 
     // Temporal parameters (adjustable)
+    /// <summary>Target temporal history length in frames. Longer history smooths the image but responds more slowly to change.</summary>
     public int FramesToAccumulate = 6;         // Number of frames to average together (1 = no temporal, 10 = very smooth)
 
     private const int MaxFrames = 16;
@@ -50,7 +54,8 @@ public class UDR2 : core.System
         Inspector.AddToggle("udr2", "debugRays", "Debug Edges", DebugRays, V => DebugRays = V);
     }
 
-    /// <summary>Sets the live image provider consumed by this stage.</summary>
+    /// <summary>Connects the image provider evaluated by the reconstruction stage.</summary>
+    /// <param name="source">Provider for the current input image; connect it once rather than reassigning it every frame.</param>
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;

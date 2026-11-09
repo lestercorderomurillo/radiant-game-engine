@@ -1,14 +1,14 @@
 import { readFile, readdir, mkdir, writeFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
-import { slugFromFile } from "../src/features/guides/guide-slug.mjs"
+import { guideAliases, slugFromFile } from "../src/features/guides/guide-slug.mjs"
 
 const site = fileURLToPath(new URL("../", import.meta.url))
 const dist = path.join(site, "dist")
 const html = await readFile(path.join(dist, "index.html"), "utf8")
 const api = JSON.parse(await readFile(path.join(dist, "generated/index.json"), "utf8"))
 const guides = (await readdir(path.resolve(site, ".."))).filter(file => file.endsWith(".md"))
-const routes = ["api", "guides/overview", ...guides.map(file => `guides/${slugFromFile(file)}`), ...api.types.map(type => `api/${type.id}`)]
+const routes = ["api", "guides/overview", ...Object.keys(guideAliases).map(slug => `guides/${slug}`), ...guides.map(file => `guides/${slugFromFile(file)}`), ...api.types.map(type => `api/${type.id}`)]
 for (const route of routes) {
   const directory = path.resolve(dist, route)
   if (!directory.startsWith(dist + path.sep)) throw new Error(`Invalid route: ${route}`)

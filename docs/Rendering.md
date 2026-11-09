@@ -51,7 +51,7 @@ The following example shows lit raster rendering:
 var raster = ECS.AddSystem(new RasterRenderer { Geometry = geometry, Input = geometry.GetOutput, After = [geometry] });
 ```
 
-For lit 2D scenes with glowing shapes, shadows and colored glass, use [2D global illumination](HRC.md) instead.
+For emissive 2D shapes, shadows and colored transmission, see the HRC technique in [Lighting](HRC.md#holographic-radiance-cascades).
 
 ## Path trace
 

@@ -3,20 +3,17 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>
-/// Real-time global illumination for 2D scenes: emissive shapes cast soft light and shadows, and translucent
-/// materials tint the light passing through them. Add it together with <c>Geometry</c>; pick the quality in the
-/// Holographic Radiance Cascades window (F1 → View).
-/// </summary>
-/// <example>
-/// The following example shows the minimum setup for a lit scene:
-/// <code>
+/// <summary>Computes 2D global illumination using Holographic Radiance Cascades.</summary>
+/// <remarks>
+/// Pair with <see cref="Geometry"/>. Emissive shapes contribute light; material transmission controls blockers and colored glass.
+/// This is one lighting technique, alongside <see cref="RasterRenderer"/> and <see cref="PathTracer"/>.
+/// The HRC quality presets control probe spacing, independently of <see cref="UDRQuality"/> resolution presets.
+/// Pass the linear-light output to color management before display.
+/// </remarks>
+/// <example><code>
 /// ECS.AddSystem&lt;Geometry&gt;();
 /// ECS.AddSystem&lt;HRCGI&gt;();
-///
-/// LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 80f, Color.White, Color.Gold);
-/// </code>
-/// </example>
+/// </code></example>
 public class HRCGI : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;

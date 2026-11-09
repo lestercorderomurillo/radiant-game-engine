@@ -26,8 +26,8 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
 
   return (
     <div className={cn("not-prose group relative my-5 overflow-hidden rounded-lg border bg-code", className)}>
-      <div className="flex h-9 items-center justify-between border-b px-3 text-xs text-muted-foreground">
-        <span className="font-mono">{language ?? "text"}</span>
+      <div className="flex h-9 items-center justify-between border-b px-3 text-[13px] text-muted-foreground">
+        <span>{language ?? "text"}</span>
         <CopyButton text={code} label={t("code.copy")} copiedLabel={t("code.copied")} className="-mr-1.5" />
       </div>
       {html ? (

@@ -22,7 +22,7 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
             <a
               href={`#${item.id}`}
               className={cn(
-                "-ml-px block truncate border-l py-1 text-muted-foreground transition-colors hover:text-foreground",
+                "-ml-px block break-words border-l py-1 leading-relaxed text-muted-foreground transition-colors hover:text-foreground",
                 item.depth <= 2 ? "pl-3" : "pl-6 text-[13px]",
                 activeId === item.id ? "border-brand font-medium text-foreground" : "border-transparent",
               )}

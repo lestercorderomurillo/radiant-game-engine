@@ -1,4 +1,4 @@
-# Entities and components
+# Entities
 
 Everything in a Radiant scene is an entity: a lightweight ID you attach plain-data components to. Systems then
 query the entities that have the components they care about, in parallel.

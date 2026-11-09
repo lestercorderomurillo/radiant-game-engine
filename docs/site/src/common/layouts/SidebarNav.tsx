@@ -6,6 +6,7 @@ import { Input } from "@/common/ui/input"
 import { ScrollArea } from "@/common/ui/scroll-area"
 import { t } from "@/common/i18n/t"
 import { cn } from "@/common/lib/utils"
+import { guideAliases } from "@/features/guides/guide-slug.mjs"
 import { guideSections } from "@/features/guides/guides"
 import { KindIcon } from "@/features/reference/components/KindIcon"
 import type { ApiTypeSummary } from "@/features/reference/reference.api"
@@ -21,7 +22,13 @@ const linkClass = (active: boolean) =>
 
 /** Guides and API navigation; the active tab follows the current route. */
 export function SidebarNav() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const pathname = useRouterState({ select: (state) => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "")
+    const path = state.location.pathname
+    const relative = (base && path.startsWith(base + "/") ? path.slice(base.length) : path).replace(/\/+$/, "") || "/"
+    const alias = relative.startsWith("/guides/") ? guideAliases[relative.slice("/guides/".length)] : undefined
+    return alias ? `/guides/${alias}` : relative
+  } })
   const [tab, setTab] = useState<Tab>(pathname.startsWith("/api") ? "api" : "guides")
   const viewport = useRef<HTMLDivElement>(null)
 

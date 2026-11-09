@@ -142,6 +142,3 @@
 .scrollbar-thin {
   scrollbar-width: thin;
 }
-
-/* Keep highlighted code within the documentation’s monochrome palette. */
-.shiki { filter: grayscale(1); }

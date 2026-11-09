@@ -1,4 +1,4 @@
-# Renderer and window
+# Backend contracts
 
 Scenes and systems draw through `IRenderer` and control the window through `IWindow`. Both are available
 wherever you write game code.

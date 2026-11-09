@@ -1,7 +1,6 @@
 # Input
 
-Every scene and system reads the keyboard, mouse and typed text through `Controls`. All callbacks in a frame see
-the same snapshot, so a press is never missed or counted twice.
+Read keyboard, mouse and text input through `Controls`. Scenes and systems share one snapshot per update, so they observe the same state without consuming each other’s events.
 
 ## Read keys and buttons
 
@@ -19,6 +18,7 @@ public override void Update()
 ```
 
 Read presses, releases and text in `Update`. Read held keys in `FixedUpdate`, where movement and physics run.
+A press query does not consume the press: querying it again during the same frame returns the same result.
 
 ## Use the mouse
 
@@ -47,12 +47,12 @@ foreach (char character in Controls.Text)
 }
 ```
 
-## Focus
+## Handle focus changes
 
 When the window loses focus, held keys and buttons read as released and typed text is dropped, so characters
 don't keep walking off-screen. A key still held when focus returns counts as a fresh press.
 
-## Script or replay input
+## Replay input
 
 Pass your own `IInputSource` to `GameClient` to feed recorded or generated input, which is ideal for tests and
 replays.
@@ -68,3 +68,9 @@ Your source returns an `InputSnapshot` (keyboard, mouse, text and focus) from `C
 each typed character only once.
 
 Gamepads, touch and IME composition are not available.
+
+## Continue
+
+- [Cameras](CameraControls.md) — navigate 2D and 3D views.
+- [Inspector](Inspector.md) — keep UI interactions separate from gameplay input.
+- [Systems](Systems.md) — choose update and fixed-update callbacks.

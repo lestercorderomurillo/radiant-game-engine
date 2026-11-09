@@ -66,21 +66,10 @@ public readonly record struct MouseState(int X = 0, int Y = 0, int ScrollWheelVa
 /// <summary>One backend sample, including committed UTF-16 text since the previous capture.</summary>
 public readonly record struct InputSnapshot(KeyboardState Keyboard, MouseState Mouse, string Text = "", bool IsFocused = true);
 
-/// <summary>
-/// This frame's keyboard, mouse and typed text, available as <c>Controls</c> in every scene and system.
-/// Every callback in a frame sees the same snapshot, so a key press is never missed or counted twice.
-/// </summary>
-/// <example>
-/// The following example shows how to jump on a key press and aim with the mouse:
-/// <code>
-/// public override void Update()
-/// {
-///     if (Controls.WasPressed(Key.Space)) Jump();
-///     if (Controls.IsDown(MouseButton.Right)) Aim(Renderer.ScreenToWorld(Controls.Mouse.Position));
-///     Zoom += Controls.ScrollDelta / 120f;
-/// }
-/// </code>
-/// </example>
+/// <summary>Provides the keyboard, mouse and text state shared by a scene's callbacks for one update.</summary>
+/// <remarks>Access through Controls in a scene or system. Read transitions and text in Update, and held state for continuous actions.
+/// Queries do not consume events: repeated calls in the same frame observe the same transition.
+/// Unfocused snapshots are normalized to released controls and empty text.</remarks>
 public sealed class InputFrame
 {
     /// <summary>An input frame with nothing pressed, used before the first capture and in headless runs.</summary>

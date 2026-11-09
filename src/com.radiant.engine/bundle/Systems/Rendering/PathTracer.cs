@@ -7,10 +7,17 @@ namespace com.radiant.engine.bundle;
 [Flags]
 public enum TraceChannels { None = 0, Albedo = 1, Normals = 2, Depth = 4, Emission = 8, Sample = 16, All = Albedo | Normals | Depth | Emission | Sample }
 
-/// <summary>Auto uses Vulkan ray queries when installed and supported, otherwise shader BVH traversal.</summary>
+/// <summary>Selects the path tracer's GPU execution backend, not its lighting model.</summary>
+/// <remarks>Auto uses Vulkan ray queries when installed and supported, otherwise shader BVH traversal.
+/// Software means shader traversal on the GPU, not CPU rendering.</remarks>
 public enum PathTracingBackend { Auto, Software, Vulkan }
 
-/// <summary>Progressive diffuse GPU path tracing over an opt-in 2D or 3D triangle adapter.</summary>
+/// <summary>Accumulates diffuse global illumination from a 2D or 3D triangle adapter.</summary>
+/// <remarks>Provide <see cref="ITraceGeometry"/> through <see cref="Geometry"/>. The image converges over successive samples;
+/// use denoising before tone mapping when needed. The current material model is diffuse, without glossy or transparent transport.
+/// <see cref="PathTracingBackend"/> selects how rays execute, independently of this lighting model.</remarks>
+/// <seealso cref="RasterRenderer"/>
+/// <seealso cref="HRCGI"/>
 [SystemTag("Rendering", "Path tracing")]
 public class PathTracer : ImageSystem
 {

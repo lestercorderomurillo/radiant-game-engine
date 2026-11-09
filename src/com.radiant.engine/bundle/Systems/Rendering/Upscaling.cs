@@ -3,17 +3,42 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Available image reconstruction backends, including native resolution.</summary>
-public enum UpscalingMode { None, UDR1, UDR2, UDR3, UDR4 }
+/// <summary>Selects a UDR reconstruction algorithm, independently of the resolution preset.</summary>
+/// <remarks>Use <see cref="UDRQuality"/> to choose Performance, Balanced or Native resolution.
+/// UDR1–UDR3 require HRC-derived input. UDR4 also supports generic 2D and 3D images through spatial reconstruction.</remarks>
+public enum UpscalingMode
+{
+    /// <summary>Passes the input through without reconstruction.</summary>
+    None,
+    /// <summary>Spatial reconstruction using HRC geometry, without frame history.</summary>
+    UDR1,
+    /// <summary>Spatial reconstruction and temporal accumulation for HRC input.</summary>
+    UDR2,
+    /// <summary>Lanczos reconstruction, edge refinement and temporal accumulation for HRC input.</summary>
+    UDR3,
+    /// <summary>Temporal reconstruction for HRC input, or spatial reconstruction for generic images.</summary>
+    UDR4
+}
 
-/// <summary>Shared reconstruction stage. Owns only the selected backend and never presents implicitly.</summary>
+/// <summary>Reconstructs an image at display resolution using one selected UDR algorithm.</summary>
+/// <remarks>
+/// Connect <c>Input</c> to the preceding image stage and present <see cref="GetOutput"/> separately.
+/// Set <see cref="HrcInput"/> before selecting a mode or initializing the system. HRC-derived images can use
+/// UDR1–UDR4; other 2D and 3D images use UDR4's spatial fallback. The stage owns and disposes its selected algorithm.
+/// </remarks>
+/// <seealso cref="UpscalingMode"/>
+/// <seealso cref="UDRQuality"/>
 [SystemTag("Rendering", "Upscaling")]
 public class Upscaling : ImageSystem
 {
-    /// <summary>Enable HRC guidance only for an input produced by the scene's HRC pipeline.</summary>
+    /// <summary>Whether the input is derived from this scene's HRC lighting and matching geometry buffers.</summary>
+    /// <remarks>Set before selecting a mode or initializing the system. Do not enable for unrelated raster or path-traced images.</remarks>
     public bool HrcInput;
+    /// <summary>Gets the selected algorithm; use <see cref="Select"/> to change it. Defaults to <see cref="UpscalingMode.None"/>.</summary>
     public UpscalingMode Mode { get; private set; }
+    /// <summary>Gets the per-axis render scale, or 1 when the stage is disabled or no algorithm is selected.</summary>
     public float Scale => !Enabled || Mode == UpscalingMode.None ? 1f : UDRQuality.ScaleNormalized;
+    /// <summary>Describes whether reconstruction is bypassed, HRC-guided or using the generic spatial fallback.</summary>
     public string Status => Mode == UpscalingMode.None ? "Native / reconstruction off"
         : HrcInput ? "HRC geometry guidance; temporal history in UDR2–4"
         : "UDR4 spatial fallback; temporal guidance unavailable";
@@ -24,7 +49,11 @@ public class Upscaling : ImageSystem
     private bool ScalingView;
     private Point? OriginalResolution;
 
-    /// <summary>Select a backend, releasing the previous backend's targets, windows, and subscriptions.</summary>
+    /// <summary>Selects an algorithm and releases the previous algorithm's resources.</summary>
+    /// <param name="mode">Reconstruction algorithm, or <see cref="UpscalingMode.None"/> to bypass the stage.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The value is not a defined <see cref="UpscalingMode"/>.</exception>
+    /// <exception cref="InvalidOperationException">UDR1, UDR2 or UDR3 is selected without <see cref="HrcInput"/>.</exception>
+    /// <remarks>Algorithm selection and resolution quality are independent. Change quality through <see cref="UDRQuality.Set"/>.</remarks>
     public void Select(UpscalingMode mode)
     {
         if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
@@ -71,7 +100,10 @@ public class Upscaling : ImageSystem
         Backend.Initialize();
     }
 
-    /// <summary>Scale a scene view while retaining its explicit resolution when reconstruction is bypassed.</summary>
+    /// <summary>Resolves a producer's view size using the active per-axis render scale.</summary>
+    /// <param name="resolution">The producer's current explicit resolution, or null to use the window size.</param>
+    /// <returns>The scaled view size, or the original explicit resolution when reconstruction is bypassed.</returns>
+    /// <remarks>Call when updating the view. The first unscaled resolution is retained while scaling is active.</remarks>
     public Point? ResolveViewSize(Point? resolution)
     {
         if (Scale == 1)
@@ -96,7 +128,8 @@ public class Upscaling : ImageSystem
         Select(Mode);
     }
 
-    /// <summary>Invalidate reconstruction on scene cuts. Legacy backends are recreated to discard history.</summary>
+    /// <summary>Discards reconstruction history after a camera cut, teleport or level change.</summary>
+    /// <remarks>Resets UDR4 directly. Other active algorithms are recreated to clear accumulated state.</remarks>
     public void ResetHistory()
     {
         if (Backend is UDR4 reconstruction) reconstruction.ResetHistory();

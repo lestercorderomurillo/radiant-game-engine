@@ -1,43 +1,46 @@
-# Image quality and upscaling
+# Image quality
 
-Radiant's image stages form one chain that every pipeline can share:
+Control noise, jagged edges, brightness and resolution as separate stages. The same image pipeline can process 2D and 3D rendering, while each stage uses only the buffers it needs.
 
-`image → tone mapping → antialiasing → upscaling → buffer inspector → screen`
+## Choose the stage for the problem
 
-UI and gizmos are drawn afterwards, so they always stay sharp.
+| Image problem | Stage | What to adjust |
+| --- | --- | --- |
+| Path-traced noise | `Denoising` | Backend, guide buffers and temporal settings |
+| Exposure or highlights | `ToneMapping` or HRC's `ColorManagement` | Exposure and tone curve |
+| Jagged geometry edges | `RasterSampling` and `AntiAliasing` | Geometry samples or image-space method |
+| Rendering cost at high resolution | `Upscaling` | UDR algorithm and resolution preset |
+| Need to inspect intermediate images | `RenderInspector` | Select a registered buffer |
 
-## Upscaling modes
+Upscaling does not replace lighting, and antialiasing does not replace denoising. Start with the stage that addresses the visible problem.
 
-- **None** renders at full resolution with no upscaling.
-- **Native** keeps the selected upscaler but passes the image through untouched, handy for A/B comparisons.
-- **Performance** and **Balanced** render at 25% and 50% of each dimension, then reconstruct.
+## Order the pipeline
 
-## Add upscaling to your pipeline
+For a path-traced image, denoise before tone mapping. For raster rendering, shade geometry before resolving its samples. A typical image-stage chain is:
 
-`Upscaling` hosts the UDR upscalers behind one switch. Place it after antialiasing and present its output.
+`lighting → denoising (if needed) → tone mapping → antialiasing → upscaling → presentation`
 
-The following example shows the end of a pipeline with selectable upscaling:
+UI and gizmos are drawn afterwards at display resolution. Wire `Input` to the preceding stage's `GetOutput`, and use `After` to express execution order. See [Rendering pipelines](Rendering.md) for complete producer and stage examples.
 
-```csharp
-var aa = ECS.AddSystem(new AntiAliasing { Input = color.GetOutput, After = [color] });
-var upscaler = ECS.AddSystem(new Upscaling { Input = aa.GetOutput, After = [aa] });
-ECS.AddSystem(new RenderPresentation { Input = upscaler.GetOutput, After = [upscaler] });
+## Balance resolution and detail
 
-upscaler.Select(UpscalingMode.UDR4);   // Or UpscalingMode.None to turn it off
-```
+Three controls serve different purposes:
 
-So the producer renders fewer pixels, let the upscaler pick its resolution each frame:
+- **Lighting quality** changes the producer's work, such as HRC probe spacing or path-tracing bounce count.
+- **Antialiasing** changes how edges are sampled or filtered.
+- **Upscaling quality** changes input resolution before reconstruction.
 
-```csharp
-geometry.Resolution = upscaler.ResolveViewSize(geometry.Resolution);
-```
+The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [Upscaling](UDR4.md) for the compatibility table and setup.
 
-Pass the upscaler to `AntiAliasingSettings.Upscaler` and players get an **Image quality** window (F1 → View) to
-choose the upscaler, its quality, antialiasing and to reset history.
+## Inspect the result
 
-## Which upscaler can I use?
+Add `Inspector` and the relevant settings systems to expose controls under **F1 → View**. `AntiAliasingSettings.Upscaler` connects the selected `Upscaling` stage to the **Image quality** window.
 
-- With [2D global illumination](HRC.md), set `HrcInput = true` and every upscaler is available. UDR4 then uses
-  motion and history for the best quality.
-- For any other image (flat or lit shapes, path tracing, 3D), UDR4 runs as a spatial upscaler: sharp and
-  alpha-preserving, without motion history.
+Compare the same camera view at native resolution and at the intended render scale. Check silhouettes, fine detail, moving objects and changes in light. Use `RenderInspector` to distinguish a problem in lighting from one introduced by a later image stage.
+
+## Continue
+
+- [Lighting](HRC.md) — HRC, raster lighting and path tracing.
+- [Upscaling](UDR4.md) — algorithms, quality presets and history.
+- [Rendering pipelines](Rendering.md#denoise) — denoiser setup and guide buffers.
+- [Inspector](Inspector.md) — controls and diagnostic overlays.

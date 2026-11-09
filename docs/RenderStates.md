@@ -1,4 +1,4 @@
-# Blending and sampling
+# Render states
 
 Render states control how drawing blends with what's already there, how textures are filtered, and how
 triangles are culled and depth-tested. Pick a preset, or describe your own in one line.

@@ -3,12 +3,16 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Lanczos reconstruction stage for reduced-resolution HRC lighting.</summary>
+/// <summary>Reconstructs HRC lighting with Lanczos filtering, edge refinement and temporal accumulation.</summary>
+/// <remarks>Uses HRC geometry and motion buffers, then sharpens the reconstructed result. Use Upscaling.ResetHistory when hosted by the shared stage. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <seealso cref="Upscaling"/>
 public class UDR3 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.5f;
     public bool EdgeCorrection = true;
+    /// <summary>Target temporal history length in frames. Longer history smooths the image but responds more slowly to change.</summary>
     public int FramesToAccumulate = 6;
 
     private int DebugEdges = 0;
@@ -46,7 +50,8 @@ public class UDR3 : core.System
         Inspector.AddToggle("udr3", "debugEdges", "Debug Edges", false, (enabled) => DebugEdges = enabled ? 1 : 0);
     }
 
-    /// <summary>Sets the live image provider consumed by this stage.</summary>
+    /// <summary>Connects the image provider evaluated by the reconstruction stage.</summary>
+    /// <param name="source">Provider for the current input image; connect it once rather than reassigning it every frame.</param>
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;

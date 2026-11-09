@@ -1,4 +1,4 @@
-# Vectors, colors and geometry
+# Math
 
 Radiant uses the standard .NET math types for vectors and matrices, plus a few small types of its own for
 colors and pixel rectangles.
