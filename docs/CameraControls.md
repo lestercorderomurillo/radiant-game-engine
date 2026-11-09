@@ -1,22 +1,39 @@
-# Shared camera controls
+# Camera controls
 
-Open **F1 > ECS > Open Camera Controls** or **View > Camera Controls**. One window serves the whole scene; inspecting another entity does not change the camera being controlled.
+Fly through any scene while it runs: pick a camera, hold the right mouse button and move. No camera code needed.
 
-Search by entity ID or camera type, then select a camera instance. The Render view selector lists compatible `ICameraView` system instances. **Use selected camera** binds that view to the selected camera. Navigation edits the camera without changing other view bindings. Disabled cameras cannot be activated or moved; missing cameras and empty search results stop navigation.
+## Open the controller
 
-Enable **Navigate camera**, then hold the right mouse button outside inspector windows: WASD moves, Q/E moves vertically in 3D, mouse movement looks, and Shift increases speed. Movement speed uses world units per second. Closing the controller or hiding the inspector suspends navigation.
-
-Scenes using `Renderer.FitWorld` also expose **World view (fitted 2D)**. WASD pans this view; Zoom in/out keeps its center and aspect ratio. Scene code can restore its framing by calling `FitWorld` again. Pac-Man and Zuma expose a Camera controls button in their scene settings.
-
-## Integration
-
-Register `Inspector` as usual. No per-camera windows or game-specific controller systems are required:
+Press **F1**, then choose **ECS → Open Camera Controls** (or **View → Camera Controls**). From code:
 
 ```csharp
-Inspector.OpenCameraControls();       // Browse the scene's cameras.
-Inspector.OpenCameraControls(entity); // Select a camera explicitly.
+Inspector.OpenCameraControls();          // Browse the scene's cameras
+Inspector.OpenCameraControls(cameraId);  // Start with a specific camera selected
 ```
 
-Calls are safe when no Inspector is registered. Entity selection does not activate a render view automatically. Camera entities are discovered from `Camera2D` and `Camera3D`; compatible render views implement `ICameraView`. Fitted-world tools read the current framing through `Renderer.TryGetWorldFit(out center, out size)` and edit it through `FitWorld`.
+## Navigate
 
-Headless controller regressions run with `dotnet run --project tests/Radiant.Tests -c Release`. They cover discovery, multiple view instances, selection persistence, independent property inspection, filtering, empty scenes/results, deletion, and disabled cameras.
+1. Search by entity ID or camera type and select a camera.
+2. If the scene has several views, choose one under **Render view** and click **Use selected camera**.
+3. Enable **Navigate camera**, then hold the right mouse button outside inspector windows.
+
+| Input | Action |
+| --- | --- |
+| W A S D | Move |
+| Q / E | Move down / up (3D) |
+| Mouse | Look around |
+| Shift | Move faster |
+
+Every renderer (flat, raster and path tracing) follows the camera immediately. Closing the window or hiding the
+inspector stops navigation.
+
+## 2D scenes
+
+Scenes framed with `Renderer.FitWorld` show a **World view (fitted 2D)** entry. WASD pans it and the zoom
+buttons zoom around its center. Call `FitWorld` again from your scene to restore its original framing.
+
+## Make your camera controllable
+
+Any entity with a `Camera2D` or `Camera3D` appears in the list. Give it a `Transform2D` or `Transform3D` to drive
+its position and rotation from the transform; the camera component keeps the lens settings (zoom, field of view,
+clip range).

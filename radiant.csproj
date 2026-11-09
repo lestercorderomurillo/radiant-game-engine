@@ -8,6 +8,7 @@
     <OutputType>Library</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefaultItemExcludes>$(DefaultItemExcludes);docs/site/**;tools/**</DefaultItemExcludes>
     <Optimize>true</Optimize>
   </PropertyGroup>
   <ItemGroup>

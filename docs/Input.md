@@ -1,83 +1,70 @@
-# Radiant input
+# Input
 
-Scenes and systems use `Controls`, an immutable `InputFrame` captured by the runtime.
-There is no need to import `Microsoft.Xna.Framework.Input` or call platform statics.
-The name distinguishes player controls from the existing image-pipeline `Input` ports.
+Every scene and system reads the keyboard, mouse and typed text through `Controls`. All callbacks in a frame see
+the same snapshot, so a press is never missed or counted twice.
+
+## Read keys and buttons
+
+The following example shows the three ways to read a key or mouse button:
 
 ```csharp
 using com.radiant.engine.input;
 
-// Inside a Scene or ECS System:
 public override void Update()
 {
-    if (Controls.WasPressed(Key.Space)) Jump();
-    if (Controls.IsDown(Key.W)) MoveForward(Time.DeltaSeconds);
-    if (Controls.WasReleased(MouseButton.Left)) FinishDrag();
-    var pointer = Controls.Mouse.Position; // System.Numerics.Vector2, client pixels
-    var wheel = Controls.ScrollDelta;
-    string committedText = Controls.Text;
+    if (Controls.WasPressed(Key.Space)) Jump();            // Only on the frame it goes down
+    if (Controls.WasReleased(MouseButton.Left)) Drop();    // Only on the frame it comes up
+    if (Controls.IsDown(Key.LeftShift)) Sprint();          // Every frame while held
 }
 ```
 
-`Controls.Keyboard` and `Controls.Mouse` are Radiant value snapshots. Mouse position
-is measured in client pixels; wheel values are cumulative units, 120 per notch.
-`Controls.MouseDelta` and `ScrollDelta` are differences between focused captures.
-Keyboard values represent logical keys, not portable physical scan codes. Use the
-text stream for typing rather than translating key codes into characters.
+Read presses, releases and text in `Update`. Read held keys in `FixedUpdate`, where movement and physics run.
 
-The loop captures once per variable update, before scene initialization and callbacks.
-All systems and scenes share that sample through the fixed, variable and render phases.
-Reads do not consume input. Read held state in `FixedUpdate`; handle press/release
-edges and text in `Update`, because several fixed ticks (or none) can occur within one
-variable update. Rendering does not poll input or drain text again.
+## Use the mouse
 
-On focus loss, held keys/buttons become released and text is discarded. Pointer and
-wheel deltas are suppressed across focus changes to avoid jumps. A key held on focus
-regain is treated as a fresh press. Sources supply committed UTF-16 text, including
-control characters; the editor consumes this stream for typing and deletion.
-Full IME composition, gamepads, touch and pointer capture are not implemented by this
-contract yet. Do not infer these capabilities from `IInputSource`.
+The following example shows how to place something under the cursor, drag a camera and zoom with the wheel:
 
-## Backend boundary
+```csharp
+Vector2 world = Renderer.ScreenToWorld(Controls.Mouse.Position); // Window pixels → world
+if (Controls.IsDown(MouseButton.Right)) camera.Position -= Controls.MouseDelta / camera.Zoom;
+camera.Zoom *= 1f + Controls.ScrollDelta / 1200f;                // 120 units per wheel notch
+```
 
-`IRuntimeHost.Input` provides an `IInputSource`, defaulting to `NullInputSource` for
-hosts without input devices. The MonoGame host owns `MonoGameInputSource`, which is
-the only engine class that polls MonoGame keyboard/mouse APIs and subscribes to its
-text event. It translates key identifiers explicitly rather than relying on enum
-numeric compatibility and unsubscribes when the host is disposed.
+When the inspector is open, check `Inspector.IsMouseOverUI()` before reacting to world clicks.
 
-An input source returns an `InputSnapshot` containing keyboard, mouse, text and focus.
-Capture runs on the loop thread. Drain pending text once per capture. Do not return
-repeated text on later captures unless it was entered again. Mouse states and keyboard
-states are immutable; the keyboard constructor copies key bits, not array references.
+## Read typed text
 
-## Custom devices, tests and replay
+`Controls.Text` holds the characters typed since the last frame, already respecting the keyboard layout and
+modifiers.
 
-Inject a caller-owned source alongside either runtime backend:
+The following example shows a simple chat box:
+
+```csharp
+foreach (char character in Controls.Text)
+{
+    if (character == '\b' && message.Length > 0) message = message[..^1];
+    else if (!char.IsControl(character)) message += character;
+}
+```
+
+## Focus
+
+When the window loses focus, held keys and buttons read as released and typed text is dropped, so characters
+don't keep walking off-screen. A key still held when focus returns counts as a fresh press.
+
+## Script or replay input
+
+Pass your own `IInputSource` to `GameClient` to feed recorded or generated input, which is ideal for tests and
+replays.
+
+The following example shows how to run 120 simulated frames with scripted input:
 
 ```csharp
 new GameClient(new HeadlessBackend(120, TimeSpan.FromSeconds(1.0 / 60)), myInput)
     .Run(new SimulationScene());
 ```
 
-A source can return prerecorded snapshots or snapshots generated by a test. Advanced
-hosts can set `GameLoop.InputSource`; it overrides the host source. The caller owns
-an injected source's lifetime. A backend owns its default source's lifetime.
+Your source returns an `InputSnapshot` (keyboard, mouse, text and focus) from `Capture()` once per frame. Return
+each typed character only once.
 
-This permits deterministic simulation tests without initializing desktop input.
-The source can be reused by any backend; it exposes no XNA types. Default headless
-input is neutral and unfocused. Built-in gameplay systems, the inspector and sample
-scenes now read this same API. Editor navigation tests inject Radiant input directly,
-instead of reflecting into MonoGame's private keyboard/mouse fields.
-
-## Migration
-
-- `Keyboard.GetState()` → `Controls.Keyboard`.
-- `Mouse.GetState()` → `Controls.Mouse`.
-- XNA `Keys.W` → Radiant `Key.W`.
-- Previous/current key comparisons → `Controls.WasPressed(Key.W)` or `WasReleased`.
-- Window `TextInput` subscription → process `Controls.Text` once in `Update`.
-
-Vectors and matrices now use [System.Numerics](Math.md). The remaining XNA colors,
-integer geometry, rendering resources and graphics APIs are a separate migration. This change isolates keyboard, mouse and committed text input;
-it does not yet make the graphics backend portable.
+Gamepads, touch and IME composition are not available.

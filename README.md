@@ -141,3 +141,7 @@ dotnet run --project tests/Radiant.3D -c Release -- --capture
 ```
 
 The unedited final frame is saved to `artifacts/showcase/cornell-box.png`.
+
+## Online documentation
+
+[Read the Radiant documentation](https://lestercorderomurillo.github.io/radiant-game-engine/) — guides and the generated C# API reference. Automatically deployed from `main` by GitHub Actions.

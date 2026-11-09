@@ -1,44 +1,71 @@
-# UDR4 temporal reconstruction
+# UDR4 upscaling
 
-UDR4 reconstructs reduced-resolution HRC lighting using geometry-guided bicubic filtering, motion-reprojected history, neighborhood/variance clipping, and conservative rejection of changed geometry and lighting. It is a custom analytical upscaler, with no trained model or frame generation.
+UDR4 renders lighting at a fraction of the resolution and reconstructs a sharp, stable full-resolution image.
+It reuses detail from previous frames, follows moving objects and rejects stale history where geometry or light
+changed.
 
-Pac-Man selects UDR4 by default at Balanced (50% per dimension). Its Pipeline inspector retains UDR1–3 for comparisons. Performance remains 25% and Native remains a direct bypass. UDR4 exposes sharpening and history length in its inspector window.
+## Add it to a lit scene
 
-## Integration
-
-Register `Geometry`, `HRCGI`, `ColorManagement`, and `UDR4`. `ColorManagement` is the Update-phase adapter for the same `ToneMapping` color operators and settings used by the generic 2D/3D pipelines; its defaults retain PBR Neutral and Gamma22. Connect the tonemapper to `HRCGI.GetOutput` and UDR4 to `ColorManagement.GetOutput`. The system ordering attributes put UDR4 after these producers. UDR4 also accepts linear HRC output directly. Add `MotionTrackable` to moving rectangles, circles, and triangles.
+The following example shows how to chain lighting, color management and UDR4:
 
 ```csharp
-lighting = ECS.AddSystem<HRCGI>();
-tonemapper = ECS.AddSystem<ColorManagement>();
-upscaler = ECS.AddSystem<UDR4>();
-// After system initialization:
-tonemapper.SetInputSource(lighting.GetOutput);
-upscaler.SetInputSource(tonemapper.GetOutput);
+var lighting = ECS.AddSystem<HRCGI>();
+var color = ECS.AddSystem<ColorManagement>();
+var upscaler = ECS.AddSystem<UDR4>();
+
+// After base.SetupECS():
+color.SetInputSource(lighting.GetOutput);
+upscaler.SetInputSource(color.GetOutput);
 ```
 
-Call `upscaler.ResetHistory()` after level changes, teleports, or other discontinuities. Pac-Man calls it when loading or restarting a level. Input texture replacement, input dimensions, quality changes, resizing, and reinitialization also reset history. A stable source delegate does not need to be assigned every frame. `GetOutput()` returns the current reconstructed texture, or the source in Native mode and before reconstruction is ready.
+Set the source once; you don't need to assign it every frame. UDR4 also accepts the lighting output directly.
 
-UDR4 controls `HRCGI.OutputJitter` while active. HRC samples its radiance field at eight subpixel offsets, measured in reduced-resolution output texels. Reconstruction removes the corresponding `LastOutputJitter`; geometry, collision coordinates, character overlays, and HUD remain unjittered. This samples the existing HRC field more densely; it does not increase cascade probe or ray resolution. A custom input producer must provide an unjittered texture when there is no HRC system. Do not connect unrelated imagery while allowing UDR4 to control an HRC producer.
+## Track moving objects
 
-## Motion and history
+Give moving rectangles, circles and triangles a `MotionTrackable` component so UDR4 can follow them instead of
+smearing them.
 
-`Geometry.TemporalMotionTexture` stores signed, 32-bit floating-point world displacement, independently of the legacy encoded motion texture. Displacement uses consecutive rounded positions actually rendered by Geometry, rather than averaged velocity. It is collected with the same buffered geometry frame. Current and previous world-to-screen transforms account for camera movement. Motion silhouettes follow the rectangle, circle, and triangle primitives and are ordered by Z among tracked objects.
+The following example shows a ball that stays crisp while it moves:
 
-History is rejected outside the viewport and when an emissive/absorption signature changes. Radiance differences reduce history weight separately because moving light and shadow patterns can move independently of geometry. A 3×3 neighborhood and variance bounds constrain history before blending. The unsharpened result becomes history; bounded sharpening affects presentation only.
-
-This implementation has no depth/object-ID buffer. Textured objects use their primitive motion silhouette, untracked moving objects rely on appearance rejection, and overlapping translucent objects cannot carry multiple velocities per pixel. Rotation/deformation and changes of primitive size are not tracked by the translation buffer. These cases deliberately favor current-frame appearance but can still show artifacts. This is not a claim of FSR-quality reconstruction.
-
-Four RGBA16F targets plus the RG32F motion buffer consume approximately 40 bytes per output pixel (79 MiB at 1920×1080), excluding existing HRC/geometry buffers and driver overhead. Motion is disabled in Native mode and when UDR4 is disposed. The four full-screen passes have not yet been assigned a measured GPU time budget.
-
-## Validation
-
-```sh
-dotnet build radiant.sln -c Release -m:1
-dotnet run --project tests/Radiant.Tests -c Release --no-build
-dotnet run --project tests/Radiant.Scenes -c Release --no-build -- --udr4-regression
+```csharp
+int ball = ECS.CreateEntity(new Vector2(400, 300));
+ECS.AddComponent<Circle2D>(ball) = new Circle2D(20f);
+ECS.AddComponent<Material>(ball).Emissive = Color.Orange;
+ECS.AddComponent<MotionTrackable>(ball);
 ```
 
-The headless checks exercise motion history wraparound, signed displacement beyond the legacy range, and jitter bounds/periodicity. The GPU regression checks finite startup, history accumulation/reset, moving silhouettes and disocclusion, camera mapping, and resizing against current geometry pixels. Pac-Man's rendering suite covers all four upscalers, all three quality settings, eye overlays, aspect ratios, Native bypass, and disabling/re-enabling upscaling. Its smoke suite covers all six levels, restart, pause, and switching back to UDR4.
+Camera movement is tracked automatically.
 
-On an isolated Xvfb display with RADV, use `SDL_VIDEODRIVER=x11 MESA_VK_WSI_DEBUG=sw` as described in the HRC notes. This changes presentation, not the GPU executing the shaders. GPU test artifacts are written under `artifacts/udr4` and Pac-Man rendering captures under `artifacts/rendering` when run from the engine directory.
+## Reset after a cut
+
+Call `ResetHistory()` whenever the image jumps: a new level, a teleport, a respawn.
+
+```csharp
+public void LoadLevel(int index)
+{
+    BuildLevel(index);
+    ECS.GetSystem<UDR4>().ResetHistory();
+}
+```
+
+Resizing, quality changes and new inputs reset history automatically.
+
+## Tune it
+
+Pick the quality in **Image quality**: Performance (25% resolution per axis), Balanced (50%) or Native (no
+upscaling). The UDR4 window adds:
+
+- **Sharpness**: crispness of the final image. It never feeds back into history, so it can't build up artifacts.
+- **History length**: more frames give smoother results; fewer react faster to change.
+
+## Get the best results
+
+- UDR4 subtly shifts where lighting is sampled each frame (`HRCGI.OutputJitter`). Geometry, collisions and UI are
+  never shifted.
+- Rotating, deforming and resizing objects are reconstructed from the current frame, which keeps them correct but
+  can look softer while they change.
+- Overlapping translucent objects moving in different directions can show faint trails; avoid long-lived stacks
+  of them in fast scenes.
+- At 1920 × 1080, UDR4 uses about 79 MiB of GPU memory.
+
+To compare upscalers, MegaLights cycles None and UDR1–4 with **F11**.

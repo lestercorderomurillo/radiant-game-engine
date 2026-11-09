@@ -1,127 +1,83 @@
-# Radiant runtime backends
+# Running your game
 
-Applications start through Radiant's `GameClient`, `Scene` and ECS APIs. The runtime
-loop now depends on `IRuntimeHost`, not on `MonoGame.Game`, `Window`, `GameTime`,
-`SpriteBatch` or `GraphicsDevice`. This migration separates application lifecycle, simulation and input; it is not yet
-a graphics-backend abstraction.
+`GameClient` opens the window, runs the game loop and cleans up when the player quits. The same scenes also run
+without a window for tests, tools and servers.
 
-## Application entry point
+## Open a window
+
+The following example shows a complete `Program.cs`:
 
 ```csharp
 using com.radiant.engine.runtime;
 
 new GameClient().Run(new MyScene(), new WindowOptions
 {
-    Title = "My game", Width = 1280, Height = 720
+    Title = "My game",
+    Width = 1280,
+    Height = 720,
+    Maximized = false
 });
 ```
 
-The default backend is `MonoGameBackend`. Game code does not need to subclass
-`Window` or `Game`. Existing desktop regression fixtures can still subclass `Window`;
-that class is the MonoGame-specific host and is not a portable application API.
+The world keeps the same coordinates whatever size the window has, so resizing never moves your content.
 
-## Simulation without a window
+## Run without a window
+
+`HeadlessBackend` runs a fixed number of updates with an exact time step and no graphics device. It's perfect
+for deterministic tests and simulations.
+
+The following example shows how to simulate one second at 64 updates per second:
 
 ```csharp
-using System;
-using com.radiant.engine.runtime;
-
 new GameClient(new HeadlessBackend(64, TimeSpan.FromSeconds(1.0 / 64)))
     .Run(new MySimulationScene());
 ```
 
-This executes 64 updates with deterministic elapsed time, runs fixed ticks through
-the same ECS scheduler, then disposes the scene. It creates no graphics device and
-never invokes render callbacks. Use simulation-only systems: a system that requires
-textures, desktop input or a renderer is not headless-compatible. `Scene.Renderer`
-and `System.Renderer` are null in this host. The assembly still references MonoGame;
-this is not yet a standalone dependency-free core package.
+In headless runs `Renderer` is null and render callbacks never run, so keep simulation logic in systems that
+don't draw.
 
-## Radiant time
+## Use time correctly
 
-Scenes and systems expose `FrameTime Time`:
+Every scene and system has `Time`:
 
-- `Time.Total`: accumulated variable time, or accumulated simulation tick time in FixedUpdate.
-- `Time.Elapsed`: duration of the current phase.
-- `Time.DeltaSeconds`: that duration in seconds.
-- `Time.IsFixedStep`: true only during the fixed simulation callback.
+| Property | Meaning |
+| --- | --- |
+| `Time.DeltaSeconds` | Seconds to advance in this callback |
+| `Time.Total` | Time since the game started |
+| `Time.IsFixedStep` | True inside `FixedUpdate` |
 
-The loop owns these clocks. It no longer forwards MonoGame's timing object. Fixed
-updates receive exactly 1/64 second. Variable updates receive their actual duration;
-rendering receives the latest variable-update time. Catch-up remains capped at eight
-fixed ticks per update, so fixed simulation time can lag wall time after a stall.
+`FixedUpdate` always receives exactly 1/64 of a second, which keeps physics stable. `Update` receives the real
+frame time. After a long stall the loop catches up at most eight fixed steps per frame, so the game slows down
+briefly instead of freezing.
 
-Migration: replace `GameTime.ElapsedGameTime.TotalSeconds` with `Time.DeltaSeconds`
-and `GameTime.TotalGameTime` with `Time.Total`. `Scene.DeltaTime` remains available
-for existing systems. The unused `GameLoop.SpriteBatch` and extra window SpriteBatch
-were removed; draw through the renderer.
+The following example shows frame-rate independent movement:
 
-## Implementing another runtime host
-
-Implement `IRuntimeBackend.CreateHost(GameLoop, WindowOptions)` and return an
-`IRuntimeHost`. `GameClient` owns the returned host and disposes the loop before
-releasing the host, including when Run throws. Each run gets a new loop and host.
-
-The host initializes its platform resources and calls `Loop.Initialize(this)` once.
-It then calls `Loop.Update()` with the built-in stopwatch, or `Loop.Update(elapsed)`
-with explicit durations. Choose one clock source consistently. Graphical hosts also
-call `Loop.Render()` while a graphics frame is active, on the same thread.
-
-The loop calls the host in this order:
-
-1. `PrepareScene`: create presentation resources before scene/system initialization.
-2. Scene initialization, ECS setup, entity setup and simulation callbacks.
-3. For each rendered frame: `BeginFrame`, scene/ECS render phases, `EndFrame`.
-4. Scene/system disposal, then `ReleaseScene`, before disposing platform resources.
-
-`ReleaseScene` must tolerate partial preparation. `Dispose` on the loop is idempotent.
-Scene transitions release the previous scene before preparing the next one. The host
-must stay alive through scene disposal so systems can release their GPU resources.
-
-The MonoGame adapter constructs the existing Renderer and presents its output.
-The headless adapter has no presentation resources. Tests also use a separate host
-implementation to verify transitions and exception cleanup through this contract.
-
-## Remaining graphics migration
-
-The runtime interface intentionally does not promise arbitrary graphics backends yet.
-`Renderer` and GPU resources still expose native texture/effect/device types.
-Keyboard, mouse and text input use [Radiant input contracts](Input.md); vectors,
-matrices, colors, integer geometry and mesh vertices use [backend-independent math](Math.md).
-Blend, sampler, rasterizer and depth/stencil settings use [Radiant render states](RenderStates.md).
-Next steps are resource contracts, followed by an internal
-graphics-device interface and a MonoGame implementation. Compute and ray-tracing
-support should be reported as optional capabilities of that graphics backend.
-
-Do not wrap the current Renderer in an interface with Texture2D, Effect or GraphicsDevice
-parameters: that would preserve the dependency in the contract. Do not assume a
-backend implements Vulkan, compute or hardware tracing simply because it implements
-the runtime host interface.
-
-## Verification
-
-`RuntimeBackendRegression` uses only Radiant and .NET types and verifies headless
-simulation, timing propagation, a second host implementation, scene transitions,
-fixed-tick catch-up limits and cleanup after failure. Run the full CPU suite with:
-
-```sh
-dotnet run --project tests/Radiant.Tests -p:RadiantBuildContent=false
+```csharp
+public override void FixedUpdate()
+{
+    position += velocity * Time.DeltaSeconds;
+}
 ```
 
-The desktop Vulkan RT and compute regressions also cover compatibility with the
-existing graphical host. No new graphics backend or MonoGame fork is required for
-this runtime separation.
+## Control the frame rate
 
-## Check sibling games after API changes
+Rendering targets 144 frames per second by default. The following example shows how to cap it at 60, or pass 0
+for no limit:
 
-With Pacman and Zuma cloned beside the engine, run:
-
-```sh
-python eng/check-consumers.py
+```csharp
+Renderer.GameLoop.SetTargetFps(60);
 ```
 
-This builds all eight projects across the engine and both game solutions, including
-content, then runs the three deterministic suites. `--configuration Debug` checks
-Debug instead of Release; `--pacman-root` and `--zuma-root` accept custom locations.
-Builds run sequentially because the solutions share engine outputs. Graphical checks
-remain separate and must use isolated displays as documented in the games' BUILD.md.
+Lit 2D scenes also offer an **FPS Limit** dropdown in their pipeline window.
+
+## Write your own host
+
+To run Radiant on another platform, implement `IRuntimeBackend.CreateHost(gameLoop, options)` and return an
+`IRuntimeHost`. Your host:
+
+1. Initializes the platform and calls `gameLoop.Initialize(host)` once.
+2. Calls `gameLoop.Update()` every tick, and `gameLoop.Render()` while a frame is active on the same thread.
+3. Provides a renderer in `PrepareScene`, presents in `BeginFrame` / `EndFrame`, and releases scene resources in
+   `ReleaseScene`, which must tolerate a scene that only partly started.
+
+`GameClient` creates a fresh loop and host for each run and disposes both, even if the game throws.

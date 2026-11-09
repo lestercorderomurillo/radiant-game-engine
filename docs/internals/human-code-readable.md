@@ -75,7 +75,10 @@ This document is a review guide, not an installed formatter or executable linter
 ## C# hover documentation
 
 - Give each class and method one concise XML summary describing its purpose or
-  contract. Mention a non-obvious constraint or side effect when it matters.
+  contract from the caller's point of view. Mention a non-obvious constraint or side
+  effect when it matters.
+- Key entry points may add one short `<example>` introduced with "The following
+  example shows how to …"; it appears in IntelliSense and on the docs site.
 - Use `/// <inheritdoc/>` for overrides that keep the documented base contract.
   Document a partial class once, at its main declaration.
 - Preserve useful existing documentation. Promote an introductory comment instead
