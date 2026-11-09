@@ -1,21 +1,11 @@
 # Getting started
 
-Build the engine, try a demo, then open a window with your own lit scene in about twenty lines of code.
+Add Radiant to a game project and open a window with your own lit scene in about twenty lines of code.
 
-## Run a demo
+## Requirements
 
 You need the .NET 8 SDK (or newer), a Vulkan-capable GPU and a desktop session. On Linux, also install the
 Vulkan loader and SDL2.
-
-The following example shows how to build everything and launch the simple lighting demo:
-
-```sh
-dotnet build radiant.sln -c Release
-dotnet run --project tests/Radiant.Scenes -c Release --no-build -- lights
-```
-
-Swap `lights` for `triangles` (MegaLights), `tiles` or `rendering2d`, or run the 3D Cornell Box with
-`dotnet run --project tests/Radiant.3D -c Release`. Press **F1** in any demo to open the inspector.
 
 ## Create a game project
 
@@ -80,7 +70,8 @@ using com.radiant.engine.runtime;
 new GameClient().Run(new MyScene(), new WindowOptions { Title = "My game", Width = 1280, Height = 720 });
 ```
 
-`Run` returns when the player closes the window, after cleaning up the scene.
+`Run` returns when the player closes the window, after cleaning up the scene. Press **F1** while the game runs
+to open the inspector.
 
 ## Next steps
 

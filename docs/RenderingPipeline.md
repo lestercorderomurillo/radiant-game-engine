@@ -1,21 +1,12 @@
 # Image quality and upscaling
 
-Every demo shares the same final image chain, and your scenes can too:
+Radiant's image stages form one chain that every pipeline can share:
 
 `image → tone mapping → antialiasing → upscaling → buffer inspector → screen`
 
 UI and gizmos are drawn afterwards, so they always stay sharp.
 
-## Adjust image quality
-
-Press **F1** and open **Image quality** to choose the upscaler, its quality level, post antialiasing, geometry
-antialiasing (where supported) and to reset history.
-
-| Demo | Default | Upscalers offered |
-| --- | --- | --- |
-| SimpleLight, MegaLights | UDR4 Balanced | None, UDR1–4 |
-| Rendering2D, CornellBox | None | None, UDR4 |
-| Tileset | None | None, UDR4 |
+## Upscaling modes
 
 - **None** renders at full resolution with no upscaling.
 - **Native** keeps the selected upscaler but passes the image through untouched, handy for A/B comparisons.
@@ -41,7 +32,8 @@ So the producer renders fewer pixels, let the upscaler pick its resolution each 
 geometry.Resolution = upscaler.ResolveViewSize(geometry.Resolution);
 ```
 
-Pass the upscaler to `AntiAliasingSettings.Upscaler` to get the shared Image quality controls.
+Pass the upscaler to `AntiAliasingSettings.Upscaler` and players get an **Image quality** window (F1 → View) to
+choose the upscaler, its quality, antialiasing and to reset history.
 
 ## Which upscaler can I use?
 

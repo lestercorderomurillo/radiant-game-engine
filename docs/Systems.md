@@ -1,7 +1,7 @@
 # Systems and scenes
 
 A [`System`](../src/com.radiant.engine/core/System.cs) holds behavior that runs every frame. A
-[`Scene`](../src/com.radiant.engine/core/Scene.cs) bundles systems and entities into a level, menu or demo.
+[`Scene`](../src/com.radiant.engine/core/Scene.cs) bundles systems and entities into a level, a menu or any other screen.
 
 ## Write a system
 

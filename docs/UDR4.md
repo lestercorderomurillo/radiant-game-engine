@@ -67,5 +67,3 @@ upscaling). The UDR4 window adds:
 - Overlapping translucent objects moving in different directions can show faint trails; avoid long-lived stacks
   of them in fast scenes.
 - At 1920 × 1080, UDR4 uses about 79 MiB of GPU memory.
-
-To compare upscalers, MegaLights cycles None and UDR1–4 with **F11**.

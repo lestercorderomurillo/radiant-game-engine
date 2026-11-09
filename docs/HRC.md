@@ -83,10 +83,3 @@ var upscaler = ECS.AddSystem<UDR4>();
 color.SetInputSource(lighting.GetOutput);
 upscaler.SetInputSource(color.GetOutput);
 ```
-
-## Try it
-
-```sh
-dotnet run --project tests/Radiant.Scenes -c Release -- lights      # One warm light
-dotnet run --project tests/Radiant.Scenes -c Release -- triangles   # MegaLights: paint lights and blockers
-```

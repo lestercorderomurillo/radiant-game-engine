@@ -82,7 +82,7 @@ runtime once, then build or run with it:
 
 ```sh
 python3 eng/build-vulkan-rt.py
-dotnet run --project tests/Radiant.3D -c Release -p:RadiantVulkanRT=true -- --path-backend=vulkan
+dotnet run --project MyGame -c Release -p:RadiantVulkanRT=true
 ```
 
 `PathTracer.Backend` chooses `Auto` (hardware when available), `Software` or `Vulkan`. The **Path tracing** window
@@ -206,10 +206,3 @@ each other with `After`.
 Add a `RenderInspector` to a view, then press **Tab** or use **F1** to step through every available buffer:
 color, normals, depth, path-tracing guides, denoiser history and more. Raw buffers are shown without tone
 mapping, exactly as the next stage sees them.
-
-## Try it
-
-```sh
-dotnet run --project tests/Radiant.3D -c Release                    # Cornell Box: flat, raster, path tracing
-dotnet run --project tests/Radiant.Scenes -c Release -- rendering2d  # The same pipelines in 2D
-```
