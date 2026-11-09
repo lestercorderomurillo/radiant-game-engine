@@ -45,6 +45,7 @@ export function Markdown({ source, resolveLink = fallbackLink, resolveImage, var
     <div
       className={cn(
         "prose prose-neutral max-w-none dark:prose-invert",
+        variant !== "compact" && "prose-p:max-w-[68ch]",
         "prose-headings:scroll-mt-20 prose-headings:font-semibold prose-headings:tracking-tight prose-h2:mt-12 prose-h2:border-b prose-h2:pb-2 prose-h2:text-2xl prose-h3:text-lg",
         "prose-code:rounded-md prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[0.85em] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none",
         "prose-a:font-medium prose-strong:font-semibold prose-li:my-1 prose-img:my-6",

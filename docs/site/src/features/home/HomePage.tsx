@@ -18,7 +18,7 @@ const features: Feature[] = [
   { icon: BoxesIcon, title: "home.feature.ecs.title", body: "home.feature.ecs.body", guide: "ecs", fallbackType: "ECS" },
   { icon: BlocksIcon, title: "home.feature.systems.title", body: "home.feature.systems.body", guide: "systems", fallbackType: "System" },
   { icon: PaletteIcon, title: "home.feature.renderer.title", body: "home.feature.renderer.body", guide: "renderer", fallbackType: "Renderer" },
-  { icon: SunIcon, title: "home.feature.lighting.title", body: "home.feature.lighting.body", guide: "hrc", fallbackType: "HRCGI" },
+  { icon: SunIcon, title: "home.feature.lighting.title", body: "home.feature.lighting.body", guide: "lighting", fallbackType: "HRCGI" },
   { icon: LayoutPanelTopIcon, title: "home.feature.inspector.title", body: "home.feature.inspector.body", guide: "inspector", fallbackType: "Inspector" },
   { icon: CpuIcon, title: "home.feature.runtime.title", body: "home.feature.runtime.body", guide: "runtime-backends", fallbackType: "GameClient" },
 ]

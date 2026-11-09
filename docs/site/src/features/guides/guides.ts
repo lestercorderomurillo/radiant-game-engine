@@ -1,5 +1,5 @@
 import { readmeForGuide } from "./readme-guide.mjs"
-import { slugFromFile } from "./guide-slug.mjs"
+import { guideAliases, slugFromFile } from "./guide-slug.mjs"
 import GithubSlugger from "github-slugger"
 import { t, type MessageKey } from "@/common/i18n/t"
 import type { DocLink } from "@/common/lib/docLinks"
@@ -40,7 +40,7 @@ const sectionOrder: { title: MessageKey; slugs: string[] }[] = [
   { title: "guides.sections.engine", slugs: ["ecs", "systems", "input", "inspector", "camera-controls", "math"] },
   {
     title: "guides.sections.rendering",
-    slugs: ["renderer", "hrc", "udr4", "rendering", "rendering-pipeline", "3d", "graphics-resources", "render-states", "compute-shaders"],
+    slugs: ["renderer", "rendering", "lighting", "rendering-pipeline", "upscaling", "3d", "graphics-resources", "render-states", "compute-shaders"],
   },
   { title: "guides.sections.platform", slugs: ["runtime-backends", "renderer-contracts"] },
 ]
@@ -110,7 +110,7 @@ export const guideSections: GuideSection[] = (() => {
 /** Guides in sidebar order, for previous/next navigation. */
 export const orderedGuides = guideSections.flatMap((section) => section.guides)
 
-export const getGuide = (slug: string) => guidesBySlug.get(slug)
+export const getGuide = (slug: string) => guidesBySlug.get(guideAliases[slug] ?? slug)
 
 export const sectionOf = (guide: Guide) => guideSections.find((section) => section.guides.includes(guide))
 

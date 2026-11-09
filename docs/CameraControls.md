@@ -1,4 +1,4 @@
-# Camera controls
+# Cameras
 
 Fly through any scene while it runs: pick a camera, hold the right mouse button and move. No camera code needed.
 

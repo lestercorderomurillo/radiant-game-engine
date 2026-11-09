@@ -1,4 +1,4 @@
-# Running your game
+# Runtime
 
 `GameClient` opens the window, runs the game loop and cleans up when the player quits. The same scenes also run
 without a window for tests, tools and servers.

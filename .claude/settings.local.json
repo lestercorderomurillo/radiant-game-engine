@@ -31,7 +31,11 @@
       "WebFetch(domain:unpkg.com)",
       "WebFetch(domain:app.unpkg.com)",
       "WebFetch(domain:material-icons.github.io)",
-      "WebFetch(domain:fonts.google.com)"
+      "WebFetch(domain:fonts.google.com)",
+      "Bash(git fetch *)",
+      "Bash(gh run *)",
+      "Bash(echo \"docs exit=$?\")",
+      "Bash(echo \"build exit=$?\")"
     ]
   }
 }

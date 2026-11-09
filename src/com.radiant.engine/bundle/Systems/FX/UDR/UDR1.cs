@@ -3,10 +3,13 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Spatial reconstruction stage for reduced-resolution HRC lighting.</summary>
+/// <summary>Reconstructs HRC lighting spatially, with geometry-guided edge refinement and sharpening.</summary>
+/// <remarks>Uses only the current image; it does not accumulate previous frames. Requires the matching HRC geometry buffers. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <seealso cref="Upscaling"/>
 public class UDR1 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.5f;
     public bool EdgeCorrection = true;
     public bool DebugRays = false;
@@ -37,7 +40,8 @@ public class UDR1 : core.System
         Inspector.AddToggle("udr1", "debugRays", "Debug Edges", DebugRays, V => DebugRays = V);
     }
 
-    /// <summary>Sets the live image provider consumed by this stage.</summary>
+    /// <summary>Connects the image provider evaluated by the reconstruction stage.</summary>
+    /// <param name="source">Provider for the current input image; connect it once rather than reassigning it every frame.</param>
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;

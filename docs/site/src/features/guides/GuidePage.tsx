@@ -1,5 +1,5 @@
 import { getRouteApi, Link } from "@tanstack/react-router"
-import { ArrowLeftIcon, ArrowRightIcon, PencilIcon } from "lucide-react"
+import { ArrowLeftIcon, ArrowRightIcon, ChevronDownIcon, PencilIcon } from "lucide-react"
 import { DocPage } from "@/common/layouts/DocPage"
 import { Markdown } from "@/common/components/Markdown"
 import { t } from "@/common/i18n/t"
@@ -40,6 +40,22 @@ export function GuidePage() {
           variant="lead"
           className="mt-3"
         />
+      )}
+
+      {guide.headings.some((heading) => heading.depth === 2) && (
+        <details className="group mt-8 border-y py-3 xl:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium">
+            {t("toc.title")}
+            <ChevronDownIcon aria-hidden="true" size={16} className="transition-transform group-open:rotate-180" />
+          </summary>
+          <nav aria-label={t("toc.title")} className="mt-3 grid gap-2 text-sm">
+            {guide.headings.filter((heading) => heading.depth === 2).map((heading) => (
+              <a key={heading.id} href={`#${heading.id}`} className="text-muted-foreground hover:text-foreground hover:underline">
+                {heading.text}
+              </a>
+            ))}
+          </nav>
+        </details>
       )}
 
       <Markdown

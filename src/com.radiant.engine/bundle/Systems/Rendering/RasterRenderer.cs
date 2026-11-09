@@ -3,7 +3,11 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Diffuse geometry lighting before MSAA resolve, or an image lighting pass with optional normals.</summary>
+/// <summary>Applies directional diffuse lighting and ambient illumination to 2D or 3D raster input.</summary>
+/// <remarks>With <see cref="Geometry"/> supplied, shades covered samples before MSAA resolve.
+/// Otherwise lights the input image using optional normals. This technique does not compute HRC transmission or path-traced indirect light.</remarks>
+/// <seealso cref="HRCGI"/>
+/// <seealso cref="PathTracer"/>
 [SystemTag("Rendering")]
 public class RasterRenderer : ImageSystem
 {
@@ -11,8 +15,11 @@ public class RasterRenderer : ImageSystem
     public IRasterGeometry Geometry;
     /// <summary>Normal texture for image lighting when Geometry is not supplied.</summary>
     public Func<Texture2D> Normals;
+    /// <summary>Direction used by the diffuse lighting calculation; normalized before shading.</summary>
     public Vector3 LightDirection = Vector3.Normalize(new Vector3(-0.4f, 0.8f, 0.6f));
+    /// <summary>RGB intensity of the directional light.</summary>
     public Vector3 LightColor = Vector3.One;
+    /// <summary>Constant ambient contribution added to directional diffuse shading.</summary>
     public float Ambient = 0.12f;
 
     /// <inheritdoc/>

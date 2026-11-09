@@ -1,16 +1,16 @@
-# Inspector and gizmos
+# Inspector
 
 Build in-game tuning and debug panels in a few lines: sliders, toggles, dropdowns, text fields and lists inside
 draggable windows. Press **F1** to show or hide them.
 
 Add the [`Inspector`](../src/com.radiant.engine/bundle/Systems/UI/Inspector/Inspector.cs) system to your scene.
-Every method is static and does nothing when the inspector isn't present, so tuning code can stay in your game.
+Use its static widget helpers to build panels, then keep diagnostic overlays in the Gizmos section below.
 
 ## Windows and widgets
 
 Create windows and widgets once (in `Initialize` or `SetupScene`), then update their values every frame.
 
-The following example shows how to build a lighting panel:
+Create a lighting panel with controls bound to your game state:
 
 ```csharp
 Inspector.CreateWindow("lighting", "Lighting");
@@ -21,7 +21,7 @@ Inspector.AddDropdown("lighting", "quality", "Quality", ["Low", "Medium", "High"
 Inspector.AddButton("lighting", "reset", "Reset", Reset);
 ```
 
-The following example shows how to keep a label up to date:
+Update the label during the frame:
 
 ```csharp
 public override void Update()
@@ -76,7 +76,7 @@ if (!Inspector.IsEditingText && Controls.WasPressed(Key.R)) Restart();
 Built-in themes: Carbon (default), Solaris, Midnight, Sentinel (light), Greenfields, Neon and Nord. Register
 your own with `RegisterTheme(name, theme)` and switch with `ApplyTheme(name)`.
 
-## Gizmos
+## Draw gizmos
 
 [`GizmosRenderer`](../src/com.radiant.engine/bundle/Systems/UI/Gizmos/GizmosRenderer.cs) draws diagnostic
 shapes and labels over the scene. The following example shows how to queue gizmos from a system's `Render`:
@@ -91,3 +91,9 @@ gizmos.ToggleGizmos();
 ```
 
 `PerformanceMonitor` adds frame-time, CPU and GPU metrics windows; GPU counters are available on Windows only.
+
+## Continue
+
+- [Input](Input.md) — read controls and respect UI focus.
+- [Cameras](CameraControls.md) — navigate the scene while inspecting it.
+- [Image quality](RenderingPipeline.md) — inspect lighting and reconstruction buffers.

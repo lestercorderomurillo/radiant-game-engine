@@ -78,7 +78,7 @@ to open the inspector.
 - [Entities and components](ECS.md): create things and query them fast.
 - [Systems and scenes](Systems.md): add behavior that runs every frame.
 - [Input](Input.md): react to the keyboard and mouse.
-- [2D global illumination](HRC.md): lights, shadows and colored glass.
+- [Lighting](HRC.md): choose HRC, raster lighting or path tracing.
 - [Inspector and gizmos](Inspector.md): build debug panels in a few lines.
 
 Run `eng/docs.sh` to browse this documentation locally, with the API reference generated from the source.

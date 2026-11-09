@@ -1,15 +1,25 @@
-# 2D global illumination
+# Lighting
 
-`HRCGI` lights your 2D world in real time: every glowing shape is a light source, solid shapes cast soft
-shadows, and colored glass tints the light that passes through it. No light lists, no shadow maps.
+Choose how light interacts with your scene, then connect the result to the same image pipeline. Radiant provides lighting techniques for both 2D and 3D; the technique determines which geometry, materials and buffers it needs.
 
-It's based on [Holographic Radiance Cascades](https://arxiv.org/abs/2505.02041) by Freeman, Sannikov and Margel.
+## Choose a technique
 
-## Light a scene
+| Technique | Scene | Use it for |
+| --- | --- | --- |
+| **Holographic Radiance Cascades** (`HRCGI`) | 2D shapes | Emissive lights, soft shadows and colored transmission |
+| **Raster lighting** (`RasterRenderer`) | 2D or 3D raster geometry | Directional diffuse shading with an ambient term |
+| **Path tracing** (`PathTracer`) | 2D or 3D trace geometry | Progressive diffuse global illumination |
+| **Unlit rendering** (`FlatRenderer`) | 2D or 3D images | Preserve authored colors without a lighting pass |
 
-Add `Geometry`, which turns your entities into what the lighting needs, and `HRCGI`.
+Lighting technique and execution backend are separate choices. Vulkan ray queries accelerate path tracing; they do not define the lighting model. Toon lighting is not a built-in technique yet. Custom shader passes can provide other looks without changing the rest of the pipeline.
 
-The following example shows a dark room with one lamp and a wall:
+## Holographic Radiance Cascades
+
+HRC is the current lighting technique for emissive 2D shapes. `Geometry` supplies the scene buffers and `HRCGI` computes the illumination. Moving or recoloring a shape updates the light on the next rendered frame.
+
+### Set up a 2D scene
+
+Register both systems before calling the base setup:
 
 ```csharp
 public override void SetupECS()
@@ -22,64 +32,93 @@ public override void SetupECS()
 public override void SetupScene()
 {
     Renderer.FitWorld(Renderer.VirtualSize / 2, Renderer.VirtualSize);
-
-    var warm = new Color(255, 180, 100);
-    LightFactory.CreateLight(ECS, new Vector2(1500, 1080), 60f, warm, warm);
+    LightFactory.CreateLight(ECS, new Vector2(1500, 1080), 60f,
+        Color.White, Color.White);
 
     int wall = ECS.CreateEntity(new Vector2(1900, 700));
     ECS.AddComponent<Rectangle2D>(wall) = new Rectangle2D(new Vector2(60, 700));
     ECS.AddComponent<Material>(wall).Albedo = Color.Black;
-
     base.SetupScene();
 }
 ```
 
-## Control light with materials
+### Shape the light
 
-Every shape with a `Material` takes part in the lighting:
+HRC interprets `Material` as emission and transmission. These settings are specific to this technique; they are not a universal material model for every renderer.
 
-| You want | Set |
+| Result | Material setting |
 | --- | --- |
-| A light | `Emissive` to the light color; its alpha is the brightness |
-| A solid wall | `Albedo = Color.Black` |
-| Colored glass | `Albedo` to the glass color with partial alpha, e.g. `new Color(60, 255, 60, 160)` |
-| Something light ignores | Leave the default white `Albedo` and black `Emissive` |
+| Emissive light | Set `Emissive`; alpha controls brightness |
+| Opaque blocker | Set `Albedo = Color.Black` |
+| Colored transmission | Set `Albedo` to a color with partial alpha |
+| No effect on light | Keep white `Albedo` and black `Emissive` |
 
-The following example shows a pane of green glass; light behind it comes out green:
+For example, `new Color(60, 255, 60, 160)` in `Albedo` creates green transmission. Use `Renderer.FitWorld` to keep the world framing consistent as the window changes shape.
 
-```csharp
-ECS.AddComponent<Material>(glass).Albedo = new Color(60, 255, 60, 160);
-```
+### Adjust quality
 
-Moving or recoloring shapes updates the lighting the same frame.
+Open **F1 → View → Holographic Radiance Cascades**. Performance, Balanced, Ultra and Native change probe spacing; Ultra is the default. Wider spacing reduces lighting detail.
 
-## Pick a quality level
+These are **lighting quality** settings. They are separate from the resolution presets used by [Upscaling](UDR4.md).
 
-The **Holographic Radiance Cascades** window (F1 → View) offers four quality levels that trade detail for speed: **Performance**, **Balanced**,
-**Ultra** (the default) and **Native**. Lower levels space the light probes further apart, which softens small
-details.
-
-Combine a lower `Renderer.RenderScale` with an upscaler such as [UDR4](UDR4.md) to keep large scenes fast and
-sharp.
-
-## Keep proportions on any window
-
-Frame your world with `Renderer.FitWorld`. Lights, shapes and mouse coordinates then keep their proportions when
-the window changes shape, from landscape to portrait.
-
-## Use the result
-
-`GetOutput()` returns the lit image in linear color, so an area evenly lit at brightness 1 reads as exactly 1.
-Feed it to tone mapping before display.
-
-The following example shows the classic chain: lighting, color management, then upscaling:
+`HRCGI.GetOutput()` supplies linear light. Connect it to `ColorManagement` before display, then add reconstruction when rendering below display resolution:
 
 ```csharp
 var lighting = ECS.AddSystem<HRCGI>();
 var color = ECS.AddSystem<ColorManagement>();
 var upscaler = ECS.AddSystem<UDR4>();
 
-// After base.SetupECS():
+// Connect providers after base.SetupECS().
 color.SetInputSource(lighting.GetOutput);
 upscaler.SetInputSource(color.GetOutput);
 ```
+
+## Raster lighting
+
+Use `RasterRenderer` for directional diffuse shading. It accepts an `IRasterGeometry` producer, including the 2D and 3D raster adapters. With geometry supplied, it shades covered samples before MSAA resolves the image.
+
+```csharp
+var lighting = ECS.AddSystem(new RasterRenderer
+{
+    Geometry = geometry,
+    Input = geometry.GetOutput,
+    After = [geometry],
+    LightColor = Vector3.One,
+    Ambient = 0.12f
+});
+```
+
+Here `geometry` is your existing raster geometry system. `LightDirection`, `LightColor` and `Ambient` control the light. This pass does not provide HRC transmission or path-traced indirect light.
+
+## Path tracing
+
+Use `PathTracer` with an `ITraceGeometry` adapter to accumulate diffuse light transport in 2D or 3D. For a 3D scene, `MeshGeometry3D` supplies the triangles:
+
+```csharp
+var meshes = ECS.AddSystem<MeshGeometry3D>();
+var lighting = ECS.AddSystem(new PathTracer
+{
+    Geometry = meshes,
+    After = [meshes],
+    MaxBounces = 4,
+    ResolutionScale = 0.5f
+});
+var color = ECS.AddSystem(new ToneMapping
+{
+    Input = lighting.GetOutput,
+    After = [lighting]
+});
+```
+
+The image converges over successive samples. Use `SurfaceEmission` for emissive 3D surfaces, and insert `Denoising` before tone mapping when low sample counts are too noisy. The current material model is diffuse; glossy and transparent surfaces are not traced.
+
+`PathTracingBackend.Auto` selects Vulkan ray queries when available and otherwise uses shader BVH traversal. `Software` still runs on the GPU; it does not mean CPU rendering. See [Rendering pipelines](Rendering.md#hardware-ray-tracing) for the optional Vulkan runtime setup.
+
+## Build the final image
+
+Lighting produces an image; it does not replace the rest of the rendering pipeline. Choose the appropriate color stage, antialiasing, reconstruction and presentation for that output.
+
+- [Rendering pipelines](Rendering.md) — connect geometry, lighting and image stages.
+- [Image quality](RenderingPipeline.md) — order denoising, tone mapping and antialiasing.
+- [Upscaling](UDR4.md) — compare UDR1–UDR4 and their input requirements.
+- [3D scenes](3D.md) — create meshes, cameras and surface buffers.

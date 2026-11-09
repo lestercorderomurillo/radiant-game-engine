@@ -3,19 +3,24 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Geometry-guided temporal reconstruction for HRC lighting. Call ResetHistory on scene cuts.</summary>
+/// <summary>Reconstructs HRC lighting with temporal guidance, or generic images with spatial filtering.</summary>
+/// <remarks>Temporal guidance requires matching HRC geometry and motion. For standalone generic 2D or 3D sources, set UseHrcGeometry and Temporal to false before initialization. Call ResetHistory after scene cuts. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <seealso cref="Upscaling"/>
 [RunAfter(typeof(Geometry), typeof(HRCGI), typeof(ColorManagement))]
 public class UDR4 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
     /// <summary>Disable automatic presentation when an explicit presentation stage consumes GetOutput.</summary>
     public bool Present = true;
-    /// <summary>Spatial fallback for sources without HRC geometry and motion.</summary>
+    /// <summary>Enables temporal reconstruction when matching HRC geometry is available; false selects spatial reconstruction.</summary>
     public bool Temporal = true;
-    /// <summary>Connect HRC buffers only when the input is actually derived from HRC.</summary>
+    /// <summary>Uses the scene’s HRC geometry as guidance. Set false before initialization for generic raster or path-traced images.</summary>
     public bool UseHrcGeometry = true;
+    /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.25f;
+    /// <summary>Target temporal history length in frames. Longer history smooths the image but responds more slowly to change.</summary>
     public int FramesToAccumulate = 8;
+    /// <summary>Gets the number of valid frames accumulated since the latest history reset.</summary>
     public int HistoryFrames { get; private set; }
 
     private Func<Texture2D> InputSource;
@@ -55,7 +60,8 @@ public class UDR4 : core.System
             value => { FramesToAccumulate = (int)value; ResetHistory(); });
     }
 
-    /// <summary>Sets the live image provider consumed by this stage.</summary>
+    /// <summary>Connects the image provider evaluated by the reconstruction stage.</summary>
+    /// <param name="source">Provider for the current input image; connect it once rather than reassigning it every frame.</param>
     public void SetInputSource(Func<Texture2D> source)
     {
         InputSource = source;
