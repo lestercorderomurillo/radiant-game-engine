@@ -48,7 +48,7 @@ internal sealed class MixedDimensionWindow : Window
     private int Frame;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public MixedDimensionWindow() : base(new GameLoop(), new() { Title = "Radiant mixed-dimension regression", Width = 640, Height = 360 })
+    public MixedDimensionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant mixed-dimension regression", Width = 640, Height = 360 })
     {
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;

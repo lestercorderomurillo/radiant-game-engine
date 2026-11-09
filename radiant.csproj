@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="eng/Radiant.Desktop.props" />
   <PropertyGroup>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Keep field/property documentation optional; validate all XML comments. -->
     <NoWarn>$(NoWarn);1591</NoWarn>
@@ -13,6 +13,10 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Radiant.Tests" />
+    <InternalsVisibleTo Include="Radiant.Scenes" />
+    <EmbeddedResource Include="Content/branding/radiant-splash.png" LogicalName="Radiant.Branding.Splash" />
+    <EmbeddedResource Include="Content/fonts/Inter-Regular.ttf" LogicalName="Radiant.Branding.Font" />
     <Compile Include="eng/Radiant.Numerics.cs" />
     <Compile Include="src/com.radiant.engine/runtime/Backends/MonoGame/**/*.cs" />
     <ProjectReference Include="src/Radiant.Core/Radiant.Core.csproj" />

@@ -706,3 +706,27 @@ Tracing builds one BLAS over the existing world-triangle adapter plus an identit
 - `docs/*.md` are user-facing feature guides: what you can do and how, each snippet introduced with "The following example shows how to …", no migration notes, validation commands or implementation history. Those engineering records live in `docs/internals/` (original per-subsystem notes, including regression commands), which the site does not show; add new design/migration/validation notes there.
 - Guides link to engine sources with relative paths (`../src/.../ECS.cs`): GitHub opens the file, the site routes to the type page.
 - `docs/site/node_modules`, `dist` and `public/generated` are ignored; `radiant.csproj` excludes `docs/site/**` and `tools/**` from default items.
+## Official branding and startup
+
+`Content/branding/radiant-splash.png` is the approved Radiant identity (four-blade white emblem,
+black background, subtle particle wave, “Create something amazing.”). The runtime embeds it
+and Inter-Regular so the loader does not depend on loose content or the working directory.
+`StartupScreen` excludes the concept image's bottom status/bar and renders both live.
+`Window` advances `GameLoop.PrepareStartup()` once per presented loading frame, then resets
+simulation timing before the first update. Headless execution and later scene transitions remain
+synchronous. Frame-sensitive rendering fixtures use `WindowOptions.ShowLoader = false`.
+`WindowOptions.PrepareApplication` is a cancellable async callback before scene creation; it
+reports immutable `LoadingProgress` through a thread-safe sink. No update server, downloads,
+installation, or automatic update policy are supplied. Exceptions keep the loader open and
+prevent scene startup; hidden loaders throw. Closing cancels pending work and observes faults.
+`Window.IsLoading`, `LoadingProgress`, and `StartupError` expose current state to subclasses.
+Subclass update/draw hooks must avoid scene access until `IsLoading` is false.
+See `docs/Startup.md`. Headless startup regressions are in `Radiant.Tests`; the real Vulkan
+fixture is `Radiant.Scenes --startup-regression` (success, resize, failure, cancel, hidden).
+
+The v0.3.1 loader opens in a 768×512 borderless non-resizable window; after startup `Window`
+restores the requested game size, native decorations and maximization. `Inspector.ShowAbout()`
+and Help → About Radiant reuse `StartupScreen` as a centered modal artwork panel, with a
+small theme-colored X, version footer, paused simulation and Escape/click dismissal.
+`Window.IsAboutVisible` and `CloseAbout()` expose modal state; dismissing it resets timing
+and consumes Escape until release. The startup drawing implementation lives in the MonoGame backend; startup coordination remains portable.

@@ -36,7 +36,7 @@ sealed class LightingCaptureWindow : Window
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public LightingCaptureWindow(Scene scene, string output)
-        : base(new GameLoop(), new() { Title = "HRC comparison", Width = 1024, Height = 640 })
+        : base(new GameLoop(), new() { ShowLoader = false, Title = "HRC comparison", Width = 1024, Height = 640 })
     {
         Scene = scene;
         Output = output;

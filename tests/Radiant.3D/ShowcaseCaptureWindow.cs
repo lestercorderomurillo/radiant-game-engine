@@ -13,7 +13,7 @@ internal sealed class ShowcaseCaptureWindow : Window
     private int Frame;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public ShowcaseCaptureWindow(DenoiserMode Denoiser = DenoiserMode.Atrous) : base(new GameLoop(), new() { Title = "Radiant Cornell Box capture", Width = 1280, Height = 720 })
+    public ShowcaseCaptureWindow(DenoiserMode Denoiser = DenoiserMode.Atrous) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant Cornell Box capture", Width = 1280, Height = 720 })
     {
         Scene = new() { InitialRenderMethod = 2, InitialDenoiser = Denoiser };
         GameLoop.AddScene(Scene);

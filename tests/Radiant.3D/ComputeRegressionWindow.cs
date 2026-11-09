@@ -15,7 +15,7 @@ internal sealed class ComputeRegressionWindow : Window
     private int Frame;
     private readonly bool ExpectUnavailable;
 
-    public ComputeRegressionWindow(bool ExpectUnavailable) : base(new GameLoop(), new() { Title = "Compute regression", Width = 160, Height = 120 })
+    public ComputeRegressionWindow(bool ExpectUnavailable) : base(new GameLoop(), new() { ShowLoader = false, Title = "Compute regression", Width = 160, Height = 120 })
     {
         this.ExpectUnavailable = ExpectUnavailable;
     }

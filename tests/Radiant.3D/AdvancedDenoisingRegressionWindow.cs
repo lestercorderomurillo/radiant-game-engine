@@ -41,7 +41,7 @@ internal sealed class AdvancedDenoisingRegressionWindow : Window
     private void SetCamera(int entity) { if (Scene is CornellBoxScene c) c.Meshes.CameraEntity = entity; else ((Rendering2DScene)Scene).Geometry.CameraEntity = entity; }
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public AdvancedDenoisingRegressionWindow(bool twoD) : base(new GameLoop(), new() { Title = "Radiant temporal and neural denoising regression", Width = 640, Height = 360 })
+    public AdvancedDenoisingRegressionWindow(bool twoD) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant temporal and neural denoising regression", Width = 640, Height = 360 })
     {
         TwoD = twoD;
         Scene = twoD ? new Rendering2DScene() : new CornellBoxScene();

@@ -28,7 +28,7 @@ internal sealed class AARegressionWindow : Window
     private Texture2D GeometryColor => Scene is CornellBoxScene c ? c.Geometry.ColorTexture : ((Rendering2DScene)Scene).Geometry.ColorTexture;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public AARegressionWindow(bool twoD, int method = 0) : base(new GameLoop(), new() { Title = "Radiant AA regression", Width = 640, Height = 360 })
+    public AARegressionWindow(bool twoD, int method = 0) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant AA regression", Width = 640, Height = 360 })
     {
         Method = method;
         Scene = twoD ? new Rendering2DScene() : new CornellBoxScene();

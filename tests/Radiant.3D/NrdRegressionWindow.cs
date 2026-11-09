@@ -41,7 +41,7 @@ internal sealed class NrdRegressionWindow : Window
     private int ReferenceFrames;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public NrdRegressionWindow(bool ExpectUnavailable) : base(new GameLoop(), new() { Title = "Radiant NRD regression", Width = 320, Height = 200 })
+    public NrdRegressionWindow(bool ExpectUnavailable) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant NRD regression", Width = 320, Height = 200 })
     {
         this.ExpectUnavailable = ExpectUnavailable;
         GameLoop.AddScene(Scene);

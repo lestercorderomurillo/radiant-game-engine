@@ -61,7 +61,7 @@ internal sealed class AccumulationRegressionWindow : Window
     private int Frame;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public AccumulationRegressionWindow() : base(new GameLoop(), new() { Title = "Radiant accumulation regression", Width = 320, Height = 180 })
+    public AccumulationRegressionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant accumulation regression", Width = 320, Height = 180 })
     {
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;

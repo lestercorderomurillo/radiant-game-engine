@@ -36,32 +36,7 @@ public partial class Inspector
             Id = "about_radiant",
             Label = "About Radiant",
             Type = MenuItemType.Action,
-            ActionCallback = () =>
-            {
-                if (!Windows.ContainsKey("about_radiant"))
-                {
-                    CreateWindow("about_radiant", "About Radiant", 999, AutoPosition: false);
-                    AddSectionLabel("about_radiant", "about_engine", "Radiant Engine");
-                    AddLabel("about_radiant", "about_desc", "A lightweight 2D and 3D engine.");
-                    AddLabel("about_radiant", "about_spacer1", " ");
-                    AddLabel("about_radiant", "about_f2", "High-performance entity system.");
-                    AddLabel("about_radiant", "about_f3", "GPU-accelerated rendering.");
-                    AddLabel("about_radiant", "about_f1", "Built-in editor, systems and tools.");
-                    AddLabel("about_radiant", "about_spacer2", " ");
-                    AddLabel("about_radiant", "about_author", "Developed by Lester Cordero Murillo");
-                    AddLabel("about_radiant", "about_build", ".NET 8.0 | Build 2026.02");
-                }
-
-                if (Windows.TryGetValue("about_radiant", out var aboutWindow))
-                {
-                    int windowHeight = ComputeWindowHeight(aboutWindow);
-                    aboutWindow.Position = new Vector2(
-                        (Renderer.VirtualWidth / UIScale - aboutWindow.Size.X) / 2,
-                        (Renderer.VirtualHeight / UIScale - windowHeight) / 2);
-                }
-
-                ShowWindow("about_radiant");
-            }
+            ActionCallback = ShowAbout
         });
 
         var view = new MenuData { Id = "view", Label = "View" };
@@ -89,6 +64,13 @@ public partial class Inspector
 
         RebuildViewMenu();
         ComputeMenuBarLayout();
+    }
+
+    /// <summary>Opens Radiant's shared artwork with a small close button from the current inspector theme.</summary>
+    public static void ShowAbout()
+    {
+        if (Instance?.Renderer.Window is com.radiant.engine.runtime.IAboutWindow window)
+            window.ShowAbout(CloseColor, CloseHover, CloseText);
     }
 
     /// <summary>Rebuilds the View menu from the registered inspector windows.</summary>

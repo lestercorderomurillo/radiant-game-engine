@@ -36,7 +36,7 @@ export interface GuideSection {
 
 /** Sidebar order. Markdown files not listed here are appended under "More" automatically. */
 const sectionOrder: { title: MessageKey; slugs: string[] }[] = [
-  { title: "guides.sections.start", slugs: ["overview", "getting-started"] },
+  { title: "guides.sections.start", slugs: ["overview", "getting-started", "startup"] },
   { title: "guides.sections.engine", slugs: ["ecs", "systems", "input", "inspector", "camera-controls", "math"] },
   {
     title: "guides.sections.rendering",

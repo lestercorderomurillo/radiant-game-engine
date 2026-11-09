@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 internal sealed class RenderStateRegressionWindow : Window
 {
-    public RenderStateRegressionWindow() : base(new GameLoop(), new() { Title = "Radiant render states", Width = 160, Height = 120 }) { }
+    public RenderStateRegressionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant render states", Width = 160, Height = 120 }) { }
 
     private IRenderer Renderer;
     private Texture2D Source, Pattern;
