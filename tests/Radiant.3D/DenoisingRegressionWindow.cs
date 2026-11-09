@@ -36,7 +36,7 @@ internal sealed class DenoisingRegressionWindow : Window
     }
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public DenoisingRegressionWindow(bool twoD) : base(new GameLoop(), new() { Title = "Radiant denoising regression", Width = 640, Height = 360 })
+    public DenoisingRegressionWindow(bool twoD) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant denoising regression", Width = 640, Height = 360 })
     {
         TwoD = twoD;
         Scene = twoD ? new Rendering2DScene() : new CornellBoxScene();

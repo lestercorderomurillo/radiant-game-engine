@@ -693,3 +693,21 @@ Tracing builds one BLAS over the existing world-triangle adapter plus an identit
 ## Shared camera controller
 
 `Inspector.OpenCameraControls(entity = -1)` opens one scene-wide Camera Controls window, also available through ECS and View menus. Selection is independent of the property inspector. Search filters IDs/types; compatible ICameraView instances control activation. Missing/disabled cameras stop navigation. Fitted 2D scenes appear as World view with pan/zoom via `Renderer.TryGetWorldFit` and `FitWorld`. Closing the window stops navigation. Pac-Man and Zuma use this shared API.
+
+## Official branding and startup
+
+`Content/branding/radiant-splash.png` is the approved Radiant identity (four-blade white emblem,
+black background, subtle particle wave, “Create something amazing.”). The runtime embeds it
+and Inter-Regular so the loader does not depend on loose content or the working directory.
+`StartupScreen` excludes the concept image's bottom status/bar and renders both live.
+`Window` advances `GameLoop.PrepareStartup()` once per presented loading frame, then resets
+simulation timing before the first update. Headless execution and later scene transitions remain
+synchronous. Frame-sensitive rendering fixtures use `WindowOptions.ShowLoader = false`.
+`WindowOptions.PrepareApplication` is a cancellable async callback before scene creation; it
+reports immutable `LoadingProgress` through a thread-safe sink. No update server, downloads,
+installation, or automatic update policy are supplied. Exceptions keep the loader open and
+prevent scene startup; hidden loaders throw. Closing cancels pending work and observes faults.
+`Window.IsLoading`, `LoadingProgress`, and `StartupError` expose current state to subclasses.
+Subclass update/draw hooks must avoid scene access until `IsLoading` is false.
+See `docs/Startup.md`. Headless startup regressions are in `Radiant.Tests`; the real Vulkan
+fixture is `Radiant.Scenes --startup-regression` (success, resize, failure, cancel, hidden).

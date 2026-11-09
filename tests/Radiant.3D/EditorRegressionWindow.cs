@@ -30,7 +30,7 @@ internal sealed class EditorRegressionWindow : Window
     private Dictionary<string, WindowData> EditorWindows => (Dictionary<string, WindowData>)typeof(Inspector).GetField("Windows", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(Scene.ECS.GetSystem<Inspector>());
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public EditorRegressionWindow(bool twoD, bool navigation = false) : base(new GameLoop(), new() { Title = "Radiant editor regression", Width = 1280, Height = 720 })
+    public EditorRegressionWindow(bool twoD, bool navigation = false) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant editor regression", Width = 1280, Height = 720 })
     {
         TwoD = twoD;
         Navigation = navigation;

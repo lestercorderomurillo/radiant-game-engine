@@ -16,7 +16,7 @@ sealed class UDR4RegressionWindow : Window
     private bool SawMotion;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public UDR4RegressionWindow() : base(new GameLoop(), new() { Title = "UDR4 regression", Width = 320, Height = 180 })
+    public UDR4RegressionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "UDR4 regression", Width = 320, Height = 180 })
     {
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;

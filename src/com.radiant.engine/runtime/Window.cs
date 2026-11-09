@@ -19,12 +19,23 @@ public class Window : Game, IRuntimeHost
 
     private bool MaximizeOnShow;
     private MonoGameInputSource DesktopInput;
+    private readonly WindowOptions Options;
+    private StartupSession Startup;
+    private StartupScreen LoadingScreen;
+    private bool LoadingFramePresented;
+    /// <summary>True until application preparation and initial scene loading have completed.</summary>
+    public bool IsLoading => Startup is { Finished: false };
+    /// <summary>The current startup/update status, or null after startup resources have been released.</summary>
+    public LoadingProgress LoadingProgress => Startup?.Progress;
+    /// <summary>Failure that prevented startup; the loader stays visible until the window closes.</summary>
+    public Exception StartupError => Startup?.Error;
     IInputSource IRuntimeHost.Input => DesktopInput ?? (IInputSource)NullInputSource.Instance;
 
     /// <summary>Creates a MonoGame host with the supplied game loop and window settings.</summary>
     public Window(GameLoop gameLoop, WindowOptions Options = null)
     {
         Options ??= new WindowOptions();
+        this.Options = Options;
         MaximizeOnShow = Options.Maximized;
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Height);
@@ -77,6 +88,8 @@ public class Window : Game, IRuntimeHost
 
         DesktopInput = new MonoGameInputSource(Window, () => IsActive);
         GameLoop.Initialize(this);
+        Startup = new StartupSession(GameLoop, Options);
+        if (Options.ShowLoader) LoadingScreen = new StartupScreen(GraphicsDevice);
     }
 
     /// <summary>Marks a window resize for deferred renderer updates.</summary>
@@ -108,6 +121,27 @@ public class Window : Game, IRuntimeHost
     {
         base.Update(gameTime);
 
+        if (Startup != null)
+        {
+            if (Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(Microsoft.Xna.Framework.Input.Keys.Escape))
+            {
+                Exit();
+                return;
+            }
+            if (Options.ShowLoader && !LoadingFramePresented) return;
+            LoadingFramePresented = false;
+            do { Startup.Advance(); }
+            while (!Options.ShowLoader && Startup.CanAdvanceSynchronously);
+            if (Startup.Error != null && !Options.ShowLoader)
+                throw new InvalidOperationException("Radiant startup failed.", Startup.Error);
+            if (!Startup.Finished) return;
+            Startup.Dispose();
+            Startup = null;
+            LoadingScreen?.Dispose();
+            LoadingScreen = null;
+            GameLoop.ResetStartupTiming();
+        }
+
         GameLoop.Update();
 
         if (GameLoop.Controls.IsDown(Key.Escape)) Exit();
@@ -118,6 +152,16 @@ public class Window : Game, IRuntimeHost
     {
         if (MaximizeOnShow) { NativeWindow.Maximize(Window.Handle); MaximizeOnShow = false; }
 
+        if (Startup != null)
+        {
+            if (LoadingScreen != null) LoadingScreen.Draw(Startup.Progress, Startup.Error != null);
+            else GraphicsDevice.Clear(Microsoft.Xna.Framework.Color.Black);
+            LoadingFramePresented = true;
+            // Loading does not pass through the game loop's frame limiter.
+            System.Threading.Thread.Sleep(8);
+            return;
+        }
+
         GameLoop.Render();
     }
 
@@ -126,6 +170,8 @@ public class Window : Game, IRuntimeHost
     {
         if (disposing)
         {
+            Startup?.Dispose();
+            LoadingScreen?.Dispose();
             Window.ClientSizeChanged -= OnClientSizeChanged;
             if (GraphicsDevice != null) GraphicsDevice.DeviceReset -= OnClientSizeChanged;
             GameLoop.Dispose();

@@ -31,7 +31,7 @@ internal sealed class RenderingSettingsRegressionWindow : Window
     private Widget Widget(string id, string field) => Windows[id].Widgets[Windows[id].WidgetIndex[field]];
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public RenderingSettingsRegressionWindow(bool twoD) : base(new GameLoop(), new() { Title = "Shared rendering settings regression", Width = 1280, Height = 720 })
+    public RenderingSettingsRegressionWindow(bool twoD) : base(new GameLoop(), new() { ShowLoader = false, Title = "Shared rendering settings regression", Width = 1280, Height = 720 })
     {
         TwoD = twoD;
         Scene = twoD ? new Rendering2DScene() : new CornellBoxScene();

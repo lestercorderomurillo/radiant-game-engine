@@ -18,7 +18,7 @@ public sealed class SmokeWindow : Window
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public SmokeWindow(Scene Scene, string Output, Action<Scene, int> Step = null)
-        : base(new GameLoop(), new() { Title = "Radiant smoke test", Width = 960, Height = 540 })
+        : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant smoke test", Width = 960, Height = 540 })
     {
         this.Scene = Scene;
         this.Output = Output;

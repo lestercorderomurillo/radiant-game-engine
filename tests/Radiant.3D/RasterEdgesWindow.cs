@@ -46,7 +46,7 @@ internal sealed class RasterEdgesWindow : Window
     private HalfVector4[] Previous;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public RasterEdgesWindow() : base(new GameLoop(), new() { Title = "Radiant raster edge regression", Width = 640, Height = 360 }) { GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
+    public RasterEdgesWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant raster edge regression", Width = 640, Height = 360 }) { GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
 
     /// <inheritdoc/>
     protected override void Update(GameTime time)

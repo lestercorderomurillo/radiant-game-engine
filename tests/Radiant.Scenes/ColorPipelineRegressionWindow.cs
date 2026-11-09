@@ -43,7 +43,7 @@ internal sealed class ColorPipelineRegressionWindow : Window
     private readonly ToneMapper[] Cases = Enum.GetValues<ToneMapper>();
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public ColorPipelineRegressionWindow() : base(new GameLoop(), new() { Title = "Shared HRC color pipeline regression", Width = 320, Height = 180 }) { UDRQuality.Set(1); GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
+    public ColorPipelineRegressionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Shared HRC color pipeline regression", Width = 320, Height = 180 }) { UDRQuality.Set(1); GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
 
     /// <inheritdoc/>
     protected override void Update(GameTime time)

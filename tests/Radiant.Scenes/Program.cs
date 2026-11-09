@@ -5,6 +5,16 @@ using com.radiant.engine.runtime;
 using Radiant.Testing;
 using Microsoft.Xna.Framework;
 
+if (Array.IndexOf(args, "--startup-regression") >= 0)
+{
+    foreach (var Mode in new[] { "success", "failure", "cancel", "hidden" })
+    {
+        using var window = new StartupRegressionWindow(Mode);
+        window.Run();
+    }
+    return;
+}
+
 if (Array.IndexOf(args, "--color-pipeline") >= 0)
 {
     using var window = new ColorPipelineRegressionWindow();

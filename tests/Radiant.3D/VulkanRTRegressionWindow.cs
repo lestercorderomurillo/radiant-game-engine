@@ -58,7 +58,7 @@ internal sealed class VulkanRTRegressionWindow : Window
     private bool ExpectEnvironment;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public VulkanRTRegressionWindow(bool ExpectSoftware) : base(new GameLoop(), new() { Title = "Radiant Vulkan RT regression", Width = 320, Height = 200 })
+    public VulkanRTRegressionWindow(bool ExpectSoftware) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant Vulkan RT regression", Width = 320, Height = 200 })
     {
         this.ExpectSoftware = ExpectSoftware;
         GameLoop.AddScene(Scene);

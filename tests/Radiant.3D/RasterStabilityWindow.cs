@@ -15,7 +15,7 @@ internal sealed class RasterStabilityWindow : Window
     private TraceCamera LastCamera;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public RasterStabilityWindow() : base(new GameLoop(), new() { Title = "Raster stability regression", Width = 640, Height = 360 }) { GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
+    public RasterStabilityWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Raster stability regression", Width = 640, Height = 360 }) { GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
 
     /// <inheritdoc/>
     protected override void Draw(GameTime time)

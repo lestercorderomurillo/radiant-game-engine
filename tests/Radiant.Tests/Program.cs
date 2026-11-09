@@ -7,6 +7,7 @@ using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 
 RuntimeBackendRegression.Run();
+StartupRegression.Run();
 InputRegression.Run();
 MathBackendRegression.Run();
 RenderStateRegression.Run();

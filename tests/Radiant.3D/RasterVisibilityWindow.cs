@@ -25,7 +25,7 @@ internal sealed class RasterVisibilityWindow : Window
     ];
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public RasterVisibilityWindow() : base(new GameLoop(), new() { Title = "Raster visibility regression", Width = 960, Height = 540 }) { GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
+    public RasterVisibilityWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Raster visibility regression", Width = 960, Height = 540 }) { GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
 
     /// <inheritdoc/>
     protected override void Update(GameTime time)

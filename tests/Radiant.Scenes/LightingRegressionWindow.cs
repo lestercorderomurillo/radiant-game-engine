@@ -28,7 +28,7 @@ sealed class LightingRegressionWindow : Window
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public LightingRegressionWindow()
-        : base(new GameLoop(), new() { Title = "HRC lighting regression", Width = 960, Height = 540 })
+        : base(new GameLoop(), new() { ShowLoader = false, Title = "HRC lighting regression", Width = 960, Height = 540 })
     {
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;

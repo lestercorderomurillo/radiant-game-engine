@@ -103,6 +103,15 @@ public partial class GameLoop : IGameObject
         LastFpsUpdate = GlobalTimer.Elapsed.TotalSeconds;
     }
 
+    /// <summary>Excludes startup work from the first simulation and frame timing samples.</summary>
+    internal void ResetStartupTiming()
+    {
+        LastUpdateTicks = GlobalTimer.ElapsedTicks;
+        LastFrameTicks = LastUpdateTicks;
+        LastFrameTimingTicks = LastUpdateTicks;
+        LastFpsUpdate = GlobalTimer.Elapsed.TotalSeconds;
+    }
+
     /// <summary>Changes the frame-rate cap and recalculates the render interval.</summary>
     public void SetTargetFps(int fps)
     {
@@ -144,19 +153,34 @@ public partial class GameLoop : IGameObject
     /// <summary>Disposes the previous scene and initializes the requested scene and renderer.</summary>
     private void TransitionScene(int id)
     {
+        foreach (var Progress in PrepareSceneSteps(id)) { }
+    }
+
+    // Desktop startup advances this iterator once per displayed frame. Other hosts
+    // and subsequent transitions keep the synchronous lifecycle.
+    internal IEnumerator<LoadingProgress> PrepareStartup() => PrepareSceneSteps(Scenes.Length > 0 ? 0 : NoScene).GetEnumerator();
+
+    private IEnumerable<LoadingProgress> PrepareSceneSteps(int id)
+    {
+        yield return new LoadingProgress("Initializing engine...", 0);
         ReleaseActiveScene();
         SceneId = id;
 
         if (SceneId != NoScene)
         {
             Scenes[SceneId].Controls = Controls;
+            yield return new LoadingProgress("Preparing renderer...", 0.2);
             Host?.PrepareScene(Scenes[SceneId]);
+            yield return new LoadingProgress("Initializing scene...", 0.4);
             Scenes[SceneId].Initialize();
+            yield return new LoadingProgress("Loading systems...", 0.6);
             Scenes[SceneId].SetupECS();
+            yield return new LoadingProgress("Loading scene...", 0.8);
             Scenes[SceneId].SetupScene();
         }
 
         NextSceneId = NoScene;
+        yield return new LoadingProgress("Ready", 1);
     }
 
     /// <summary>Queues a scene change for the next update boundary.</summary>

@@ -20,7 +20,7 @@ public sealed class UpscalingRegressionWindow : Window
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public UpscalingRegressionWindow(Scene scene)
-        : base(new GameLoop(), new() { Title = "Reconstruction regression", Width = 320, Height = 180 })
+        : base(new GameLoop(), new() { ShowLoader = false, Title = "Reconstruction regression", Width = 320, Height = 180 })
     {
         Scene = scene;
         GameLoop.AddScene(scene);

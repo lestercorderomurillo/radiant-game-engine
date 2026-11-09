@@ -27,7 +27,7 @@ internal sealed class PipelineRegressionWindow : Window
     private void Select(int method) { if (Scene is CornellBoxScene s) s.SelectRenderer(method); else ((Rendering2DScene)Scene).SelectRenderer(method); }
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public PipelineRegressionWindow(Scene scene, DenoiserMode? denoiser = null) : base(new GameLoop(), new() { Title = "Radiant pipeline regression", Width = 640, Height = 360 })
+    public PipelineRegressionWindow(Scene scene, DenoiserMode? denoiser = null) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant pipeline regression", Width = 640, Height = 360 })
     {
         Scene = scene;
         RequestedDenoiser = denoiser;
