@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
@@ -81,7 +79,7 @@ public partial class Inspector
             Id = "close",
             Label = "Close",
             Type = MenuItemType.Action,
-            ActionCallback = () => Renderer.Window.Exit()
+            ActionCallback = () => Renderer.Window.RequestClose()
         });
 
         Menus.Add(file);

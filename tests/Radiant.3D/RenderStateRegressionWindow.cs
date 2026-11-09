@@ -1,3 +1,4 @@
+using Window = com.radiant.engine.backends.monogame.MonoGameWindow;
 using System;
 using com.radiant.engine.core;
 using com.radiant.engine.runtime;
@@ -8,7 +9,7 @@ internal sealed class RenderStateRegressionWindow : Window
 {
     public RenderStateRegressionWindow() : base(new GameLoop(), new() { Title = "Radiant render states", Width = 160, Height = 120 }) { }
 
-    private Renderer Renderer;
+    private IRenderer Renderer;
     private Texture2D Source, Pattern;
     private RenderTarget2D Target;
     private int Frame;
@@ -28,14 +29,15 @@ internal sealed class RenderStateRegressionWindow : Window
     {
         if (Renderer == null)
         {
-            Renderer = new Renderer(this);
+            Renderer = CreateRenderer();
+            GraphicsResourceGpuRegression.Run(Renderer, this);
             try { Renderer.Configure((object)Microsoft.Xna.Framework.Graphics.BlendState.Opaque); throw new Exception("Native state silently accepted"); }
             catch (ArgumentException) { }
-            Source = new Texture2D(GraphicsDevice, 1, 1);
+            Source = Renderer.CreateTexture(1, 1);
             Source.SetData(new[] { Foreground });
-            Pattern = new Texture2D(GraphicsDevice, 2, 2);
+            Pattern = Renderer.CreateTexture(2, 2);
             Pattern.SetData(Colors);
-            Target = new RenderTarget2D(GraphicsDevice, 4, 4, false, SurfaceFormat.Color, DepthFormat.None);
+            Target = Renderer.CreateRenderTarget(4, 4, SurfaceFormat.Color);
         }
         int scenario = Frame / 3;
         // Read after presentation: Native Vulkan submits the preceding frame asynchronously.
@@ -56,10 +58,11 @@ internal sealed class RenderStateRegressionWindow : Window
                     Equal(pixels[y * 4 + x], Colors[sy * 2 + sx], "Point sampling / " + flip);
                 }
             }
-            else Equal(pixels[5], new Color(159, 64, 64), "Linear filtering");
-            if (scenario == 9)
+            else if (scenario == 9) Equal(pixels[5], new Color(159, 64, 64), "Linear filtering");
+            else foreach (var pixel in pixels) Equal(pixel, scenario is 11 or 13 ? Color.Coral : Color.Red, "Shape batch case " + scenario);
+            if (scenario == 13)
             {
-                Console.WriteLine("PASS: Radiant blend descriptions, custom mask subtraction, channel masks, point/linear sampling and sprite flip flags on GPU.");
+                Console.WriteLine("PASS: Radiant blend descriptions, custom mask subtraction, channel masks, point/linear sampling, sprite flips, external/main batch growth, Z order and empty clears on GPU.");
                 Exit();
                 return;
             }
@@ -69,7 +72,31 @@ internal sealed class RenderStateRegressionWindow : Window
             Renderer.Configure(Blends[scenario]).DrawTexture(Source, new Rectangle(0, 0, 4, 4));
         else if (scenario < 9)
             Renderer.DrawTexture(Pattern, Vector2.Zero, null, Color.White, 0, Vector2.Zero, new Vector2(2), (SpriteEffects)(scenario - 5), 0);
-        else Renderer.Configure(SamplerState.LinearClamp).DrawTexture(Pattern, new Rectangle(0, 0, 4, 4));
+        else if (scenario == 9) Renderer.Configure(SamplerState.LinearClamp).DrawTexture(Pattern, new Rectangle(0, 0, 4, 4));
+        else if (scenario == 10)
+        {
+            var external = new Shape[65537];
+            Array.Fill(external, Shape.Rect(Vector2.Zero, Renderer.VirtualSize, Color.Red));
+            Renderer.FlushShapesExternal(external, external.Length, Target, technique: "Sharp");
+        }
+        else if (scenario == 11)
+        {
+            for (int i = 0; i < 65537; i++) Renderer.DrawRect(Vector2.Zero, Renderer.VirtualSize, Color.Coral);
+            Renderer.FlushShapes(Target, technique: "Sharp");
+        }
+        else if (scenario == 12)
+        {
+            Renderer.InitializeParallelShapes(1, 3);
+            var shapes = Renderer.GetParallelBuffer(0);
+            var depths = Renderer.GetParallelZBuffer(0);
+            shapes[0] = Shape.Rect(Vector2.Zero, Renderer.VirtualSize, Color.Red); depths[0] = 2;
+            shapes[1] = Shape.Rect(Vector2.Zero, Renderer.VirtualSize, Color.Lime); depths[1] = 0;
+            shapes[2] = Shape.Rect(Vector2.Zero, Renderer.VirtualSize, Color.White); depths[2] = 1;
+            Renderer.SetParallelCount(0, 3);
+            Renderer.SortParallelBufferByZ(0);
+            Renderer.CollectParallelShapesSorted().FlushShapes(Target, technique: "Sharp");
+        }
+        else Renderer.ClearShapes().FlushShapes(Target, Color.Coral, "Sharp");
         Renderer.Commit().SetTarget(null);
         Frame++;
     }

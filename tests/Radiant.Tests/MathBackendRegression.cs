@@ -34,6 +34,16 @@ internal static class MathBackendRegression
         Require(Marshal.SizeOf<Vector2>() == 8 && Marshal.SizeOf<Vector3>() == 12 && Marshal.SizeOf<Vector4>() == 16 && Marshal.SizeOf<Matrix>() == 64, "GPU math layout changed");
         Require(Marshal.SizeOf<MeshVertex>() == 32 && Marshal.OffsetOf<MeshVertex>(nameof(MeshVertex.Normal)).ToInt32() == 12 && Marshal.OffsetOf<MeshVertex>(nameof(MeshVertex.TextureCoordinate)).ToInt32() == 24, "Mesh vertex ABI changed");
 
+        var meshVertices = Mesh.Plane.VertexData.ToArray();
+        var meshIndices = Mesh.Plane.IndexData.ToArray();
+        var mesh = new Mesh(meshVertices, meshIndices);
+        meshVertices[0] = default;
+        meshIndices[0] = 3;
+        Require(mesh.VertexData[0].Position == Mesh.Plane.VertexData[0].Position &&
+            mesh.IndexData[0] == 0, "Mesh backend views must preserve the constructor snapshot");
+        Require(mesh.VertexData.Length == mesh.VertexCount &&
+            mesh.IndexData.Length == mesh.TriangleCount * 3, "Mesh backend view counts differ");
+
         Require(Marshal.SizeOf<Color>() == 4 && Marshal.OffsetOf<Color>(nameof(Color.A)).ToInt32() == 3, "RGBA8 ABI changed");
         Require(Marshal.SizeOf<Point>() == 8 && Marshal.SizeOf<Rectangle>() == 16, "Integer geometry ABI changed");
         Require(Marshal.SizeOf<ColorVertex>() == 16 && Marshal.OffsetOf<ColorVertex>(nameof(ColorVertex.Color)).ToInt32() == 12, "Colored vertex ABI changed");

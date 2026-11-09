@@ -1,13 +1,18 @@
+using com.radiant.engine.runtime;
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using com.radiant.engine.input;
 
-namespace com.radiant.engine.runtime;
+namespace com.radiant.engine.backends.monogame;
 
 /// <summary>Hosts the game loop in a MonoGame window and forwards resizing and drawing events.</summary>
-public class Window : Game, IRuntimeHost
+public class MonoGameWindow : Game, IRuntimeHost, IWindow
 {
+    string IWindow.Title { get => Window.Title; set => Window.Title = value; }
+    Rectangle IWindow.ClientBounds => Window.ClientBounds.ToRadiant();
+    void IWindow.RequestClose() => Exit();
+
     public static int BuildNumber { get; private set; }
     public static string BuildTag { get; private set; }
 
@@ -22,14 +27,14 @@ public class Window : Game, IRuntimeHost
     IInputSource IRuntimeHost.Input => DesktopInput ?? (IInputSource)NullInputSource.Instance;
 
     /// <summary>Creates a MonoGame host with the supplied game loop and window settings.</summary>
-    public Window(GameLoop gameLoop, WindowOptions Options = null)
+    public MonoGameWindow(GameLoop gameLoop, WindowOptions Options = null)
     {
         Options ??= new WindowOptions();
         MaximizeOnShow = Options.Maximized;
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(Options.Height);
-        BuildNumber = typeof(Window).Assembly.GetName().Version?.Build ?? 0;
-        BuildTag = $"Radiant {typeof(Window).Assembly.GetName().Version}";
+        BuildNumber = typeof(MonoGameWindow).Assembly.GetName().Version?.Build ?? 0;
+        BuildTag = $"Radiant {typeof(MonoGameWindow).Assembly.GetName().Version}";
 
         GraphicsDeviceManager = new GraphicsDeviceManager(this);
 
@@ -41,7 +46,7 @@ public class Window : Game, IRuntimeHost
         IsFixedTimeStep = false;
         InactiveSleepTime = TimeSpan.Zero;
 
-        GraphicsDeviceManager.PreferredDepthStencilFormat = DepthFormat.None;
+        GraphicsDeviceManager.PreferredDepthStencilFormat = Microsoft.Xna.Framework.Graphics.DepthFormat.None;
         GraphicsDeviceManager.PreferredBackBufferWidth = Options.Width;
         GraphicsDeviceManager.PreferredBackBufferHeight = Options.Height;
         GraphicsDeviceManager.GraphicsProfile = GraphicsProfile.HiDef;
@@ -53,7 +58,10 @@ public class Window : Game, IRuntimeHost
         Content.RootDirectory = "Content";
     }
 
-    void IRuntimeHost.PrepareScene(com.radiant.engine.core.Scene Scene) => Scene.Renderer = new com.radiant.engine.core.Renderer(this);
+    /// <summary>Creates a portable renderer owning an independent graphics session for this host.</summary>
+    public com.radiant.engine.core.Renderer CreateRenderer() => new(new MonoGameGraphicsBackend(this), this, GameLoop);
+
+    void IRuntimeHost.PrepareScene(com.radiant.engine.core.Scene Scene) => Scene.Renderer = CreateRenderer();
     void IRuntimeHost.ReleaseScene(com.radiant.engine.core.Scene Scene)
     {
         Scene.Renderer?.Dispose();

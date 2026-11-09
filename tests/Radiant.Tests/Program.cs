@@ -10,6 +10,13 @@ RuntimeBackendRegression.Run();
 InputRegression.Run();
 MathBackendRegression.Run();
 RenderStateRegression.Run();
+GraphicsResourceRegression.Run();
+RendererContractRegression.Run();
+RenderViewRegression.Run();
+ResourceCacheRegression.Run();
+ShapeCollectionRegression.Run();
+FontServiceRegression.Run();
+PortableRendererRegression.Run();
 
 var Scene = new Scene();
 Scene.Initialize();

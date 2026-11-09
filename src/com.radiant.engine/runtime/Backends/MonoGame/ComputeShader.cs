@@ -1,4 +1,5 @@
 using System;
+using com.radiant.engine.runtime;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Framework.Utilities;
@@ -10,10 +11,10 @@ namespace com.radiant.engine.core;
 /// Uses SPIR-V entry point main and optional push constants. Create, dispatch and dispose
 /// on the render thread. Dispose before the renderer; do not dispose or render into Output.
 /// </summary>
-public sealed class ComputeShader : IDisposable
+internal sealed class ComputeShader : IComputeShader
 {
     private const string Library = "mgruntime";
-    private readonly Renderer Renderer;
+    private readonly IRenderer Renderer;
     private readonly int Thread = Environment.CurrentManagedThreadId;
     private readonly int ConstantBytes;
     private IntPtr Context;
@@ -43,7 +44,7 @@ public sealed class ComputeShader : IDisposable
         return true;
     }
 
-    internal ComputeShader(Renderer Renderer, NativeGraphicsHandles Handles, ReadOnlySpan<byte> Spirv, int Width, int Height, int PushConstantBytes)
+    internal ComputeShader(IRenderer Renderer, MonoGameGraphicsBackend Backend, NativeGraphicsHandles Handles, ReadOnlySpan<byte> Spirv, int Width, int Height, int PushConstantBytes)
     {
         if (Width <= 0 || Height <= 0) throw new ArgumentOutOfRangeException(nameof(Width), "Both dimensions must be positive.");
         if (PushConstantBytes < 0 || PushConstantBytes % 4 != 0) throw new ArgumentOutOfRangeException(nameof(PushConstantBytes));
@@ -55,7 +56,7 @@ public sealed class ComputeShader : IDisposable
         var code = MemoryMarshal.Cast<byte, uint>(Spirv).ToArray();
         Context = Create(Handles.LogicalDevice, code, (uint)Spirv.Length, (uint)Width, (uint)Height, (uint)PushConstantBytes);
         if (Context == IntPtr.Zero) throw Error();
-        try { Output = Renderer.WrapVulkanTraceImage(Image(Context), Width, Height); }
+        try { Output = Backend.WrapImage(Image(Context), Width, Height); }
         catch { Destroy(Context); Context = IntPtr.Zero; throw; }
     }
 

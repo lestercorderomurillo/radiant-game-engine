@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.bundle;
 
@@ -24,17 +23,17 @@ public partial class Inspector
     private static Color CloseText = new(245, 245, 245, 255);
     private static Color LabelDim = new(15, 15, 15, 255);
 
-    /// <summary> Returns the names of all registered themes. </summary>
+    /// <summary>Names of every registered theme: Carbon (default), Solaris, Midnight, Sentinel, Greenfields, Neon, Nord and your own.</summary>
     public static string[] GetThemeNames() => ThemeNameList.ToArray();
 
-    /// <summary> Registers a custom theme. Overwrites if the name already exists. </summary>
+    /// <summary>Adds a color theme that users can pick from the Theme dropdown.</summary>
     public static void RegisterTheme(string Name, InspectorTheme Theme)
     {
         if (!Themes.ContainsKey(Name)) ThemeNameList.Add(Name);
         Themes[Name] = Theme;
     }
 
-    /// <summary> Applies a registered theme by name. </summary>
+    /// <summary>Switches every window to a theme by name.</summary>
     public static void ApplyTheme(string Name)
     {
         if (!Themes.TryGetValue(Name, out var theme)) return;
@@ -56,7 +55,7 @@ public partial class Inspector
         LabelDim = theme.LabelDim;
     }
 
-    /// <summary> Applies a registered theme by index in the registration order. </summary>
+    /// <summary>Switches every window to a theme by its position in <c>GetThemeNames</c>.</summary>
     public static void ApplyTheme(int Index)
     {
         if (Index >= 0 && Index < ThemeNameList.Count) ApplyTheme(ThemeNameList[Index]);

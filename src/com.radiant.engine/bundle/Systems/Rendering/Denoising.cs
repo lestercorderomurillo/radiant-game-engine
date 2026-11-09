@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 

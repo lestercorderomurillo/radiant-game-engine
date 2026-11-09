@@ -2,19 +2,38 @@ using System;
 
 namespace com.radiant.engine.core;
 
-/// <summary>Switches among mutually exclusive systems, initializing and disposing them as needed.</summary>
+/// <summary>
+/// A set of interchangeable systems where at most one runs at a time, such as alternative upscalers. Switching
+/// disposes the old system and initializes the new one.
+/// </summary>
+/// <example>
+/// The following example shows how to offer two upscalers and cycle them with a key:
+/// <code>
+/// var upscaling = new SystemGroup("Upscaling",
+///     ("Bilinear", ECS.AddSystem&lt;Bilinear&gt;()),
+///     ("UDR3", ECS.AddSystem&lt;UDR3&gt;(enabled: false)));
+/// ECS.RegisterSystemGroup(upscaling);
+///
+/// if (Controls.WasPressed(Key.F11)) upscaling.Toggle();
+/// </code>
+/// </example>
 public class SystemGroup
 {
     private readonly (string Name, System System)[] Entries;
     private int ActiveIndex;
 
+    /// <summary>Name shown in the System Inspector, such as <c>"Upscaling"</c>.</summary>
     public string Name { get; }
+    /// <summary>Name of the running system, or null when none is.</summary>
     public string ActiveName => ActiveIndex >= 0 ? Entries[ActiveIndex].Name : null;
+    /// <summary>The running system, or null when none is.</summary>
     public System Active => ActiveIndex >= 0 ? Entries[ActiveIndex].System : null;
+    /// <summary>Index of the running system, or -1 when none is.</summary>
     public int ActiveIdx => ActiveIndex;
+    /// <summary>Every entry's name, in order. Handy for a dropdown.</summary>
     public string[] Names => Array.ConvertAll(Entries, e => e.Name);
 
-    /// <summary>Creates a named selection group and locates its initially enabled entry.</summary>
+    /// <summary>Creates a group from named systems. The first enabled entry starts active; register the others with <c>enabled: false</c>.</summary>
     public SystemGroup(string name, params (string name, System system)[] entries)
     {
         Name = name;
@@ -23,7 +42,7 @@ public class SystemGroup
         if (ActiveIndex < 0) ActiveIndex = 0;
     }
 
-    /// <summary>Activates the next system, cycling through a disabled state after the last entry.</summary>
+    /// <summary>Switches to the next system. After the last one, everything is off; toggling again starts over.</summary>
     public void Toggle()
     {
         int next = ActiveIndex + 1;
@@ -34,7 +53,7 @@ public class SystemGroup
             SetActive(next);
     }
 
-    /// <summary>Disposes the current system and initializes the selected entry.</summary>
+    /// <summary>Switches to the system at an index.</summary>
     public void SetActive(int index)
     {
         if (index == ActiveIndex || index < 0 || index >= Entries.Length) return;
@@ -53,7 +72,7 @@ public class SystemGroup
         next.Initialize();
     }
 
-    /// <summary>Disposes and disables the active system, leaving the group inactive.</summary>
+    /// <summary>Turns the running system off and leaves the group with none active.</summary>
     public void DisableActive()
     {
         if (ActiveIndex < 0) return;
@@ -64,7 +83,7 @@ public class SystemGroup
         ActiveIndex = -1;
     }
 
-    /// <summary>Returns the entry index for a system, or -1 when it is not in the group.</summary>
+    /// <summary>Returns a system's index in the group, or -1.</summary>
     public int IndexOf(System system)
     {
         for (int i = 0; i < Entries.Length; i++)
@@ -73,7 +92,7 @@ public class SystemGroup
         return -1;
     }
 
-    /// <summary>Invokes an action for every system in the group.</summary>
+    /// <summary>Runs an action on every system in the group, active or not.</summary>
     public void ForEach(Action<System> action)
     {
         for (int i = 0; i < Entries.Length; i++)

@@ -1,14 +1,20 @@
 using System;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Creates emissive ECS lights with matching geometry and materials.</summary>
+/// <summary>One-line helpers for adding lights to a 2D scene lit by <c>HRCGI</c>.</summary>
+/// <example>
+/// The following example shows how to add a warm lamp and a hundred colorful sparks:
+/// <code>
+/// var warm = new Color(255, 180, 100);
+/// LightFactory.CreateLight(ECS, new Vector2(1920, 1080), 60f, warm, warm);
+/// LightFactory.SpawnRandom(ECS, 100, Renderer.VirtualSize, radius: 4f);
+/// </code>
+/// </example>
 public static class LightFactory
 {
-    /// <summary>Creates an emissive circle entity with the requested position and material.</summary>
+    /// <summary>Creates a glowing circle and returns its entity. <paramref name="emissive"/> is the light color (its alpha is brightness); <paramref name="z"/> sets the draw layer.</summary>
     public static int CreateLight(ECS ecs, Vector2 position, float radius,
         Color albedo, Color emissive, float? z = null, Texture2D texture = null)
     {
@@ -32,7 +38,7 @@ public static class LightFactory
         return id;
     }
 
-    /// <summary>Creates lights at randomized positions within the requested bounds.</summary>
+    /// <summary>Scatters small lights of random hues across an area and returns their entities. Great for stress tests and ambience.</summary>
     public static int[] SpawnRandom(ECS ecs, int count, Vector2 screenSize, float radius = 3f)
     {
         var ids = new int[count];
@@ -49,7 +55,7 @@ public static class LightFactory
         return ids;
     }
 
-    /// <summary>Converts a normalized hue into a fully saturated RGB color.</summary>
+    /// <summary>Turns a hue from 0 to 1 into a fully saturated color, for rainbow effects.</summary>
     public static Color HueToRGB(float hue)
     {
         float r = MathF.Abs(hue * 6f - 3f) - 1f;

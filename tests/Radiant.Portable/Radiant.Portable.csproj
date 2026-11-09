@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Radiant.Core/Radiant.Core.csproj" />
+    <Compile Include="../../eng/Radiant.Numerics.cs" Link="Radiant.Numerics.cs" />
+    <Compile Include="../Radiant.Tests/PortableRendererRegression.cs" Link="PortableRendererRegression.cs" />
+    <Compile Include="../Radiant.Tests/ResourceCacheRegression.cs" Link="ResourceCacheRegression.cs" />
+    <Compile Include="../Radiant.Tests/FontServiceRegression.cs" Link="FontServiceRegression.cs" />
+    <Compile Include="../Radiant.Tests/ShapeCollectionRegression.cs" Link="ShapeCollectionRegression.cs" />
+    <Compile Include="../Radiant.Tests/RuntimeBackendRegression.cs" Link="RuntimeBackendRegression.cs" />
+    <Compile Include="../Radiant.Tests/InputRegression.cs" Link="InputRegression.cs" />
+  </ItemGroup>
+</Project>

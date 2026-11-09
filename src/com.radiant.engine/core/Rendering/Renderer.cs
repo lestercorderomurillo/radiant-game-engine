@@ -1,14 +1,11 @@
 using com.radiant.engine.runtime;
 using System;
-using FontStashSharp;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
+using com.radiant.engine.graphics;
 
-#pragma warning disable CS0618
 namespace com.radiant.engine.core;
 
 /// <summary>
-/// Fluent rendering API for MonoGame/XNA providing shader management, render targets,
+/// Fluent Radiant rendering API providing shader management, render targets,
 /// and fullscreen quad drawing for post-processing effects.
 ///
 /// <example>
@@ -41,7 +38,7 @@ namespace com.radiant.engine.core;
 /// </example>
 ///
 /// <example>
-/// SpriteBatch-based texture drawing with shader:
+/// Texture drawing with shader:
 /// <code>
 /// Renderer
 ///     .Reset()
@@ -53,18 +50,12 @@ namespace com.radiant.engine.core;
 /// </code>
 /// </example>
 /// </summary>
-public partial class Renderer : IDisposable
+public partial class Renderer : IRenderer
 {
-    /// <summary>The parent window containing the graphics device.</summary>
-    public Window Window { get; }
-
-    /// <summary>The underlying MonoGame graphics device.</summary>
-    [Obsolete("Use Renderer API (CreateRenderTarget, CreateTexture, SetTarget, Clear, ViewportBounds, etc.) instead of accessing Device directly.")]
-    public GraphicsDevice Device { get; }
-
-    /// <summary>Shared SpriteBatch for texture drawing operations.</summary>
-    [Obsolete("Use Renderer API (Blit, BeginDraw/EndDraw, DrawSprite, DrawString, etc.) instead of accessing SpriteBatch directly.")]
-    public SpriteBatch SpriteBatch { get; }
+    public IWindow Window { get; }
+    public GameLoop GameLoop { get; }
+    private readonly IGraphicsBackend Backend;
+    private bool Disposed;
 
     /// <summary>Scene render target that replaces the backbuffer as the main render surface.</summary>
     public RenderTarget2D SceneRT { get; private set; }
@@ -75,119 +66,69 @@ public partial class Renderer : IDisposable
     /// <summary>Name of the currently active shader (null if none).</summary>
     public string CurrentShaderName { get; private set; }
 
+    private readonly com.radiant.engine.graphics.IGraphicsResourceFactory Resources;
     private readonly ShaderRegistry Shaders;
     private readonly TextureManager Textures;
     private readonly FontRegistry Fonts;
     private readonly ShapeBatcher ShapeBatch;
+    private readonly IGeometryBackend Geometry;
+    private readonly IGraphicsCommands Commands;
 
-    /// <summary>Current viewport width in pixels.</summary>
-    public int ScreenWidth { get; private set; }
-
-    /// <summary>Current viewport height in pixels.</summary>
-    public int ScreenHeight { get; private set; }
-
-    /// <summary>Current viewport size as Vector2.</summary>
-    public Vector2 ScreenSize { get; private set; }
-
-    /// <summary>Width / Height ratio.</summary>
-    public float AspectRatio { get; private set; }
-
-    /// <summary>Height / Width ratio.</summary>
-    public float InverseAspectRatio { get; private set; }
-
-    /// <summary>Virtual resolution width (fixed world coordinate space).</summary>
-    public float VirtualWidth { get; private set; }
-
-    /// <summary>Virtual resolution height (fixed world coordinate space).</summary>
-    public float VirtualHeight { get; private set; }
-
-    /// <summary>Virtual resolution as Vector2 (fixed world coordinate space).</summary>
-    public Vector2 VirtualSize { get; private set; }
-
-    /// <summary>Diagonal length of the screen in pixels.</summary>
-    public float ScreenDiagonal { get; private set; }
-
-    /// <summary>Total pixel count (Width * Height).</summary>
-    public int ScreenArea { get; private set; }
-
-    /// <summary>Largest power of 2 that fits within max(Width, Height).</summary>
-    public int ScreenLowerPowerOfTwo { get; private set; }
-
-    /// <summary>Smallest power of 2 that contains max(Width, Height).</summary>
-    public int ScreenHigherPowerOfTwo { get; private set; }
-
-    /// <summary>Square Vector2 using ScreenLowerPowerOfTwo.</summary>
-    public Vector2 ScreenSizeLowerPowerOfTwo { get; private set; }
-
-    /// <summary>Square Vector2 using ScreenHigherPowerOfTwo.</summary>
-    public Vector2 ScreenSizeHigherPowerOfTwo { get; private set; }
-
-    /// <summary>Scale factor from virtual coordinates to screen pixels (ScreenSize / VirtualSize).</summary>
-    public Vector2 VirtualToScreenScale { get; private set; }
-
-    private float RenderScaleValue = 1.0f;
-
-    /// <summary>
-    /// Render scale factor for dynamic resolution (0.25 to 1.0).
-    /// Systems can subscribe to RenderScaleChanged to resize their render targets.
-    /// </summary>
-    public float RenderScale
+    private readonly RenderView View = new(3840, 2160);
+    public int ScreenWidth => View.ScreenWidth;
+    public int ScreenHeight => View.ScreenHeight;
+    public Vector2 ScreenSize => View.ScreenSize;
+    public float AspectRatio => View.AspectRatio;
+    public float InverseAspectRatio => View.InverseAspectRatio;
+    public float VirtualWidth => View.VirtualWidth;
+    public float VirtualHeight => View.VirtualHeight;
+    public Vector2 VirtualSize => View.VirtualSize;
+    public float ScreenDiagonal => View.ScreenDiagonal;
+    public int ScreenArea => View.ScreenArea;
+    public int ScreenLowerPowerOfTwo => View.ScreenLowerPowerOfTwo;
+    public int ScreenHigherPowerOfTwo => View.ScreenHigherPowerOfTwo;
+    public Vector2 ScreenSizeLowerPowerOfTwo => View.ScreenSizeLowerPowerOfTwo;
+    public Vector2 ScreenSizeHigherPowerOfTwo => View.ScreenSizeHigherPowerOfTwo;
+    public Vector2 VirtualToScreenScale => View.VirtualToScreenScale;
+    public int ScaledWidth => View.ScaledWidth;
+    public int ScaledHeight => View.ScaledHeight;
+    public Vector2 ScaledSize => View.ScaledSize;
+    public int ScaledHigherPowerOfTwo => View.ScaledHigherPowerOfTwo;
+    public float RenderScale { get => View.RenderScale; set => View.RenderScale = value; }
+    public event Action<float> RenderScaleChanged
     {
-        get => RenderScaleValue;
-        set
-        {
-            if (Math.Abs(RenderScaleValue - value) > 0.001f)
-            {
-                RenderScaleValue = Math.Clamp(value, 0.25f, 1.0f);
-                UpdateScaledScreenInfo();
-                RenderScaleChanged?.Invoke(RenderScaleValue);
-            }
-        }
+        add => View.RenderScaleChanged += value;
+        remove => View.RenderScaleChanged -= value;
     }
 
-    /// <summary>Fired when RenderScale changes. Parameter is the new scale value.</summary>
-    public event Action<float> RenderScaleChanged;
-
-    /// <summary>Scaled viewport width (ScreenWidth * RenderScale).</summary>
-    public int ScaledWidth { get; private set; }
-
-    /// <summary>Scaled viewport height (ScreenHeight * RenderScale).</summary>
-    public int ScaledHeight { get; private set; }
-
-    /// <summary>Scaled viewport size as Vector2.</summary>
-    public Vector2 ScaledSize { get; private set; }
-
-    /// <summary>Smallest power of 2 containing max(ScaledWidth, ScaledHeight).</summary>
-    public int ScaledHigherPowerOfTwo { get; private set; }
-
     /// <summary>
-    /// Creates a new Renderer bound to the specified window.
+    /// Creates a renderer from portable graphics and host services.
     /// </summary>
-    /// <param name="window">The window containing the graphics device.</param>
-    public Renderer(Window window)
+    /// <param name="backend">Owned graphics session.</param>
+    /// <param name="window">Portable window information.</param>
+    /// <param name="gameLoop">Owning ECS loop.</param>
+    public Renderer(IGraphicsBackend backend, IWindow window, GameLoop gameLoop)
     {
+        ArgumentNullException.ThrowIfNull(backend);
+        ArgumentNullException.ThrowIfNull(window);
+        ArgumentNullException.ThrowIfNull(gameLoop);
+        Backend = backend;
         Window = window;
-        Device = window.GraphicsDevice;
-        SpriteBatch = new SpriteBatch(Device);
-
-        // Fixed virtual resolution — the world coordinate space.
-        VirtualWidth = 3840;
-        VirtualHeight = 2160;
-        VirtualSize = new Vector2(VirtualWidth, VirtualHeight);
-
-        Shaders = new ShaderRegistry(Window.Content);
-        Textures = new TextureManager(Device, Window.Content);
-        Fonts = new FontRegistry(Window.Content.RootDirectory);
-        ShapeBatch = new ShapeBatcher(Device);
-
-        for (int i = 0; i < SamplerStates.Length; i++)
-            SamplerStates[i] = SamplerState.LinearClamp;
-
-        InitializeBindingPools();
-        InitializeQuad();
-        InitializeFonts();
-        UpdateScreenInfo();
-        UpdateScaledScreenInfo();
+        GameLoop = gameLoop;
+        Resources = backend.Resources;
+        Commands = backend.Commands;
+        Geometry = backend.Geometry;
+        Shaders = new ShaderRegistry(backend.Assets);
+        Textures = new TextureManager(Resources, backend.Assets);
+        Fonts = new FontRegistry(backend.Fonts);
+        ShapeBatch = new ShapeBatcher(backend.Shapes);
+        try
+        {
+            for (int i = 0; i < SamplerStates.Length; i++) SamplerStates[i] = SamplerState.LinearClamp;
+            InitializeFonts();
+            UpdateScreenInfo();
+        }
+        catch { Dispose(); throw; }
     }
 
     /// <summary>Loads the font families used by renderer text commands.</summary>
@@ -197,101 +138,22 @@ public partial class Renderer : IDisposable
         Fonts.Load("Inter-Bold", "fonts/Inter-Bold.ttf");
     }
 
-    /// <summary>Updates screen-related properties from the presentation backbuffer.</summary>
+    /// <summary>Refreshes the portable view from the presentation surface, never an offscreen target.</summary>
     public void UpdateScreenInfo()
     {
-        // A resize may arrive while an offscreen target owns the viewport.
-        // Screen dimensions always describe the presentation backbuffer.
-        var Presentation = Device.PresentationParameters;
-        ScreenWidth = Presentation.BackBufferWidth;
-        ScreenHeight = Presentation.BackBufferHeight;
-        ScreenSize = new Vector2(ScreenWidth, ScreenHeight);
-        AspectRatio = (float)ScreenWidth / ScreenHeight;
-        InverseAspectRatio = (float)ScreenHeight / ScreenWidth;
-        ScreenDiagonal = MathF.Sqrt(ScreenWidth * ScreenWidth + ScreenHeight * ScreenHeight);
-        ScreenArea = ScreenWidth * ScreenHeight;
-
-        int maxDimension = Math.Max(ScreenWidth, ScreenHeight);
-        ScreenLowerPowerOfTwo = GetLowerPowerOfTwo(maxDimension);
-        ScreenHigherPowerOfTwo = GetHigherPowerOfTwo(maxDimension);
-        ScreenSizeLowerPowerOfTwo = new Vector2(ScreenLowerPowerOfTwo, ScreenLowerPowerOfTwo);
-        ScreenSizeHigherPowerOfTwo = new Vector2(ScreenHigherPowerOfTwo, ScreenHigherPowerOfTwo);
-        VirtualToScreenScale = new Vector2(ScreenWidth / VirtualWidth, ScreenHeight / VirtualHeight);
-        UpdateWorldView();
+        var presentation = Backend.PresentationSize;
+        // A minimized surface has no drawable size; preserve the last valid view.
+        if (presentation.X <= 0 || presentation.Y <= 0) return;
+        View.Resize(presentation.X, presentation.Y);
+        ShapeBatch.ViewProjection = View.ViewProjection;
     }
 
-    /// <summary>Refreshes screen dimensions derived from the current render scale.</summary>
-    private void UpdateScaledScreenInfo()
-    {
-        ScaledWidth = Math.Max(1, (int)(ScreenWidth * RenderScaleValue));
-        ScaledHeight = Math.Max(1, (int)(ScreenHeight * RenderScaleValue));
-        ScaledSize = new Vector2(ScaledWidth, ScaledHeight);
-
-        int scaledMax = Math.Max(ScaledWidth, ScaledHeight);
-        ScaledHigherPowerOfTwo = GetHigherPowerOfTwo(scaledMax);
-    }
-
-    /// <summary>Returns the largest power of two no greater than the supplied value.</summary>
-    private static int GetLowerPowerOfTwo(int value)
-    {
-        if (value <= 0) return 1;
-
-        int power = 1;
-
-        while (power * 2 <= value)
-            power *= 2;
-
-        return power;
-    }
-
-    /// <summary>Returns the smallest power of two no less than the supplied value.</summary>
-    private static int GetHigherPowerOfTwo(int value)
-    {
-        if (value <= 0) return 1;
-
-        int power = 1;
-
-        while (power < value)
-            power *= 2;
-
-        return power;
-    }
-
-    /// <summary>
-    /// Converts screen-space coordinates (e.g. mouse position) to virtual world coordinates.
-    /// </summary>
-    public Vector2 ScreenToWorld(Vector2 screenPos)
-    {
-        return (screenPos - WorldOffset) / WorldScale;
-    }
-
-    /// <summary>
-    /// Converts virtual world coordinates to screen-space coordinates.
-    /// </summary>
-    public Vector2 WorldToScreen(Vector2 worldPos)
-    {
-        return worldPos * WorldScale + WorldOffset;
-    }
-
-    /// <summary>
-    /// Converts a virtual-coordinate rectangle to a screen-pixel Rectangle with edge-snapping.
-    /// Each edge is rounded independently so adjacent rectangles sharing a virtual edge
-    /// map to the exact same screen pixel — no sub-pixel gaps.
-    /// </summary>
-    public Rectangle VirtualToScreenRect(float x, float y, float width, float height)
-    {
-        var Start = WorldToScreen(new Vector2(x, y));
-        var End = WorldToScreen(new Vector2(x + width, y + height));
-        int px = (int)MathF.Round(Start.X);
-        int py = (int)MathF.Round(Start.Y);
-        int pr = (int)MathF.Round(End.X);
-        int pb = (int)MathF.Round(End.Y);
-
-        return new Rectangle(px, py, pr - px, pb - py);
-    }
+    public Vector2 ScreenToWorld(Vector2 screenPos) => View.ScreenToWorld(screenPos);
+    public Vector2 WorldToScreen(Vector2 worldPos) => View.WorldToScreen(worldPos);
+    public Rectangle VirtualToScreenRect(float x, float y, float width, float height) => View.VirtualToScreenRect(x, y, width, height);
 
     /// <summary>Marks the renderer as actively drawing (rarely needed directly).</summary>
-    public Renderer Begin()
+    public IRenderer Begin()
     {
         IsDrawing = true;
         return this;
@@ -301,7 +163,7 @@ public partial class Renderer : IDisposable
     /// Commits any pending SpriteBatch operations and marks drawing complete.
     /// Call at the end of each render pass.
     /// </summary>
-    public Renderer Commit()
+    public IRenderer Commit()
     {
         CommitTextures();
         IsDrawing = false;
@@ -312,7 +174,7 @@ public partial class Renderer : IDisposable
     /// Resets all render state to defaults and clears the current shader.
     /// Call at the start of each render pass for clean state.
     /// </summary>
-    public Renderer Reset()
+    public IRenderer Reset()
     {
         CommitTextures();
 
@@ -332,21 +194,17 @@ public partial class Renderer : IDisposable
     /// <summary>Whether the game window is active and focused.</summary>
     public bool IsActive => Window.IsActive;
 
-    /// <summary>The game loop for timing info (FPS, etc.).</summary>
-    public runtime.GameLoop GameLoop => Window.GameLoop;
-
     /// <summary>Current viewport bounds rectangle.</summary>
-    public Rectangle ViewportBounds => Device.Viewport.Bounds.ToRadiant();
+    public Rectangle ViewportBounds => Commands.ViewportBounds;
 
     /// <summary>Whether the window has a pending resize that needs handling.</summary>
-    public bool HasPendingResize => Window.ResizePending;
+    public bool HasPendingResize => Backend.HasPendingResize;
 
     /// <summary>Handles a pending window resize: clears the flag and updates screen info.</summary>
     public void HandleResize()
     {
-        Window.ClearResizePending();
+        Backend.AcknowledgeResize();
         UpdateScreenInfo();
-        UpdateScaledScreenInfo();
     }
 
     /// <summary>Clears the backbuffer with the specified color. Routes rendering to SceneRT.</summary>
@@ -355,12 +213,11 @@ public partial class Renderer : IDisposable
         if (SceneRT == null || SceneRT.Width != ScreenWidth || SceneRT.Height != ScreenHeight)
         {
             SceneRT?.Dispose();
-            SceneRT = new RenderTarget2D(Device, ScreenWidth, ScreenHeight, false,
-                SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            SceneRT = CreateRenderTarget(ScreenWidth, ScreenHeight, usage: RenderTargetUsage.PreserveContents);
         }
 
-        Device.SetRenderTarget(SceneRT);
-        Device.Clear(color.ToNative());
+        BindTarget(SceneRT);
+        Commands.Clear(color);
     }
 
     /// <summary>Copies SceneRT to the actual backbuffer for presentation.</summary>
@@ -368,35 +225,36 @@ public partial class Renderer : IDisposable
     {
         if (SceneRT == null) return;
 
-        Device.SetRenderTarget(null);
-        SpriteBatch.Begin(MonoGameRenderStates.ToNative(SpriteSortMode.Deferred), NativeStates.Get(BlendState.Opaque), NativeStates.Get(SamplerState.PointClamp));
-        SpriteBatch.Draw(SceneRT, Device.Viewport.Bounds, Color.White.ToNative());
-        SpriteBatch.End();
+        CommitTextures();
+        Commands.SetTargets(ReadOnlySpan<RenderTarget2D>.Empty);
+        CurrentTargets = Array.Empty<RenderTarget2D>();
+        Commands.BeginSprites(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp);
+        Commands.DrawSprite(SceneRT, Commands.ViewportBounds, null, Color.White);
+        Commands.EndSprites();
     }
 
     /// <summary>
-    /// Creates a new RenderTarget2D. Systems should use this instead of new RenderTarget2D(Device, ...).
+    /// Creates a backend-owned render target.
     /// </summary>
     public RenderTarget2D CreateRenderTarget(int width, int height,
         SurfaceFormat format = SurfaceFormat.Color, DepthFormat depth = DepthFormat.None,
         RenderTargetUsage usage = RenderTargetUsage.DiscardContents, int samples = 0)
     {
-        return new RenderTarget2D(Device, width, height, false, format, depth, samples, usage);
+        return Resources.CreateRenderTarget(width, height, format, depth, usage, samples);
     }
 
     /// <summary>Finds a supported multisample count for the requested render-target format.</summary>
     public int GetSupportedSamples(int requested, SurfaceFormat format = SurfaceFormat.Color, DepthFormat depth = DepthFormat.None)
     {
-        Device.Adapter.QueryRenderTargetFormat(Device.GraphicsProfile, format, depth, requested, out _, out _, out int selected);
-        return selected;
+        return Resources.GetSupportedSamples(requested, format, depth);
     }
 
     /// <summary>
-    /// Creates a new Texture2D. Systems should use this instead of new Texture2D(Device, ...).
+    /// Creates a backend-owned texture.
     /// </summary>
     public Texture2D CreateTexture(int width, int height, SurfaceFormat format = SurfaceFormat.Color)
     {
-        return new Texture2D(Device, width, height, false, format);
+        return Resources.CreateTexture(width, height, format);
     }
 
     /// <summary>
@@ -471,11 +329,11 @@ public partial class Renderer : IDisposable
     /// <param name="minSize">Minimum size clamp (requests below this are clamped up).</param>
     public void RegisterShapeTexture(string name, Func<int, (int Width, int Height, Color[] Pixels)> generator, int minSize = 1)
     {
-        Textures.RegisterShape(name, (device, size) =>
+        Textures.RegisterShape(name, (resources, size) =>
         {
             var (width, height, pixels) = generator(size);
 
-            var texture = new Texture2D(device, width, height);
+            var texture = resources.CreateTexture(width, height);
             texture.SetData(pixels);
 
             return texture;
@@ -507,7 +365,7 @@ public partial class Renderer : IDisposable
     /// <summary>
     /// Gets a dynamic font at a specific pixel size (raw, no supersampling applied).
     /// </summary>
-    public SpriteFontBase GetFont(string name, float size) => Fonts.GetFont(name, size);
+    public FontFace GetFont(string name, float size) => Fonts.GetFont(name, size);
 
     /// <summary>
     /// Measures text dimensions using a dynamic font at a specific pixel size.
@@ -528,24 +386,20 @@ public partial class Renderer : IDisposable
     {
         float scale = 1f / Fonts.FontRenderScale;
         var font = Fonts.GetFont(fontName, size * Fonts.FontRenderScale);
-        SpriteBatch.DrawString(font, text, position, color.ToNative(), scale: new Vector2(scale));
-        if (bold) SpriteBatch.DrawString(font, text, position + Vector2.UnitX, color.ToNative(), scale: new Vector2(scale));
+        Commands.DrawText(font, text, position, color, scale);
+        if (bold) Commands.DrawText(font, text, position + Vector2.UnitX, color, scale);
     }
 
     /// <summary>Disposes all cached resources (shaders, textures, buffers).</summary>
     public void Dispose()
     {
-        NativeStates.Dispose();
-        QuadVertexBuffer?.Dispose();
-        QuadIndexBuffer?.Dispose();
-        SpriteBatch?.Dispose();
+        if (Disposed) return;
+        Disposed = true;
         SceneRT?.Dispose();
 
         Shaders?.Dispose();
         Textures?.Dispose();
         Fonts?.Dispose();
-        ShapeBatch?.Dispose();
-        DisposeMeshes();
-        TriangleVertices?.Dispose();
+        Backend.Dispose();
     }
 }

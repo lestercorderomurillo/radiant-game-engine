@@ -47,12 +47,13 @@ public readonly struct KeyboardState
     public bool IsKeyUp(Key Key) => !IsKeyDown(Key);
 }
 
-/// <summary>Mouse position in window client pixels; wheel values are cumulative units (120 per notch).</summary>
+/// <summary>Mouse position in window pixels, buttons and wheel totals. The wheel moves 120 units per notch.</summary>
 public readonly record struct MouseState(int X = 0, int Y = 0, int ScrollWheelValue = 0,
     ButtonState LeftButton = ButtonState.Released, ButtonState MiddleButton = ButtonState.Released,
     ButtonState RightButton = ButtonState.Released, ButtonState XButton1 = ButtonState.Released,
     ButtonState XButton2 = ButtonState.Released, int HorizontalScrollWheelValue = 0)
 {
+    /// <summary>Mouse position in window pixels.</summary>
     public Vector2 Position => new(X, Y);
     public bool IsDown(MouseButton Button) => (Button switch
     {
@@ -65,19 +66,43 @@ public readonly record struct MouseState(int X = 0, int Y = 0, int ScrollWheelVa
 /// <summary>One backend sample, including committed UTF-16 text since the previous capture.</summary>
 public readonly record struct InputSnapshot(KeyboardState Keyboard, MouseState Mouse, string Text = "", bool IsFocused = true);
 
-/// <summary>Stable input shared by every scene/system callback in one variable update.</summary>
+/// <summary>
+/// This frame's keyboard, mouse and typed text, available as <c>Controls</c> in every scene and system.
+/// Every callback in a frame sees the same snapshot, so a key press is never missed or counted twice.
+/// </summary>
+/// <example>
+/// The following example shows how to jump on a key press and aim with the mouse:
+/// <code>
+/// public override void Update()
+/// {
+///     if (Controls.WasPressed(Key.Space)) Jump();
+///     if (Controls.IsDown(MouseButton.Right)) Aim(Renderer.ScreenToWorld(Controls.Mouse.Position));
+///     Zoom += Controls.ScrollDelta / 120f;
+/// }
+/// </code>
+/// </example>
 public sealed class InputFrame
 {
+    /// <summary>An input frame with nothing pressed, used before the first capture and in headless runs.</summary>
     public static InputFrame Empty { get; } = new(default, default);
+    /// <summary>The raw state captured this frame.</summary>
     public InputSnapshot Current { get; }
+    /// <summary>The raw state captured last frame.</summary>
     public InputSnapshot Previous { get; }
+    /// <summary>Keys held this frame.</summary>
     public KeyboardState Keyboard => Current.Keyboard;
+    /// <summary>Mouse position and buttons this frame. Convert the position with <c>Renderer.ScreenToWorld</c>.</summary>
     public MouseState Mouse => Current.Mouse;
+    /// <summary>Characters typed since the last frame, already respecting keyboard layout and modifiers. Use it for text entry.</summary>
     public string Text => Current.Text ?? "";
+    /// <summary>True while the window has focus. Input reads as idle when it doesn't.</summary>
     public bool IsFocused => Current.IsFocused;
+    /// <summary>How far the mouse moved since last frame, in pixels. Handy for dragging and camera look.</summary>
     public Vector2 MouseDelta => Current.IsFocused && Previous.IsFocused ? Mouse.Position - Previous.Mouse.Position : Vector2.Zero;
+    /// <summary>Wheel movement since last frame: 120 per notch, positive when scrolling up.</summary>
     public int ScrollDelta => Current.IsFocused && Previous.IsFocused ? Mouse.ScrollWheelValue - Previous.Mouse.ScrollWheelValue : 0;
 
+    /// <summary>Creates a frame from two snapshots, for tests and input replay.</summary>
     public InputFrame(InputSnapshot Current, InputSnapshot Previous)
     {
         this.Current = Normalize(Current);
@@ -86,11 +111,17 @@ public sealed class InputFrame
     private static InputSnapshot Normalize(InputSnapshot State) => State.IsFocused ? State :
         new(default, new MouseState(State.Mouse.X, State.Mouse.Y, State.Mouse.ScrollWheelValue,
             HorizontalScrollWheelValue: State.Mouse.HorizontalScrollWheelValue), "", false);
+    /// <summary>True while the key is held. Use it for continuous actions such as movement.</summary>
     public bool IsDown(Key Key) => Keyboard.IsKeyDown(Key);
+    /// <summary>True only on the frame the key goes down. Use it for one-shot actions such as jumping.</summary>
     public bool WasPressed(Key Key) => Keyboard.IsKeyDown(Key) && Previous.Keyboard.IsKeyUp(Key);
+    /// <summary>True only on the frame the key comes up.</summary>
     public bool WasReleased(Key Key) => Keyboard.IsKeyUp(Key) && Previous.Keyboard.IsKeyDown(Key);
+    /// <summary>True while the mouse button is held.</summary>
     public bool IsDown(MouseButton Button) => Mouse.IsDown(Button);
+    /// <summary>True only on the frame the mouse button goes down, such as the start of a click or drag.</summary>
     public bool WasPressed(MouseButton Button) => Mouse.IsDown(Button) && !Previous.Mouse.IsDown(Button);
+    /// <summary>True only on the frame the mouse button comes up, such as the end of a drag.</summary>
     public bool WasReleased(MouseButton Button) => !Mouse.IsDown(Button) && Previous.Mouse.IsDown(Button);
 }
 

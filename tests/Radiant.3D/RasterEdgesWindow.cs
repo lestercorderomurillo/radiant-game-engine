@@ -1,3 +1,4 @@
+using Window = com.radiant.engine.backends.monogame.MonoGameWindow;
 using System;
 using System.IO;
 using com.radiant.engine.bundle;
@@ -103,7 +104,7 @@ internal sealed class RasterEdgesWindow : Window
 
         using (var stream = File.Create($"artifacts/raster-edges/{Scene.Sampling.Mode}.png")) output.SaveAsPng(stream, output.Width, output.Height);
 
-        Console.WriteLine($"Raster {Scene.Sampling.Mode} (lit {((Microsoft.Xna.Framework.Graphics.RenderTarget2D)output).MultiSampleCount}x / buffers {Scene.Geometry.ColorTexture.MultiSampleCount}x): {edges} edge pixels, maximum brightness error={maximumError:F6}");
+        Console.WriteLine($"Raster {Scene.Sampling.Mode} (lit {((RenderTarget2D)output).MultiSampleCount}x / buffers {Scene.Geometry.ColorTexture.MultiSampleCount}x): {edges} edge pixels, maximum brightness error={maximumError:F6}");
 
         if (edges < 20 || maximumError > 0.005f) throw new Exception("Raster MSAA introduced a bright seam between equally lit faces.");
 

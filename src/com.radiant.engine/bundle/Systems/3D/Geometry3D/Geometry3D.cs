@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
@@ -111,14 +109,14 @@ public class Geometry3D : core.System, IRenderSource, IRasterGeometry
     }
 
     /// <summary>Submits geometry for the caller's current render pass.</summary>
-    public void Draw(Renderer renderer)
+    public void Draw(IRenderer renderer)
     {
         renderer.SetTechnique("Meshes");
         SubmitMeshes(renderer);
     }
 
     /// <summary>Uploads and draws visible mesh instances through the renderer.</summary>
-    private void SubmitMeshes(Renderer renderer)
+    private void SubmitMeshes(IRenderer renderer)
     {
         if (!Source.HasCamera) return;
 

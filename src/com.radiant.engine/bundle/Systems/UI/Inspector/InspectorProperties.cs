@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Xna.Framework;
 
 namespace com.radiant.engine.bundle;
 
@@ -17,10 +16,12 @@ public partial class Inspector
     private float EditStep = 0.1f;
     private int EditAxis;
 
+    /// <summary>The entity open in the Entity Inspector, or -1.</summary>
     public static int SelectedEntity => Instance?.InspectedEntity ?? -1;
+    /// <summary>True while the user is typing in an inspector text field. Skip your keyboard shortcuts while it is set.</summary>
     public static bool IsEditingText => Instance?.GlobalVisible == true && Instance.FocusedTextInputWindowId != null && Instance.Windows.TryGetValue(Instance.FocusedTextInputWindowId, out var window) && window.Visible;
 
-    /// <summary>Selects an entity and opens its property inspector.</summary>
+    /// <summary>Opens an entity in the Entity Inspector.</summary>
     public static void SelectEntity(int entity) => Instance?.SelectEntityInternal(entity);
 
     /// <summary>Synchronizes entity selection, search results, and property controls.</summary>

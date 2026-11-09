@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
@@ -151,7 +149,7 @@ public class ShapeGeometry2D : core.System, IRenderSource, ITraceGeometry, ICame
     private int PreviousSegments;
 
     /// <summary>Submits geometry for the caller's current render pass.</summary>
-    public void Draw(Renderer renderer)
+    public void Draw(IRenderer renderer)
     {
         if (HasCamera && Vertices.Length > 0) renderer.SetTechnique("Shapes").SetParameter("ViewProjection", Camera.View * Camera.Projection).DrawTriangles(Vertices);
     }

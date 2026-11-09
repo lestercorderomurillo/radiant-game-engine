@@ -1,6 +1,4 @@
 using System.Runtime.InteropServices;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.core;
 
@@ -24,14 +22,6 @@ public struct Shape
 
     /// <summary>Current minus previous rendered position in world units, for the Motion technique.</summary>
     public Vector2 Motion;
-
-    internal static readonly VertexDeclaration Declaration = new VertexDeclaration(
-        new VertexElement(0, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 1),
-        new VertexElement(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 2),
-        new VertexElement(16, VertexElementFormat.Color, VertexElementUsage.Color, 1),
-        new VertexElement(20, VertexElementFormat.Single, VertexElementUsage.TextureCoordinate, 3),
-        new VertexElement(24, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 4)
-    );
 
     /// <summary>Creates a rectangle shape.</summary>
     public static Shape Rect(Vector2 position, Vector2 size, Color color) => new()
@@ -86,28 +76,4 @@ public struct Shape
         Color = color,
         Type = 3f
     };
-}
-
-/// <summary>
-/// Vertex type for the instanced shape quad template (position + UV).
-/// </summary>
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-internal struct ShapeQuadVertex : IVertexType
-{
-    public Vector2 Position;
-    public Vector2 UV;
-
-    public static readonly VertexDeclaration Declaration = new VertexDeclaration(
-        new VertexElement(0, VertexElementFormat.Vector2, VertexElementUsage.Position, 0),
-        new VertexElement(8, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0)
-    );
-
-    VertexDeclaration IVertexType.VertexDeclaration => Declaration;
-
-    /// <summary>Stores one quad corner's position and texture coordinates.</summary>
-    public ShapeQuadVertex(Vector2 position, Vector2 uv)
-    {
-        Position = position;
-        UV = uv;
-    }
 }

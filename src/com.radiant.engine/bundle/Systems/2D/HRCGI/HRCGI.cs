@@ -1,17 +1,22 @@
 using System;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
 /// <summary>
-/// Holographic Radiance Cascades - 2D Global Illumination System
-/// Based on the paper by Rouli Freeman (arXiv:2505.02041)
-///
-/// Uses MRT with separate RGB textures for radiance and transmittance (stained glass support).
-/// Single set of cascade surfaces reused for each frustum (memory efficient).
+/// Real-time global illumination for 2D scenes: emissive shapes cast soft light and shadows, and translucent
+/// materials tint the light passing through them. Add it together with <c>Geometry</c>; pick the quality in the
+/// Holographic Radiance Cascades window (F1 → View).
 /// </summary>
+/// <example>
+/// The following example shows the minimum setup for a lit scene:
+/// <code>
+/// ECS.AddSystem&lt;Geometry&gt;();
+/// ECS.AddSystem&lt;HRCGI&gt;();
+///
+/// LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 80f, Color.White, Color.Gold);
+/// </code>
+/// </example>
 public class HRCGI : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
@@ -26,8 +31,9 @@ public class HRCGI : core.System
 
     private Geometry Geometry;
 
-    /// <summary>Subpixel offset in output texels when sampling the radiance field. Zero disables jitter.</summary>
+    /// <summary>Sub-pixel offset applied when sampling the light, set by temporal upscalers. Leave it at zero otherwise.</summary>
     public Vector2 OutputJitter { get; set; }
+    /// <summary>The jitter used for the last rendered frame.</summary>
     public Vector2 LastOutputJitter { get; private set; }
 
     // Extensions need both radiance and RGB transmittance. Descending merges
@@ -292,7 +298,7 @@ public class HRCGI : core.System
         Renderer.Blit(FinalTexture, BlendState.AlphaBlend, SamplerState.PointClamp);
     }
 
-    /// <summary>Linear RGB mean radiance (angular integral divided by 2*pi), at viewport resolution.</summary>
+    /// <summary>The lit image for this frame, in linear color, ready for tone mapping or upscaling.</summary>
     public RenderTarget2D GetOutput() => FinalTexture;
 
     /// <inheritdoc/>

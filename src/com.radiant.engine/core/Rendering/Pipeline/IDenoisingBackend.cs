@@ -1,5 +1,4 @@
 using System;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.core;
 
@@ -21,4 +20,4 @@ public interface IDenoisingBackend : IRenderSource, IDisposable
 }
 
 /// <summary>Linear HDR input and aligned guides. SingleSample is unaccumulated radiance, not the progressive mean.</summary>
-public readonly record struct DenoisingFrame(Renderer Renderer, Texture2D Input, Texture2D SingleSample, Texture2D Albedo, Texture2D Normals, Texture2D Depth, Texture2D Emission, TraceCamera? Camera, long Revision, int Iterations, float Strength, float DepthSigma, float NormalPower, float AlbedoSigma);
+public readonly record struct DenoisingFrame(IRenderer Renderer, Texture2D Input, Texture2D SingleSample, Texture2D Albedo, Texture2D Normals, Texture2D Depth, Texture2D Emission, TraceCamera? Camera, long Revision, int Iterations, float Strength, float DepthSigma, float NormalPower, float AlbedoSigma);

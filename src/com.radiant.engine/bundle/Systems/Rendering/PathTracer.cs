@@ -1,7 +1,5 @@
 using System;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
@@ -42,7 +40,7 @@ public class PathTracer : ImageSystem
 
     private RenderTarget2D SoftwareSample;
 
-    internal VulkanPathTraceSession Hardware;
+    internal IPathTraceSession Hardware;
     internal int NativeDenoiser;
     internal Func<int> NativeDenoiserProvider;
 
@@ -112,7 +110,7 @@ public class PathTracer : ImageSystem
         if (ResolvedBackend == Backend && (Hardware == null || (Hardware.Sample.Width == Width && Hardware.Sample.Height == Height && Hardware.DenoisingSignals == (NativeDenoiser != 0)))) return;
 
         string reason = null;
-        bool useHardware = Backend != PathTracingBackend.Software && Renderer.SupportsVulkanPathTracing(out reason);
+        bool useHardware = Backend != PathTracingBackend.Software && Renderer.SupportsPathTracing(out reason);
 
         if (Backend == PathTracingBackend.Vulkan && !useHardware) throw new NotSupportedException(reason);
 
@@ -126,7 +124,7 @@ public class PathTracer : ImageSystem
         if (Backend == PathTracingBackend.Software) BackendStatus = "GPU shader BVH traversal";
         else if (useHardware)
         {
-            Hardware = Renderer.CreateVulkanPathTracer(Width, Height, NativeDenoiser != 0);
+            Hardware = Renderer.CreatePathTracer(Width, Height, NativeDenoiser != 0);
             ActiveBackend = PathTracingBackend.Vulkan;
             BackendStatus = reason;
         }

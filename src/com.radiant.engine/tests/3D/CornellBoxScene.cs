@@ -108,7 +108,7 @@ public class CornellBoxScene : Scene
     }
 
     /// <summary>Returns the image from the currently selected flat, raster, or path-traced renderer.</summary>
-    public Microsoft.Xna.Framework.Graphics.Texture2D GetRenderedOutput() => RenderMethod switch { 1 => Raster.GetOutput(), 2 => Lighting.GetOutput(), _ => Flat.GetOutput() };
+    public Texture2D GetRenderedOutput() => RenderMethod switch { 1 => Raster.GetOutput(), 2 => Lighting.GetOutput(), _ => Flat.GetOutput() };
 
     /// <summary>Activates the selected renderer and resets dependent image history and inspection.</summary>
     public void SelectRenderer(int index)

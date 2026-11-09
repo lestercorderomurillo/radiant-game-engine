@@ -1,3 +1,4 @@
+using Window = com.radiant.engine.backends.monogame.MonoGameWindow;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -8,8 +9,8 @@ using Microsoft.Xna.Framework.Graphics;
 
 internal sealed class ComputeRegressionWindow : Window
 {
-    private Renderer Renderer;
-    private ComputeShader Kernel;
+    private IRenderer Renderer;
+    private IComputeShader Kernel;
     private RenderTarget2D Target;
     private int Frame;
     private readonly bool ExpectUnavailable;
@@ -21,7 +22,7 @@ internal sealed class ComputeRegressionWindow : Window
 
     protected override void Draw(GameTime Time)
     {
-        Renderer ??= new Renderer(this);
+        Renderer ??= CreateRenderer();
         bool supported = Renderer.SupportsComputeShaders(out var reason);
         if (ExpectUnavailable)
         {
@@ -37,7 +38,7 @@ internal sealed class ComputeRegressionWindow : Window
         {
             Kernel = Renderer.CreateComputeShader(File.ReadAllBytes("artifacts/compute/Fill.spv"), 65, 49, 16);
             Target?.Dispose();
-            Target = new RenderTarget2D(GraphicsDevice, 65, 49, false, SurfaceFormat.Vector4, DepthFormat.None);
+            Target = Renderer.CreateRenderTarget(65, 49, SurfaceFormat.Vector4);
             try { Kernel.Dispatch(1, 1); throw new Exception("Invalid constants accepted."); } catch (ArgumentException) { }
             try { Kernel.Dispatch(0, 1); throw new Exception("Invalid groups accepted."); } catch (ArgumentOutOfRangeException) { }
         }

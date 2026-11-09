@@ -1,13 +1,10 @@
 using com.radiant.engine.runtime;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.core;
 
 public partial class Renderer
 {
     private Effect CurrentShader;
-    private readonly MonoGameRenderStates NativeStates = new();
 
     private BlendState BlendState = BlendState.Opaque;
     private DepthStencilState DepthStencilState = DepthStencilState.None;
@@ -21,7 +18,7 @@ public partial class Renderer
     /// </summary>
     /// <param name="name">Shader path relative to Content/shaders/ (e.g., "Effects/Blur").</param>
     /// <returns>This renderer for method chaining.</returns>
-    public Renderer SetShader(string name)
+    public IRenderer SetShader(string name)
     {
         CurrentShader = Shaders.Load(name);
         CurrentShaderName = name;
@@ -40,7 +37,7 @@ public partial class Renderer
     /// </summary>
     /// <param name="name">Shader path to release.</param>
     /// <returns>This renderer for method chaining.</returns>
-    public Renderer ReleaseShader(string name)
+    public IRenderer ReleaseShader(string name)
     {
         if (Shaders.Release(name) && CurrentShaderName == name)
         {
@@ -56,28 +53,28 @@ public partial class Renderer
     /// </summary>
     /// <param name="technique">Name of the technique to activate.</param>
     /// <returns>This renderer for method chaining.</returns>
-    public Renderer SetTechnique(string technique)
+    public IRenderer SetTechnique(string technique)
     {
         if (CurrentShader != null) CurrentShader.CurrentTechnique = CurrentShader.Techniques[technique];
         return this;
     }
 
     /// <summary>Sets the blend state for subsequent draw calls.</summary>
-    public Renderer Configure(BlendState state)
+    public IRenderer Configure(BlendState state)
     {
         BlendState = state;
         return this;
     }
 
     /// <summary>Sets the depth stencil state for subsequent draw calls.</summary>
-    public Renderer Configure(DepthStencilState state)
+    public IRenderer Configure(DepthStencilState state)
     {
         DepthStencilState = state;
         return this;
     }
 
     /// <summary>Sets the rasterizer state for subsequent draw calls.</summary>
-    public Renderer Configure(RasterizerState state)
+    public IRenderer Configure(RasterizerState state)
     {
         RasterizerState = state;
         return this;
@@ -86,7 +83,7 @@ public partial class Renderer
     /// <summary>Sets a sampler state at the specified slot.</summary>
     /// <param name="state">The sampler state to set.</param>
     /// <param name="slot">Sampler slot index (0-7).</param>
-    public Renderer Configure(SamplerState state, int slot = 0)
+    public IRenderer Configure(SamplerState state, int slot = 0)
     {
         if (slot >= 0 && slot < SamplerStates.Length)
         {
@@ -98,14 +95,14 @@ public partial class Renderer
     }
 
     /// <summary>Sets the sprite sort mode for DrawTexture operations.</summary>
-    public Renderer Configure(SpriteSortMode mode)
+    public IRenderer Configure(SpriteSortMode mode)
     {
         SpriteSortMode = mode;
         return this;
     }
 
     /// <summary>Sets two sampler states at specified slots.</summary>
-    public Renderer Configure((int slot, SamplerState state) s0, (int slot, SamplerState state) s1)
+    public IRenderer Configure((int slot, SamplerState state) s0, (int slot, SamplerState state) s1)
     {
         if (s0.slot >= 0 && s0.slot < SamplerStates.Length)
         {
@@ -123,7 +120,7 @@ public partial class Renderer
     }
 
     /// <summary>Sets three sampler states at specified slots.</summary>
-    public Renderer Configure((int slot, SamplerState state) s0, (int slot, SamplerState state) s1, (int slot, SamplerState state) s2)
+    public IRenderer Configure((int slot, SamplerState state) s0, (int slot, SamplerState state) s1, (int slot, SamplerState state) s2)
     {
         if (s0.slot >= 0 && s0.slot < SamplerStates.Length)
         {
@@ -147,7 +144,7 @@ public partial class Renderer
     }
 
     /// <summary>Sets four sampler states at specified slots.</summary>
-    public Renderer Configure((int slot, SamplerState state) s0, (int slot, SamplerState state) s1, (int slot, SamplerState state) s2, (int slot, SamplerState state) s3)
+    public IRenderer Configure((int slot, SamplerState state) s0, (int slot, SamplerState state) s1, (int slot, SamplerState state) s2, (int slot, SamplerState state) s3)
     {
         if (s0.slot >= 0 && s0.slot < SamplerStates.Length)
         {
@@ -177,7 +174,7 @@ public partial class Renderer
     }
 
     /// <summary>Sets multiple sampler states at specified slots.</summary>
-    public Renderer Configure(params (int slot, SamplerState state)[] samplers)
+    public IRenderer Configure(params (int slot, SamplerState state)[] samplers)
     {
         foreach (var (slot, state) in samplers)
         {
@@ -191,7 +188,7 @@ public partial class Renderer
     }
 
     /// <summary>Sets multiple render states by type detection.</summary>
-    public Renderer Configure(params object[] states)
+    public IRenderer Configure(params object[] states)
     {
         foreach (var state in states)
         {
@@ -218,49 +215,49 @@ public partial class Renderer
     }
 
     /// <summary>Sets a float parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, float value, Effect shader = null)
+    public IRenderer SetParameter(string name, float value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets an int parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, int value, Effect shader = null)
+    public IRenderer SetParameter(string name, int value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a bool parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, bool value, Effect shader = null)
+    public IRenderer SetParameter(string name, bool value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Vector2 parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Vector2 value, Effect shader = null)
+    public IRenderer SetParameter(string name, Vector2 value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Vector3 parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Vector3 value, Effect shader = null)
+    public IRenderer SetParameter(string name, Vector3 value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Vector4 parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Vector4 value, Effect shader = null)
+    public IRenderer SetParameter(string name, Vector4 value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Matrix parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Matrix value, Effect shader = null)
+    public IRenderer SetParameter(string name, Matrix value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
@@ -270,49 +267,49 @@ public partial class Renderer
     /// Sets a Texture2D parameter on the current (or specified) shader.
     /// The shader must have a named texture parameter (not just a register binding).
     /// </summary>
-    public Renderer SetParameter(string name, Texture2D value, Effect shader = null)
+    public IRenderer SetParameter(string name, Texture2D value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a float array parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, float[] value, Effect shader = null)
+    public IRenderer SetParameter(string name, float[] value, Effect shader = null)
     {
         (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Vector2 array parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Vector2[] value, Effect shader = null)
+    public IRenderer SetParameter(string name, Vector2[] value, Effect shader = null)
     {
-        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
+        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Vector3 array parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Vector3[] value, Effect shader = null)
+    public IRenderer SetParameter(string name, Vector3[] value, Effect shader = null)
     {
-        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
+        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Vector4 array parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Vector4[] value, Effect shader = null)
+    public IRenderer SetParameter(string name, Vector4[] value, Effect shader = null)
     {
-        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
+        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets a Matrix array parameter on the current (or specified) shader.</summary>
-    public Renderer SetParameter(string name, Matrix[] value, Effect shader = null)
+    public IRenderer SetParameter(string name, Matrix[] value, Effect shader = null)
     {
-        MonoGameMath.SetValue((shader ?? CurrentShader)?.Parameters[name], value);
+        (shader ?? CurrentShader)?.Parameters[name]?.SetValue(value);
         return this;
     }
 
     /// <summary>Sets multiple parameters using tuples with type detection.</summary>
-    public Renderer SetParameter(Effect shader = null, params (string name, object value)[] parameters)
+    public IRenderer SetParameter(Effect shader = null, params (string name, object value)[] parameters)
     {
         var target = shader ?? CurrentShader;
 
@@ -353,13 +350,13 @@ public partial class Renderer
             break;
             case float[] fa: parameter.SetValue(fa);
             break;
-            case Vector2[] v2a: MonoGameMath.SetValue(parameter, v2a);
+            case Vector2[] v2a: parameter.SetValue(v2a);
             break;
-            case Vector3[] v3a: MonoGameMath.SetValue(parameter, v3a);
+            case Vector3[] v3a: parameter.SetValue(v3a);
             break;
-            case Vector4[] v4a: MonoGameMath.SetValue(parameter, v4a);
+            case Vector4[] v4a: parameter.SetValue(v4a);
             break;
-            case Matrix[] ma: MonoGameMath.SetValue(parameter, ma);
+            case Matrix[] ma: parameter.SetValue(ma);
             break;
         }
     }

@@ -1,15 +1,30 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
 using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
 
 /// <summary>
-/// Retained-mode UI system with draggable windows, themes, and blurry glass.
-/// All public methods are static and null-safe (no-op if Inspector is not registered).
+/// In-game debug panels you build in a few lines: sliders, toggles, dropdowns, text fields and lists inside
+/// draggable windows. Press F1 to show or hide them. Every method is static and does nothing when the
+/// inspector isn't in the scene, so tuning code can stay in shipping builds.
 /// </summary>
+/// <example>
+/// The following example shows how to build a small tuning window and keep a label up to date:
+/// <code>
+/// public override void Initialize()
+/// {
+///     Inspector.CreateWindow("player", "Player");
+///     Inspector.AddSlider("player", "speed", "Speed", 50f, 800f, Speed, value => Speed = value);
+///     Inspector.AddToggle("player", "god", "God mode", false, enabled => GodMode = enabled);
+///     Inspector.AddLabel("player", "position", "Position: -");
+/// }
+///
+/// public override void Update() =>
+///     Inspector.SetLabel("player", "position", $"Position: {Position.X:0}, {Position.Y:0}");
+/// </code>
+/// </example>
 [CoreSystem]
 [RunAfter(typeof(Geometry))]
 [RunBefore(typeof(GizmosRenderer))]
@@ -66,7 +81,7 @@ public partial class Inspector : core.System
     private const float CursorBlinkRate = 0.53f;
     private const int InlineGap = 10;
 
-    /// <summary> Raised when "Reorder Windows" is clicked in the View menu. </summary>
+    /// <summary>Raised when the user picks View → Reorder Windows, after windows return to their default places.</summary>
     public static event Action WindowsRestored;
 
     private const int DefaultWindowWidth = 600;
@@ -99,123 +114,153 @@ public partial class Inspector : core.System
         }
     }
 
-    /// <summary> Creates a new window. LayoutOrder controls auto-position column order. </summary>
+    /// <summary>Creates a window you then fill with widgets. Lower <paramref name="LayoutOrder"/> values are placed first when windows auto-arrange.</summary>
     public static void CreateWindow(string Id, string Title, int LayoutOrder = 100, bool AutoPosition = true, bool Visible = true, WindowCategory Category = WindowCategory.System)
         => Instance?.CreateWindowInternal(Id, Title, LayoutOrder, AutoPosition, Visible, Category);
 
-    /// <summary> Creates a scene window listed below system tools in View. </summary>
+    /// <summary>Creates a window for your game's own panels, listed separately from engine tools in the View menu.</summary>
     public static void CreateSceneWindow(string Id, string Title, int LayoutOrder = 100, bool AutoPosition = true, bool Visible = true)
         => CreateWindow(Id, Title, LayoutOrder, AutoPosition, Visible, WindowCategory.Scene);
 
-    /// <summary> Destroys a window and all its widgets. </summary>
+    /// <summary>Removes a window and everything in it.</summary>
     public static void DestroyWindow(string Id)
         => Instance?.DestroyWindowInternal(Id);
 
-    /// <summary> Shows a hidden window. </summary>
+    /// <summary>Shows a window.</summary>
     public static void ShowWindow(string Id) => Instance?.SetWindowVisible(Id, true);
 
-    /// <summary> Hides a visible window. </summary>
+    /// <summary>Hides a window without destroying it.</summary>
     public static void HideWindow(string Id) => Instance?.SetWindowVisible(Id, false);
 
-    /// <summary> Toggles a window's visibility. </summary>
+    /// <summary>Shows a hidden window or hides a visible one.</summary>
     public static void ToggleWindow(string Id) => Instance?.ToggleWindowInternal(Id);
 
-    /// <summary> Returns true if the window exists and is visible. </summary>
+    /// <summary>True if the window exists and is showing.</summary>
     public static bool IsWindowVisible(string Id) => Instance?.IsWindowVisibleInternal(Id) ?? false;
 
-    /// <summary> Adds a text label widget. </summary>
+    /// <summary>Adds a line of text. Change it every frame with <c>SetLabel</c> to show live values.</summary>
     public static void AddLabel(string WindowId, string WidgetId, string Text)
         => Instance?.AddWidgetInternal(WindowId, WidgetId, WidgetType.Label, Text);
 
-    /// <summary> Adds a bold section header label with a horizontal rule. </summary>
+    /// <summary>Adds a bold heading with a divider to group the widgets below it.</summary>
     public static void AddSectionLabel(string WindowId, string WidgetId, string Text)
         => Instance?.AddSectionLabelInternal(WindowId, WidgetId, Text);
 
-    /// <summary> Adds a clickable button widget. </summary>
+    /// <summary>Adds a button that runs your callback when clicked.</summary>
     public static void AddButton(string WindowId, string WidgetId, string Text, Action Callback)
         => Instance?.AddButtonInternal(WindowId, WidgetId, Text, Callback);
 
-    /// <summary> Adds a boolean toggle widget. </summary>
+    /// <summary>Adds an on/off switch. Your callback receives the new value.</summary>
     public static void AddToggle(string WindowId, string WidgetId, string Text, bool Initial, Action<bool> Callback)
         => Instance?.AddToggleInternal(WindowId, WidgetId, Text, Initial, Callback);
 
-    /// <summary> Adds a float slider widget with min/max range. </summary>
+    /// <summary>Adds a slider between <paramref name="Min"/> and <paramref name="Max"/>. Your callback receives each new value while dragging.</summary>
     public static void AddSlider(string WindowId, string WidgetId, string Text, float Min, float Max, float Initial, Action<float> Callback)
         => Instance?.AddSliderInternal(WindowId, WidgetId, Text, Min, Max, Initial, Callback);
 
-    /// <summary> Adds a dropdown selection widget. </summary>
+    /// <summary>Adds a dropdown. Your callback receives the index of the chosen option.</summary>
+    /// <example>
+    /// The following example shows how to switch quality presets:
+    /// <code>
+    /// Inspector.AddDropdown("graphics", "quality", "Quality", ["Low", "Medium", "High"], 1, index => ApplyQuality(index));
+    /// </code>
+    /// </example>
     public static void AddDropdown(string WindowId, string WidgetId, string Text, string[] Options, int Initial, Action<int> Callback)
         => Instance?.AddDropdownInternal(WindowId, WidgetId, Text, Options, Initial, Callback);
 
-    /// <summary> Adds a text input field with placeholder text. </summary>
+    /// <summary>Adds a text field. Give it an <paramref name="InlineRatio"/> to share a row with the widget that follows.</summary>
+    /// <example>
+    /// The following example shows how to build a search bar from a field and a button on one row:
+    /// <code>
+    /// Inspector.AddTextInput("entities", "query", "Search…", text => Query = text, 0.8f);
+    /// Inspector.AddButton("entities", "go", "", Search, 0.2f); // Empty text shows a search icon
+    /// </code>
+    /// </example>
     public static void AddTextInput(string WindowId, string WidgetId, string Placeholder, Action<string> Callback, float InlineRatio = 0f)
         => Instance?.AddTextInputInternal(WindowId, WidgetId, Placeholder, Callback, InlineRatio);
 
-    /// <summary> Updates a text input's current value. </summary>
+    /// <summary>Replaces the text in a text field.</summary>
     public static void SetTextInputValue(string WindowId, string WidgetId, string Value)
         => Instance?.SetTextInputValueInternal(WindowId, WidgetId, Value);
 
-    /// <summary> Gets a text input's current value. </summary>
+    /// <summary>Returns the text currently in a text field.</summary>
     public static string GetTextInputValue(string WindowId, string WidgetId)
         => Instance?.GetTextInputValueInternal(WindowId, WidgetId) ?? "";
 
-    /// <summary> Adds an empty list box with a fixed pixel height. </summary>
+    /// <summary>Adds a scrollable list where users can select rows. <paramref name="Height"/> is in pixels.</summary>
+    /// <example>
+    /// The following example shows a two-column list of entities:
+    /// <code>
+    /// Inspector.AddListBox("world", "entities", 300);
+    /// Inspector.SetListBoxHeader("world", "entities", "ID  |  Name");
+    /// Inspector.SetListBoxItems("world", "entities", ["1  |  Player", "2  |  Lamp"]);
+    ///
+    /// var selected = Inspector.GetListBoxSelected("world", "entities");
+    /// </code>
+    /// </example>
     public static void AddListBox(string WindowId, string WidgetId, int Height, string[] Items = null)
         => Instance?.AddListBoxInternal(WindowId, WidgetId, Height, Items);
 
-    /// <summary> Updates the items displayed in a list box. </summary>
+    /// <summary>Replaces the rows of a list. Separate columns with <c>"  |  "</c>.</summary>
     public static void SetListBoxItems(string WindowId, string WidgetId, string[] Items)
         => Instance?.SetListBoxItemsInternal(WindowId, WidgetId, Items);
 
-    /// <summary> Returns the set of selected indices in a list box. </summary>
+    /// <summary>Returns the indices of the selected rows.</summary>
     public static HashSet<int> GetListBoxSelected(string WindowId, string WidgetId)
         => Instance?.GetListBoxSelectedInternal(WindowId, WidgetId);
 
-    /// <summary> Clears all selections in a list box. </summary>
+    /// <summary>Deselects every row.</summary>
     public static void ClearListBoxSelection(string WindowId, string WidgetId)
         => Instance?.ClearListBoxSelectionInternal(WindowId, WidgetId);
 
-    /// <summary> Sets a fixed header row for a list box (uses "  |  " separator for columns). </summary>
+    /// <summary>Adds a fixed header row; separate columns with <c>"  |  "</c>.</summary>
     public static void SetListBoxHeader(string WindowId, string WidgetId, string Header)
         => Instance?.SetListBoxHeaderInternal(WindowId, WidgetId, Header);
 
-    /// <summary> Sets a callback invoked when a status control (checkbox/radio) is clicked in a list box. </summary>
+    /// <summary>Runs your callback with the row index when a row's checkbox is clicked.</summary>
     public static void SetListBoxToggleCallback(string WindowId, string WidgetId, Action<int> Callback)
         => Instance?.SetListBoxToggleCallbackInternal(WindowId, WidgetId, Callback);
 
-    /// <summary> Adds a clickable button widget with inline ratio for horizontal layout. </summary>
+    /// <summary>Adds a button that shares a row with neighboring widgets, taking <paramref name="InlineRatio"/> of the width. Empty text shows a search icon.</summary>
     public static void AddButton(string WindowId, string WidgetId, string Text, Action Callback, float InlineRatio)
         => Instance?.AddButtonInternal(WindowId, WidgetId, Text, Callback, InlineRatio);
 
-    /// <summary> Removes a widget from a window. </summary>
+    /// <summary>Removes one widget from a window.</summary>
     public static void RemoveWidget(string WindowId, string WidgetId)
         => Instance?.RemoveWidgetInternal(WindowId, WidgetId);
 
-    /// <summary> Enables or disables a widget. Disabled widgets are greyed out and non-interactive. </summary>
+    /// <summary>Greys out a widget and ignores clicks while disabled.</summary>
     public static void SetWidgetEnabled(string WindowId, string WidgetId, bool Enabled)
         => Instance?.SetWidgetEnabledInternal(WindowId, WidgetId, Enabled);
 
-    /// <summary> Updates the text of a label widget. </summary>
+    /// <summary>Changes a label's text. Cheap enough to call every frame.</summary>
     public static void SetLabel(string WindowId, string WidgetId, string Text)
         => Instance?.SetLabelInternal(WindowId, WidgetId, Text);
 
-    /// <summary> Updates a slider's current value (clamped to its range). </summary>
+    /// <summary>Moves a slider to a value without calling its callback.</summary>
     public static void SetSliderValue(string WindowId, string WidgetId, float Value)
         => Instance?.SetSliderValueInternal(WindowId, WidgetId, Value);
 
-    /// <summary> Updates a toggle's current value. </summary>
+    /// <summary>Sets a toggle without calling its callback.</summary>
     public static void SetToggleValue(string WindowId, string WidgetId, bool Value)
         => Instance?.SetToggleValueInternal(WindowId, WidgetId, Value);
 
-    /// <summary> Updates a dropdown's selected index. </summary>
+    /// <summary>Selects a dropdown option without calling its callback.</summary>
     public static void SetDropdownValue(string WindowId, string WidgetId, int Index)
         => Instance?.SetDropdownValueInternal(WindowId, WidgetId, Index);
 
-    /// <summary> Replaces a dropdown's option list. Resets selection if out of range. </summary>
+    /// <summary>Replaces a dropdown's options, keeping the selection when it is still valid.</summary>
     public static void SetDropdownOptions(string WindowId, string WidgetId, string[] Options)
         => Instance?.SetDropdownOptionsInternal(WindowId, WidgetId, Options);
 
-    /// <summary> Returns true if the mouse is over any Inspector window or popup. </summary>
+    /// <summary>True when the mouse is over an inspector window or menu. Check it before reacting to world clicks.</summary>
+    /// <example>
+    /// The following example shows how to paint lights without painting through the UI:
+    /// <code>
+    /// if (Controls.IsDown(MouseButton.Left) &amp;&amp; !Inspector.IsMouseOverUI())
+    ///     LightFactory.CreateLight(ECS, Renderer.ScreenToWorld(Controls.Mouse.Position), 12f, Color.White, Color.Gold);
+    /// </code>
+    /// </example>
     public static bool IsMouseOverUI() => Instance?.GlobalVisible == true && Instance.MouseOverUI;
 
     /// <summary>Creates or retrieves an inspector window with the requested identity and ordering.</summary>

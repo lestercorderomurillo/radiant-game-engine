@@ -6,7 +6,22 @@ using com.radiant.engine.bundle;
 
 namespace com.radiant.engine.core;
 
-/// <summary>Owns entity storage, spatial queries, and dependency-ordered systems for one scene.</summary>
+/// <summary>
+/// Holds a scene's entities, their components and its systems. Create entities, attach plain-data
+/// components, and run fast parallel queries over everything that matches.
+/// </summary>
+/// <example>
+/// The following example shows how to create a glowing ball and move every ball each fixed tick:
+/// <code>
+/// int ball = ECS.CreateEntity(new Vector2(400, 300));
+/// ECS.AddComponent&lt;Circle2D&gt;(ball) = new Circle2D(16f);
+/// ECS.AddComponent&lt;Movement2D&gt;(ball);
+/// ECS.AddComponent&lt;Material&gt;(ball).Emissive = Color.Orange;
+///
+/// ECS.Query&lt;Transform2D, Movement2D&gt;((int thread, int entity, ref Transform2D transform, ref Movement2D movement) =>
+///     transform.Position += movement.Speed * Time.DeltaSeconds);
+/// </code>
+/// </example>
 public class ECS : IGameObject
 {
     // Entity tracking
@@ -50,13 +65,19 @@ public class ECS : IGameObject
     // Thread pool
     private static readonly int CachedThreadCount = Environment.ProcessorCount;
 
+    /// <summary>Number of living entities.</summary>
     public int EntityCount => EntityCountValue;
-    /// <summary>Entity membership, component layout and enabled-state changes; used by tooling caches.</summary>
+    /// <summary>Changes whenever entities are created, destroyed, enabled, disabled or gain or lose components. Compare it between frames to refresh cached lists cheaply.</summary>
     public long EntityRevision { get; private set; }
+    /// <summary>Pauses every system marked <c>[Pausable]</c>, such as movement and AI, while rendering and UI keep running.</summary>
     public bool GameplayPaused { get; set; }
+    /// <summary>Pauses systems marked <c>[Pausable(PauseGroup.Animation)]</c>, such as orbiting lights, independently of gameplay.</summary>
     public bool AnimationPaused { get; set; }
+    /// <summary>The scene this ECS belongs to.</summary>
     public Scene Scene { get; set; }
-    public Renderer Renderer { get; private set; }
+    /// <summary>The renderer shared by the scene's systems.</summary>
+    public IRenderer Renderer { get; private set; }
+    /// <summary>The spatial index behind <c>InRadius</c>, <c>InBox</c>, <c>Nearest</c> and <c>AtExact</c>.</summary>
     public SpatialIndex Spatial { get; private set; }
 
     // Job system
@@ -69,8 +90,8 @@ public class ECS : IGameObject
     private readonly JobData[] JobDataArray;
     private Action<int, int, int> CurrentWork;
 
-    /// <summary>Binds entity storage and system scheduling to a scene and renderer.</summary>
-    public ECS(Scene scene, Renderer renderer)
+    /// <summary>Creates an ECS for a scene. Scenes create their own; you only need this for standalone tools and tests.</summary>
+    public ECS(Scene scene, IRenderer renderer)
     {
         Scene = scene;
         Renderer = renderer;
@@ -91,7 +112,7 @@ public class ECS : IGameObject
         InitializeJobSystem();
     }
 
-    /// <summary>Orders registered systems and invokes their initialization callbacks.</summary>
+    /// <summary>Sorts the registered systems by their dependencies and calls their <c>Initialize</c>. <c>Scene.SetupECS</c> calls this for you.</summary>
     public void Initialize()
     {
         SortSystemsByDependencies();
@@ -209,7 +230,7 @@ public class ECS : IGameObject
         }
     }
 
-    /// <summary>Stops query workers and releases registered system resources.</summary>
+    /// <summary>Disposes every system and stops the worker threads.</summary>
     public void Dispose()
     {
         ShutdownJobSystem();
@@ -220,10 +241,23 @@ public class ECS : IGameObject
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Attaches a system to this scene and registers it for lifecycle callbacks.</summary>
+    /// <summary>Adds a system to the scene and returns it so you can configure it. Order doesn't matter; dependencies sort it.</summary>
+    /// <param name="enabled">Pass false to register a system that a <c>SystemGroup</c> will switch on later.</param>
+    /// <example>
+    /// The following example shows how to register systems in <c>SetupECS</c>:
+    /// <code>
+    /// public override void SetupECS()
+    /// {
+    ///     ECS.AddSystem&lt;Geometry&gt;();
+    ///     var lighting = ECS.AddSystem&lt;HRCGI&gt;();
+    ///     lighting.OutputJitter = Vector2.Zero;
+    ///     base.SetupECS();
+    /// }
+    /// </code>
+    /// </example>
     public T AddSystem<T>(bool enabled = true) where T : System, new() => AddSystem(new T(), enabled);
 
-    /// <summary>Attaches a system to this scene and registers it for lifecycle callbacks.</summary>
+    /// <summary>Adds a system instance you created yourself, for example one with constructor arguments.</summary>
     public T AddSystem<T>(T system, bool enabled = true) where T : System
     {
         system.Scene = Scene;
@@ -239,28 +273,28 @@ public class ECS : IGameObject
         return system;
     }
 
-    /// <summary>Returns the registered system matching the requested type.</summary>
+    /// <summary>Returns the registered system of a type, or null if the scene doesn't have one.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T GetSystem<T>() where T : System
     {
         return SystemCache.TryGetValue(typeof(T), out var system) ? (T)system : null;
     }
 
-    /// <summary>Enumerates the systems registered with this ECS.</summary>
+    /// <summary>Every registered system, in execution order.</summary>
     public IReadOnlyList<System> GetAllSystems() => Systems;
 
-    /// <summary>Registers a named group of mutually exclusive systems.</summary>
+    /// <summary>Registers a group of interchangeable systems so the System Inspector shows them together.</summary>
     public void RegisterSystemGroup(SystemGroup group)
     {
         SystemGroups.Add(group);
         group.ForEach(system => SystemToGroup[system] = group);
     }
 
-    /// <summary>Returns the named system group when it is registered.</summary>
+    /// <summary>Returns the group a system belongs to, or null.</summary>
     public SystemGroup GetSystemGroup(System system) =>
         SystemToGroup.TryGetValue(system, out var group) ? group : null;
 
-    /// <summary>Finds the group name associated with a registered system.</summary>
+    /// <summary>Returns the name of the group a system belongs to, or null.</summary>
     public string GetGroupName(System system) =>
         SystemToGroup.TryGetValue(system, out var group) ? group.Name : null;
 
@@ -315,7 +349,7 @@ public class ECS : IGameObject
         }
     }
 
-    /// <summary>Allocates a live entity ID without adding components or a spatial position.</summary>
+    /// <summary>Creates an empty entity and returns its ID.</summary>
     public int CreateEntity()
     {
         int id = RecycledIds.Count > 0 ? RecycledIds.Pop() : NextEntityId++;
@@ -327,7 +361,7 @@ public class ECS : IGameObject
         return id;
     }
 
-    /// <summary>Allocates an entity ID and initializes its requested spatial position.</summary>
+    /// <summary>Creates a 2D entity with a <c>Transform2D</c> at a position and draw layer, ready for spatial queries.</summary>
     public int CreateEntity(Vector2 position, float layer = 0)
     {
         int id = CreateEntity();
@@ -337,7 +371,7 @@ public class ECS : IGameObject
         return id;
     }
 
-    /// <summary>Allocates an entity ID and initializes its requested spatial position.</summary>
+    /// <summary>Creates a 3D entity with a <c>Transform3D</c> at a position, ready for spatial queries.</summary>
     public int CreateEntity(Vector3 position)
     {
         int id = CreateEntity();
@@ -350,13 +384,13 @@ public class ECS : IGameObject
         return id;
     }
 
-    /// <summary> Returns true if the entity ID refers to a living entity. </summary>
+    /// <summary>True while the entity exists. IDs are reused after destruction, so don't hold on to stale IDs.</summary>
     public bool IsAlive(int entity) => entity >= 0 && entity < EntityRecords.Length && EntityRecords[entity].Arch != null;
 
-    /// <summary> Schedules an entity for destruction at the start of the next Update. Safe to call mid-frame. </summary>
+    /// <summary>Destroys an entity at the start of the next update. Safe to call from inside queries and callbacks.</summary>
     public void ScheduleDestroy(int entity) => DeferredDestroyQueue.Add(entity);
 
-    /// <summary> Processes all deferred entity destructions. Called automatically at the start of Update. </summary>
+    /// <summary>Destroys every entity queued with <c>ScheduleDestroy</c> now. <c>Update</c> calls this automatically.</summary>
     public void FlushDeferred()
     {
         if (DeferredDestroyQueue.Count == 0) return;
@@ -367,7 +401,7 @@ public class ECS : IGameObject
         DeferredDestroyQueue.Clear();
     }
 
-    /// <summary> Collects all living entity IDs into the provided list (cleared first). </summary>
+    /// <summary>Fills a list with every living entity ID (the list is cleared first).</summary>
     public void GetAllEntityIds(List<int> result)
     {
         result.Clear();
@@ -381,7 +415,7 @@ public class ECS : IGameObject
         }
     }
 
-    /// <summary>Removes every entity and clears associated component and spatial state.</summary>
+    /// <summary>Destroys every entity, for example when restarting a level.</summary>
     public void DestroyAllEntities()
     {
         EntityRevision++;
@@ -405,7 +439,7 @@ public class ECS : IGameObject
             bitset.Clear();
     }
 
-    /// <summary>Removes a live entity from component storage, tags, and spatial lookup.</summary>
+    /// <summary>Destroys an entity immediately and returns false if it was already gone. Inside queries, use <c>ScheduleDestroy</c> instead.</summary>
     public bool DestroyEntity(int entity)
     {
         ref var record = ref EntityRecords[entity];
@@ -431,7 +465,16 @@ public class ECS : IGameObject
         return true;
     }
 
-    /// <summary>Adds a component type to an entity and returns a reference to its storage.</summary>
+    /// <summary>Adds a component and returns a reference you can assign or modify in place.</summary>
+    /// <remarks>Adding a component moves the entity in memory, which invalidates references you took earlier. Add everything first, then take references.</remarks>
+    /// <example>
+    /// The following example shows how to add a rectangle and set its material:
+    /// <code>
+    /// ECS.AddComponent&lt;Rectangle2D&gt;(wall) = new Rectangle2D(new Vector2(200, 20));
+    /// ref var material = ref ECS.AddComponent&lt;Material&gt;(wall);
+    /// material.Albedo = Color.Gray;
+    /// </code>
+    /// </example>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref T AddComponent<T>(int entity) where T : struct, Component
     {
@@ -473,7 +516,14 @@ public class ECS : IGameObject
         return ref newArch.Get<T>(newIndex);
     }
 
-    /// <summary>Returns a mutable reference to an entity's stored component.</summary>
+    /// <summary>Returns a reference to a component so you can read or change it in place.</summary>
+    /// <example>
+    /// The following example shows how to recolor a light:
+    /// <code>
+    /// ref var material = ref ECS.GetComponent&lt;Material&gt;(light);
+    /// material.Emissive = new Color(120, 180, 255);
+    /// </code>
+    /// </example>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref T GetComponent<T>(int entity) where T : struct, Component
     {
@@ -481,7 +531,7 @@ public class ECS : IGameObject
         return ref record.Arch.Get<T>(record.Index);
     }
 
-    /// <summary>Reports whether the entity has the requested component type.</summary>
+    /// <summary>True if the entity has a component of this type.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool HasComponent<T>(int entity) where T : struct, Component
     {
@@ -489,24 +539,24 @@ public class ECS : IGameObject
         return record.Arch != null && record.Arch.HasComponent<T>();
     }
 
-    /// <summary>Returns the component types currently attached to an entity.</summary>
+    /// <summary>Lists the component types on an entity. Meant for tools and inspectors.</summary>
     public Type[] GetComponentTypes(int entity)
     {
         ref var record = ref EntityRecords[entity];
         return record.Arch?.Types ?? Array.Empty<Type>();
     }
 
-    /// <summary>Returns the component types known to this ECS.</summary>
+    /// <summary>Every component type used in this scene so far.</summary>
     public IReadOnlyCollection<Type> GetRegisteredComponentTypes() => TypeToId.Keys;
 
-    /// <summary>Boxed component access for tooling. Runtime queries retain typed, allocation-free access.</summary>
+    /// <summary>Reads a component by runtime type, boxed. Meant for editors; game code should use <c>GetComponent</c>.</summary>
     public bool TryGetComponent(int entity, Type type, out Component component)
     {
         component = null;
         return type != null && IsAlive(entity) && EntityRecords[entity].Arch.TryGetComponent(EntityRecords[entity].Index, type, out component);
     }
 
-    /// <summary>Replaces an existing component when the requested entity or slot supports its type.</summary>
+    /// <summary>Replaces a component the entity already has, boxed. Meant for editors; game code should use <c>GetComponent</c>.</summary>
     public bool TrySetComponent(int entity, Component component)
     {
         if (component == null || !IsAlive(entity) || !EntityRecords[entity].Arch.TrySetComponent(EntityRecords[entity].Index, component)) return false;
@@ -516,7 +566,7 @@ public class ECS : IGameObject
         return true;
     }
 
-    /// <summary>Updates the entity's spatial-index position for subsequent spatial queries.</summary>
+    /// <summary>Moves a 2D entity and keeps spatial queries up to date.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetPosition(int entity, Vector2 position)
     {
@@ -525,42 +575,42 @@ public class ECS : IGameObject
         Spatial.Update(entity, new Vector3(position, transform.Layer));
     }
 
-    /// <summary>Updates the entity's spatial-index position for subsequent spatial queries.</summary>
+    /// <summary>Moves an entity and keeps spatial queries up to date.</summary>
     public void SetPosition(int entity, Vector3 position)
     {
         GetComponent<Transform3D>(entity).Position = position;
         Spatial.Update(entity, position);
     }
 
-    /// <summary>Collects entities within the requested distance of a world-space position.</summary>
+    /// <summary>Finds entities within a radius, for example everything an explosion hits.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<int> InRadius(Vector3 center, float radius) => Spatial.InRadius(center, radius);
 
-    /// <summary>Collects entities within the requested distance of a world-space position.</summary>
+    /// <summary>Finds entities within a radius of a point.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<int> InRadius(float x, float y, float z, float radius) => Spatial.InRadius(x, y, z, radius);
 
-    /// <summary>Collects entities inside the supplied world-space bounds.</summary>
+    /// <summary>Finds entities inside an axis-aligned box, for example a selection rectangle.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<int> InBox(Vector3 min, Vector3 max) => Spatial.InBox(min, max);
 
-    /// <summary>Looks up an entity at the exact indexed coordinates.</summary>
+    /// <summary>Returns the entity at exactly this position, or null. Useful for grids and tile maps.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int? AtExact(Vector3 position) => Spatial.AtExact(position);
 
-    /// <summary>Looks up an entity at the exact indexed coordinates.</summary>
+    /// <summary>Returns the entity at exactly this position, or null.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int? AtExact(float x, float y, float z) => Spatial.AtExact(x, y, z);
 
-    /// <summary>Finds nearby entities ordered by distance from the query position.</summary>
+    /// <summary>Finds up to <paramref name="count"/> entities closest to a point, nearest first.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<int> Nearest(Vector3 center, int count, float maxRadius = float.MaxValue) => Spatial.Nearest(center, count, maxRadius);
 
-    /// <summary>Finds nearby entities ordered by distance from the query position.</summary>
+    /// <summary>Finds up to <paramref name="count"/> entities closest to a point, nearest first.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<int> Nearest(float cx, float cy, float cz, int count, float maxRadius = float.MaxValue) => Spatial.Nearest(cx, cy, cz, count, maxRadius);
 
-    /// <summary>Adds an entity to the named tag's membership set.</summary>
+    /// <summary>Labels an entity with a tag, such as <c>"enemy"</c>. Tags are cheap and are removed automatically when the entity is destroyed.</summary>
     public void AddTag(int entity, string tag)
     {
         if (!TagSets.TryGetValue(tag, out var bitset))
@@ -572,23 +622,27 @@ public class ECS : IGameObject
         bitset.Add(entity);
     }
 
-    /// <summary>Removes an entity from the named tag's membership set.</summary>
+    /// <summary>Removes a tag from an entity.</summary>
     public void RemoveTag(int entity, string tag)
     {
         if (TagSets.TryGetValue(tag, out var bitset)) bitset.Remove(entity);
     }
 
-    /// <summary>Reports whether an entity belongs to the named tag.</summary>
+    /// <summary>True if the entity has the tag.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool HasTag(int entity, string tag) => TagSets.TryGetValue(tag, out var bitset) && bitset.Contains(entity);
 
-    /// <summary>
-    /// Returns the PagedBitSet for a tag. Caller iterates directly via foreach (zero-copy).
-    /// Returns null if the tag has never been used.
-    /// </summary>
+    /// <summary>Returns every entity with a tag, ready to iterate with <c>foreach</c>, or null if the tag was never used.</summary>
+    /// <example>
+    /// The following example shows how to freeze every enemy:
+    /// <code>
+    /// if (ECS.WithTag("enemy") is { } enemies)
+    ///     foreach (int enemy in enemies) ECS.DisableEntity(enemy);
+    /// </code>
+    /// </example>
     public PagedBitSet WithTag(string tag) => TagSets.TryGetValue(tag, out var bitset) ? bitset : null;
 
-    /// <summary>Destroys every live entity in the named tag's membership set.</summary>
+    /// <summary>Destroys every entity with a tag, for example all projectiles.</summary>
     public void DestroyEntitiesWithTag(string tag)
     {
         if (!TagSets.TryGetValue(tag, out var bitset)) return;
@@ -599,24 +653,25 @@ public class ECS : IGameObject
         bitset.Clear();
     }
 
-    /// <summary>Clears the named tag's membership without destroying its entities.</summary>
+    /// <summary>Removes a tag from every entity without destroying them.</summary>
     public void ClearTag(string tag)
     {
         if (TagSets.TryGetValue(tag, out var bitset)) bitset.Clear();
     }
 
-    /// <summary> Disables an entity. Disabled entities are skipped by Query but remain alive and restorable. </summary>
+    /// <summary>Hides an entity from queries without destroying it. Bring it back with <c>EnableEntity</c>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void DisableEntity(int entity) { if (DisabledEntities.Add(entity)) EntityRevision++; }
 
-    /// <summary> Re-enables a previously disabled entity so it participates in queries again. </summary>
+    /// <summary>Makes a disabled entity visible to queries again.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void EnableEntity(int entity) { if (DisabledEntities.Remove(entity)) EntityRevision++; }
 
-    /// <summary> Returns true if the entity is currently disabled. </summary>
+    /// <summary>True while the entity is disabled.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsDisabled(int entity) => DisabledEntities.Contains(entity);
 
+    /// <summary>Number of worker threads queries run on. Size per-thread buffers with it.</summary>
     public static int ThreadCount => CachedThreadCount;
 
     /// <summary>Creates workers and synchronization state for parallel component queries.</summary>
@@ -689,14 +744,23 @@ public class ECS : IGameObject
         }
     }
 
-    /// <summary>Callback receiving worker and entity identifiers plus mutable component references.</summary>
+    /// <summary>Called for each matching entity with the worker index, the entity ID and a reference to its component.</summary>
     public delegate void QueryAction<T1>(int threadIndex, int entity, ref T1 c1) where T1 : struct;
-    /// <summary>Callback receiving worker and entity identifiers plus mutable component references.</summary>
+    /// <summary>Called for each matching entity with the worker index, the entity ID and references to its two components.</summary>
     public delegate void QueryAction<T1, T2>(int threadIndex, int entity, ref T1 c1, ref T2 c2) where T1 : struct where T2 : struct;
-    /// <summary>Callback receiving worker and entity identifiers plus mutable component references.</summary>
+    /// <summary>Called for each matching entity with the worker index, the entity ID and references to its three components.</summary>
     public delegate void QueryAction<T1, T2, T3>(int threadIndex, int entity, ref T1 c1, ref T2 c2, ref T3 c3) where T1 : struct where T2 : struct where T3 : struct;
 
-    /// <summary>Visits matching entities with mutable references to the requested components.</summary>
+    /// <summary>Runs your code on every enabled entity that has the component, in parallel across worker threads.</summary>
+    /// <remarks>The callback runs on several threads at once: change only the components you receive, or write to per-thread storage indexed by the thread argument.</remarks>
+    /// <example>
+    /// The following example shows how to make every light flicker:
+    /// <code>
+    /// float flicker = 0.9f + 0.1f * MathF.Sin((float)Time.Total.TotalSeconds * 20f);
+    /// ECS.Query&lt;Material&gt;((int thread, int entity, ref Material material) =>
+    ///     material.Emissive = new Color(255, 200, 120) * flicker);
+    /// </code>
+    /// </example>
     public void Query<T1>(QueryAction<T1> action) where T1 : struct, Component
     {
         ulong sig = 1UL << GetTypeId(typeof(T1));
@@ -765,7 +829,7 @@ public class ECS : IGameObject
         });
     }
 
-    /// <summary>Visits matching entities with mutable references to the requested components.</summary>
+    /// <summary>Runs your code on every enabled entity that has both components, in parallel.</summary>
     public void Query<T1, T2>(QueryAction<T1, T2> action)
         where T1 : struct, Component
         where T2 : struct, Component
@@ -841,7 +905,7 @@ public class ECS : IGameObject
     // Cached archetype query results
     private readonly List<Archetype> QueryMatchCache = new();
 
-    /// <summary>Visits matching entities with mutable references to the requested components.</summary>
+    /// <summary>Runs your code on every enabled entity that has all three components, in parallel.</summary>
     public void Query<T1, T2, T3>(QueryAction<T1, T2, T3> action)
         where T1 : struct, Component
         where T2 : struct, Component
@@ -923,7 +987,7 @@ public class ECS : IGameObject
         });
     }
 
-    /// <summary>Updates enabled, unpaused systems after applying deferred entity destruction and resizing.</summary>
+    /// <summary>Runs every enabled system's <c>Update</c>. The game loop calls this; you don't need to.</summary>
     public void Update()
     {
         FlushDeferred();
@@ -946,7 +1010,7 @@ public class ECS : IGameObject
         }
     }
 
-    /// <summary>Runs fixed-timestep callbacks on enabled, unpaused systems.</summary>
+    /// <summary>Runs every enabled system's <c>FixedUpdate</c>. The game loop calls this 64 times per second.</summary>
     public void FixedUpdate()
     {
         for (int i = 0; i < Systems.Count; i++)
@@ -972,7 +1036,7 @@ public class ECS : IGameObject
         return false;
     }
 
-    /// <summary>Draws enabled systems in dependency and render-layer order.</summary>
+    /// <summary>Runs every enabled system's <c>Render</c> in dependency order. The game loop calls this.</summary>
     public void Render()
     {
         for (int i = 0; i < Systems.Count; i++)
@@ -984,7 +1048,7 @@ public class ECS : IGameObject
         }
     }
 
-    /// <summary>Runs enabled systems' overlay callbacks after the main render pass.</summary>
+    /// <summary>Runs every enabled system's <c>LateRender</c> by render layer. The game loop calls this.</summary>
     public void LateRender()
     {
         for (int i = 0; i < RenderSystems.Count; i++)

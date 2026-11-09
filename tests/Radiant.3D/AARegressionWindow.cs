@@ -1,3 +1,4 @@
+using Window = com.radiant.engine.backends.monogame.MonoGameWindow;
 using System;
 using System.IO;
 using System.Linq;
@@ -286,13 +287,13 @@ internal sealed class AARegressionWindow : Window
     }
 
     /// <summary>Writes the current test image to its diagnostic output path.</summary>
-    private static void Save(string path, Texture2D texture)
+    private void Save(string path, Texture2D texture)
     {
         using var stream = File.Create(path);
 
         if (texture.Format == SurfaceFormat.Vector4)
         {
-            using var preview = new Texture2D(texture.GraphicsDevice, texture.Width, texture.Height);
+            using var preview = Scene.Renderer.CreateTexture(texture.Width, texture.Height);
             preview.SetData(Read(texture).Select(p => new Color(p)).ToArray());
             preview.SaveAsPng(stream, preview.Width, preview.Height);
         }

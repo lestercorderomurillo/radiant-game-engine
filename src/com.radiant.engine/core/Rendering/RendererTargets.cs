@@ -1,167 +1,65 @@
-using com.radiant.engine.runtime;
+using System;
 using System.Collections.Generic;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
-#pragma warning disable CS0618
 namespace com.radiant.engine.core;
 
 public partial class Renderer
 {
-    private readonly RenderTargetBinding[] TwoTargetBindings = new RenderTargetBinding[2];
-    private readonly RenderTargetBinding[] ThreeTargetBindings = new RenderTargetBinding[3];
-    private readonly RenderTargetBinding[] FourTargetBindings = new RenderTargetBinding[4];
-    private readonly Stack<RenderTargetBinding[]> RenderTargetStack = new();
-    private RenderTargetBinding[] CurrentTargets = null;
+    private readonly Stack<RenderTarget2D[]> RenderTargetStack = new();
+    private RenderTarget2D[] CurrentTargets;
 
-    private const int BindingPoolSize = 16;
-    private readonly RenderTargetBinding[][] BindingPool2 = new RenderTargetBinding[BindingPoolSize][];
-    private readonly RenderTargetBinding[][] BindingPool3 = new RenderTargetBinding[BindingPoolSize][];
-    private readonly RenderTargetBinding[][] BindingPool4 = new RenderTargetBinding[BindingPoolSize][];
-    private int BindingPool2Index = 0;
-    private int BindingPool3Index = 0;
-    private int BindingPool4Index = 0;
-
-    /// <summary>Prepares reusable render-target bindings for drawing commands.</summary>
-    private void InitializeBindingPools()
+    private void BindTarget(RenderTarget2D target)
     {
-        for (int i = 0; i < BindingPoolSize; i++)
-        {
-            BindingPool2[i] = new RenderTargetBinding[2];
-            BindingPool3[i] = new RenderTargetBinding[3];
-            BindingPool4[i] = new RenderTargetBinding[4];
-        }
+        Commands.SetTargets(target == null ? ReadOnlySpan<RenderTarget2D>.Empty : new[] { target });
+        CurrentTargets = target == null ? null : new[] { target };
     }
 
-    /// <summary>
-    /// Pushes current render targets onto an internal stack. Use with PopTargets to
-    /// restore state after nested rendering operations without GPU synchronization.
-    /// </summary>
-    public Renderer PushTargets()
+    /// <summary>Saves a snapshot of the active render targets, with no nesting depth limit.</summary>
+    public IRenderer PushTargets()
     {
         RenderTargetStack.Push(CurrentTargets);
         return this;
     }
 
-    /// <summary>
-    /// Pops and restores render targets from the internal stack.
-    /// </summary>
-    public Renderer PopTargets()
+    /// <summary>Restores the most recently saved render targets.</summary>
+    public IRenderer PopTargets()
     {
-        if (RenderTargetStack.Count > 0)
-        {
-            var targets = RenderTargetStack.Pop();
-            CommitTextures();
-            if (targets == null)
-                Device.SetRenderTarget(SceneRT);
-            else
-                Device.SetRenderTargets(targets);
-            CurrentTargets = targets;
-        }
-
+        if (RenderTargetStack.Count == 0) return this;
+        CommitTextures();
+        var targets = RenderTargetStack.Peek();
+        if (targets == null) BindTarget(SceneRT);
+        else { Commands.SetTargets(targets); CurrentTargets = targets; }
+        RenderTargetStack.Pop();
         return this;
     }
 
-    /// <summary>Sets a single render target (or null for SceneRT).</summary>
-    public Renderer SetTarget(RenderTarget2D target)
+    /// <summary>Selects the scene surface when target is null.</summary>
+    public IRenderer SetTarget(RenderTarget2D target)
     {
         CommitTextures();
-        Device.SetRenderTarget(target ?? SceneRT);
-        CurrentTargets = target != null ? [new RenderTargetBinding(target)] : null;
-
+        BindTarget(target ?? SceneRT);
         return this;
     }
 
-    /// <summary>Sets two render targets for MRT rendering.</summary>
-    public Renderer SetTargets(RenderTarget2D target0, RenderTarget2D target1)
+    public IRenderer SetTargets(RenderTarget2D target0, RenderTarget2D target1) => SetTargets(new[] { target0, target1 });
+    public IRenderer SetTargets(RenderTarget2D target0, RenderTarget2D target1, RenderTarget2D target2) => SetTargets(new[] { target0, target1, target2 });
+    public IRenderer SetTargets(RenderTarget2D target0, RenderTarget2D target1, RenderTarget2D target2, RenderTarget2D target3) => SetTargets(new[] { target0, target1, target2, target3 });
+
+    /// <summary>Binds targets and retains an independent snapshot for nested restoration.</summary>
+    public IRenderer SetTargets(params RenderTarget2D[] targets)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        var snapshot = (RenderTarget2D[])targets.Clone();
+        CommitTextures();
+        Commands.SetTargets(snapshot);
+        CurrentTargets = snapshot;
+        return this;
+    }
+
+    public IRenderer Clear(Color? color = null)
     {
         CommitTextures();
-        TwoTargetBindings[0] = new RenderTargetBinding(target0);
-        TwoTargetBindings[1] = new RenderTargetBinding(target1);
-        Device.SetRenderTargets(TwoTargetBindings);
-
-        var pooled = BindingPool2[BindingPool2Index];
-        BindingPool2Index = (BindingPool2Index + 1) & (BindingPoolSize - 1);
-        pooled[0] = TwoTargetBindings[0];
-        pooled[1] = TwoTargetBindings[1];
-        CurrentTargets = pooled;
-
-        return this;
-    }
-
-    /// <summary>Sets three render targets for MRT rendering.</summary>
-    public Renderer SetTargets(RenderTarget2D target0, RenderTarget2D target1, RenderTarget2D target2)
-    {
-        CommitTextures();
-        ThreeTargetBindings[0] = new RenderTargetBinding(target0);
-        ThreeTargetBindings[1] = new RenderTargetBinding(target1);
-        ThreeTargetBindings[2] = new RenderTargetBinding(target2);
-        Device.SetRenderTargets(ThreeTargetBindings);
-
-        var pooled = BindingPool3[BindingPool3Index];
-        BindingPool3Index = (BindingPool3Index + 1) & (BindingPoolSize - 1);
-        pooled[0] = ThreeTargetBindings[0];
-        pooled[1] = ThreeTargetBindings[1];
-        pooled[2] = ThreeTargetBindings[2];
-        CurrentTargets = pooled;
-
-        return this;
-    }
-
-    /// <summary>Sets four render targets for MRT rendering.</summary>
-    public Renderer SetTargets(RenderTarget2D target0, RenderTarget2D target1, RenderTarget2D target2, RenderTarget2D target3)
-    {
-        CommitTextures();
-        FourTargetBindings[0] = new RenderTargetBinding(target0);
-        FourTargetBindings[1] = new RenderTargetBinding(target1);
-        FourTargetBindings[2] = new RenderTargetBinding(target2);
-        FourTargetBindings[3] = new RenderTargetBinding(target3);
-        Device.SetRenderTargets(FourTargetBindings);
-
-        var pooled = BindingPool4[BindingPool4Index];
-        BindingPool4Index = (BindingPool4Index + 1) & (BindingPoolSize - 1);
-        pooled[0] = FourTargetBindings[0];
-        pooled[1] = FourTargetBindings[1];
-        pooled[2] = FourTargetBindings[2];
-        pooled[3] = FourTargetBindings[3];
-        CurrentTargets = pooled;
-
-        return this;
-    }
-
-    /// <summary>Sets multiple render targets for MRT rendering.</summary>
-    public Renderer SetTargets(params RenderTarget2D[] targets)
-    {
-        CommitTextures();
-
-        var bindings = new RenderTargetBinding[targets.Length];
-
-        for (int i = 0; i < targets.Length; i++)
-            bindings[i] = new RenderTargetBinding(targets[i]);
-
-        Device.SetRenderTargets(bindings);
-        CurrentTargets = bindings;
-
-        return this;
-    }
-
-    /// <summary>Sets render targets from pre-built bindings array.</summary>
-    public Renderer SetTargets(params RenderTargetBinding[] bindings)
-    {
-        CommitTextures();
-        Device.SetRenderTargets(bindings);
-        CurrentTargets = bindings;
-
-        return this;
-    }
-
-    /// <summary>
-    /// Clears the current render target(s) to the specified color.
-    /// </summary>
-    /// <param name="color">Clear color (defaults to Black).</param>
-    public Renderer Clear(Color? color = null)
-    {
-        Device.Clear((color ?? Color.Black).ToNative());
+        Commands.Clear(color ?? Color.Black);
         return this;
     }
 }

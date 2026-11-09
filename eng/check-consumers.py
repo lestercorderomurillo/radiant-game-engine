@@ -27,7 +27,9 @@ def main():
                         f'-p:RadiantRoot={engine}'], cwd=root, check=True)
         assembly = root / 'tests' / test / 'bin' / args.configuration / 'net8.0' / f'{test}.dll'
         subprocess.run(['dotnet', str(assembly)], cwd=root, check=True)
-    print('PASS: all eight Radiant/game projects build; all three deterministic suites pass.')
+    portable = engine / 'tests/Radiant.Portable/bin' / args.configuration / 'net8.0/Radiant.Portable.dll'
+    subprocess.run(['dotnet', str(portable)], cwd=engine, check=True)
+    print('PASS: all ten Radiant/game projects build; all four deterministic suites pass.')
     print('Graphical/input checks are separate; see each game\'s BUILD.md and use an isolated display.')
 
 

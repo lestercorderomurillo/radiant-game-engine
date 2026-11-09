@@ -1,5 +1,3 @@
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.core;
 
@@ -11,5 +9,5 @@ public interface IRasterGeometry
     DepthFormat VisibilityFormat { get; }
 
     /// <summary>Submits geometry using the supplied rendering parameters.</summary>
-    void Draw(Renderer renderer);
+    void Draw(IRenderer renderer);
 }

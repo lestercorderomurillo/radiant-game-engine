@@ -1,5 +1,3 @@
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.core;
 
@@ -7,31 +5,31 @@ public partial class Renderer
 {
     /// <summary>
     /// Adds a shape to the current batch. Call FlushShapes() to render.
-    /// Silently drops shapes beyond MaxShapeCapacity.
+    /// Grows CPU storage as needed; invalid capacities throw instead of dropping shapes.
     /// </summary>
-    public Renderer DrawShape(Shape shape)
+    public IRenderer DrawShape(Shape shape)
     {
         ShapeBatch.Add(shape);
         return this;
     }
 
     /// <summary>Adds a rectangle shape to the current batch.</summary>
-    public Renderer DrawRect(Vector2 position, Vector2 size, Color color) => DrawShape(Shape.Rect(position, size, color));
+    public IRenderer DrawRect(Vector2 position, Vector2 size, Color color) => DrawShape(Shape.Rect(position, size, color));
 
     /// <summary>Adds a rectangle shape to the current batch.</summary>
-    public Renderer DrawRect(float x, float y, float width, float height, Color color) => DrawShape(Shape.Rect(x, y, width, height, color));
+    public IRenderer DrawRect(float x, float y, float width, float height, Color color) => DrawShape(Shape.Rect(x, y, width, height, color));
 
     /// <summary>Adds a circle shape to the current batch.</summary>
-    public Renderer DrawCircle(Vector2 center, float radius, Color color) => DrawShape(Shape.Circle(center, radius, color));
+    public IRenderer DrawCircle(Vector2 center, float radius, Color color) => DrawShape(Shape.Circle(center, radius, color));
 
     /// <summary>Adds a circle shape to the current batch.</summary>
-    public Renderer DrawCircle(float x, float y, float radius, Color color) => DrawShape(Shape.Circle(x, y, radius, color));
+    public IRenderer DrawCircle(float x, float y, float radius, Color color) => DrawShape(Shape.Circle(x, y, radius, color));
 
     /// <summary>Adds a triangle shape to the current batch.</summary>
-    public Renderer DrawTriangle(Vector2 position, Vector2 size, Color color) => DrawShape(Shape.Triangle(position, size, color));
+    public IRenderer DrawTriangle(Vector2 position, Vector2 size, Color color) => DrawShape(Shape.Triangle(position, size, color));
 
     /// <summary>Adds a bordered (unfilled) triangle shape to the current batch.</summary>
-    public Renderer DrawTriangleBorder(Vector2 position, Vector2 size, Color color) => DrawShape(Shape.TriangleBorder(position, size, color));
+    public IRenderer DrawTriangleBorder(Vector2 position, Vector2 size, Color color) => DrawShape(Shape.TriangleBorder(position, size, color));
 
     /// <summary>
     /// Renders all batched shapes in a single draw call and clears the batch.
@@ -39,15 +37,16 @@ public partial class Renderer
     /// <param name="target">Render target (null for backbuffer).</param>
     /// <param name="clearColor">Optional clear color before rendering.</param>
     /// <param name="technique">Shader technique: "Default" (AA), "Sharp" (no AA), or "Emissive" (sharp SDF for light sources).</param>
-    public Renderer FlushShapes(RenderTarget2D target = null, Color? clearColor = null, string technique = "Default")
+    public IRenderer FlushShapes(RenderTarget2D target = null, Color? clearColor = null, string technique = "Default")
     {
         CommitTextures();
         ShapeBatch.Flush(target ?? SceneRT, clearColor, BlendState, Shaders.Get("InstancedShapes"), technique);
+        CurrentTargets = (target ?? SceneRT) is null ? null : new[] { target ?? SceneRT };
         return this;
     }
 
     /// <summary>Clears the shape batch without rendering.</summary>
-    public Renderer ClearShapes()
+    public IRenderer ClearShapes()
     {
         ShapeBatch.Clear();
         return this;
@@ -60,17 +59,18 @@ public partial class Renderer
     /// Renders shapes directly from an external buffer - ZERO COPY.
     /// Use this when shapes are pre-collected in Renderer.Shape format.
     /// </summary>
-    public Renderer FlushShapesExternal(Shape[] shapes, int count, RenderTarget2D target = null, Color? clearColor = null, string technique = "Default")
+    public IRenderer FlushShapesExternal(Shape[] shapes, int count, RenderTarget2D target = null, Color? clearColor = null, string technique = "Default")
     {
         CommitTextures();
         ShapeBatch.FlushExternal(shapes, count, target ?? SceneRT, clearColor, BlendState, Shaders.Get("InstancedShapes"), technique);
+        CurrentTargets = (target ?? SceneRT) is null ? null : new[] { target ?? SceneRT };
         return this;
     }
 
-    /// <summary>GPU upload timing stats.</summary>
+    /// <summary>CPU time spent uploading the last shape batch.</summary>
     public float LastSetDataMs => ShapeBatch.LastSetDataMs;
 
-    /// <summary>GPU draw timing stats.</summary>
+    /// <summary>CPU time spent submitting the last shape batch (not GPU execution time).</summary>
     public float LastDrawMs => ShapeBatch.LastDrawMs;
 
     /// <summary>
@@ -79,7 +79,7 @@ public partial class Renderer
     /// </summary>
     /// <param name="threadCount">Number of worker threads.</param>
     /// <param name="capacityPerThread">Initial capacity per thread buffer.</param>
-    public Renderer InitializeParallelShapes(int threadCount, int capacityPerThread = 16384)
+    public IRenderer InitializeParallelShapes(int threadCount, int capacityPerThread = 16384)
     {
         ShapeBatch.InitializeParallel(threadCount, capacityPerThread);
         return this;
@@ -89,7 +89,7 @@ public partial class Renderer
     /// Ensures all parallel buffers have at least the specified capacity.
     /// Call when entity count grows.
     /// </summary>
-    public Renderer EnsureParallelCapacity(int capacityPerThread)
+    public IRenderer EnsureParallelCapacity(int capacityPerThread)
     {
         ShapeBatch.EnsureParallelCapacity(capacityPerThread);
         return this;
@@ -100,7 +100,7 @@ public partial class Renderer
     /// Also ensures the main Shapes array can hold the total.
     /// Call when entity count grows: EnsureParallelCapacityForEntities(entityCount)
     /// </summary>
-    public Renderer EnsureParallelCapacityForEntities(int totalEntities)
+    public IRenderer EnsureParallelCapacityForEntities(int totalEntities)
     {
         ShapeBatch.EnsureParallelCapacityForEntities(totalEntities);
         return this;
@@ -131,14 +131,14 @@ public partial class Renderer
     /// Collects all parallel thread buffers into the main Shapes array in order.
     /// Call on main thread after parallel work completes, before FlushShapes.
     /// </summary>
-    public Renderer CollectParallelShapes()
+    public IRenderer CollectParallelShapes()
     {
         ShapeBatch.CollectParallel();
         return this;
     }
 
     /// <summary>Clears all parallel shape buffers without collecting.</summary>
-    public Renderer ClearParallelShapes()
+    public IRenderer ClearParallelShapes()
     {
         ShapeBatch.ClearParallel();
         return this;
@@ -156,7 +156,7 @@ public partial class Renderer
     /// Call on main thread after parallel work completes.
     /// Uses min-heap for O(N log T) instead of O(N*T).
     /// </summary>
-    public Renderer CollectParallelShapesSorted()
+    public IRenderer CollectParallelShapesSorted()
     {
         ShapeBatch.CollectParallelSorted();
         return this;

@@ -1,4 +1,5 @@
 using System;
+using com.radiant.engine.runtime;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -7,15 +8,16 @@ using MonoGame.Framework.Utilities;
 namespace com.radiant.engine.core;
 
 /// <summary>Render-thread bridge to the optional MonoGame Vulkan ray-query runtime.</summary>
-internal sealed class VulkanPathTraceSession : IDisposable
+internal sealed class VulkanPathTraceSession : IPathTraceSession
 {
     private const string Library = "mgruntime";
 
     internal IntPtr Context;
+    internal MonoGameGraphicsBackend Backend { get; }
 
     public bool DenoisingSignals { get; }
 
-    private readonly Renderer Renderer;
+    private readonly IRenderer Renderer;
     private ITraceGeometry UploadedSource;
     private long UploadedRevision = -1;
 
@@ -93,15 +95,16 @@ internal sealed class VulkanPathTraceSession : IDisposable
     }
 
     /// <summary>Creates a native tracing session and wraps its output images.</summary>
-    public VulkanPathTraceSession(Renderer Renderer, NativeGraphicsHandles Handles, int Width, int Height, bool Signals)
+    public VulkanPathTraceSession(IRenderer Renderer, MonoGameGraphicsBackend Backend, NativeGraphicsHandles Handles, int Width, int Height, bool Signals)
     {
         this.Renderer = Renderer;
+        this.Backend = Backend;
         DenoisingSignals = Signals;
         Context = Create(Handles.LogicalDevice, checked((uint)Width), checked((uint)Height), Signals ? 1 : 0);
 
         if (Context == IntPtr.Zero) throw Error();
 
-        try { Sample = Renderer.WrapVulkanTraceImage(Image(Context), Width, Height); }
+        try { Sample = Backend.WrapImage(Image(Context), Width, Height); }
         catch { Destroy(Context); Context = IntPtr.Zero; throw; }
     }
 

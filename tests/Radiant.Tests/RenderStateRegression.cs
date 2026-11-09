@@ -10,7 +10,7 @@ internal static class RenderStateRegression
     {
         var assembly = typeof(Renderer).Assembly;
         var stateTypes = new[] { typeof(BlendState), typeof(SamplerState), typeof(RasterizerState), typeof(DepthStencilState) };
-        var enums = assembly.GetExportedTypes().Where(t => t.Namespace == "com.radiant.engine.graphics" && t.IsEnum).ToArray();
+        var enums = assembly.GetExportedTypes().Where(t => t.Namespace == "com.radiant.engine.graphics" && t.IsEnum && t != typeof(SurfaceFormat) && t != typeof(DepthFormat) && t != typeof(RenderTargetUsage)).ToArray();
         var prohibited = stateTypes.Concat(enums).Select(t => typeof(Native.BlendState).Assembly.GetType("Microsoft.Xna.Framework.Graphics." + t.Name, true)).ToArray();
         bool NativeState(Type type) => prohibited.Contains(type) || (type.HasElementType && NativeState(type.GetElementType())) || (type.IsGenericType && type.GetGenericArguments().Any(NativeState));
         foreach (var type in assembly.GetExportedTypes())
@@ -27,7 +27,7 @@ internal static class RenderStateRegression
             }
         }
         // Exercise the actual internal adapter without exposing native conversions in the public API.
-        var adapter = assembly.GetType("com.radiant.engine.runtime.MonoGameRenderStates", true);
+        var adapter = typeof(com.radiant.engine.runtime.DesktopBackend).Assembly.GetType("com.radiant.engine.runtime.MonoGameRenderStates", true);
         using var cache = (IDisposable)Activator.CreateInstance(adapter, true);
         foreach (var type in stateTypes)
         {

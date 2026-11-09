@@ -8,13 +8,14 @@
     <OutputType>Library</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The docs site's node_modules and the DocGen tool are separate projects. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);docs/site/**;tools/**</DefaultItemExcludes>
     <Optimize>true</Optimize>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="eng/Radiant.Numerics.cs" />
-    <Compile Include="src/com.radiant.engine/**/*.cs" Exclude="src/com.radiant.engine/tests/**/*.cs" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+    <Compile Include="src/com.radiant.engine/runtime/Backends/MonoGame/**/*.cs" />
+    <ProjectReference Include="src/Radiant.Core/Radiant.Core.csproj" />
     <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.4" />
     <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
     <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" Version="$(MonoGameVersion)" />

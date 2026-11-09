@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Graphics.PackedVector;
 
 namespace com.radiant.engine.bundle;
 
@@ -194,7 +191,7 @@ public sealed class OidnDenoiser : IDenoisingBackend
         public readonly Vector3[] Color, Diffuse, Normal;
 
         private Color[] PackedColors;
-        private HalfVector4[] PackedHalves;
+        private Half[] PackedHalves;
 
         /// <summary>Allocates host radiance and guide storage for the requested image dimensions.</summary>
         public HostImages(int count)
@@ -214,10 +211,10 @@ public sealed class OidnDenoiser : IDenoisingBackend
             if (texture.Format == SurfaceFormat.Vector4) { texture.GetData(values); return; }
             if (texture.Format == SurfaceFormat.HalfVector4)
             {
-                PackedHalves ??= new HalfVector4[values.Length];
+                PackedHalves ??= new Half[checked(values.Length * 4)];
                 texture.GetData(PackedHalves);
 
-                for (int i = 0; i < values.Length; i++) values[i] = PackedHalves[i].ToVector4().ToNumerics();
+                for (int i = 0; i < values.Length; i++) values[i] = new Vector4((float)PackedHalves[i * 4], (float)PackedHalves[i * 4 + 1], (float)PackedHalves[i * 4 + 2], (float)PackedHalves[i * 4 + 3]);
 
                 return;
             }

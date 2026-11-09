@@ -2,9 +2,12 @@ using System;
 
 namespace com.radiant.engine.core;
 
-/// <summary>Radiant-owned timing for the current ECS phase, independent of the platform backend.</summary>
+/// <summary>Timing for the current callback. Multiply speeds by <c>DeltaSeconds</c> so motion is frame-rate independent.</summary>
+/// <param name="Total">Time since the game started.</param>
+/// <param name="Elapsed">Time since the previous callback of the same kind.</param>
+/// <param name="IsFixedStep">True inside <c>FixedUpdate</c>, where every step has the same length.</param>
 public readonly record struct FrameTime(TimeSpan Total, TimeSpan Elapsed, bool IsFixedStep = false)
 {
-    /// <summary>Duration of this update or fixed tick in seconds.</summary>
+    /// <summary>Seconds to advance by in this callback.</summary>
     public float DeltaSeconds => (float)Elapsed.TotalSeconds;
 }

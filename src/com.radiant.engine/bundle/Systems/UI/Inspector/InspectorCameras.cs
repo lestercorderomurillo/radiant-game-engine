@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Linq;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
 using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;
@@ -20,7 +19,7 @@ public partial class Inspector
     private string[] CameraLabels = [];
     private readonly System.Collections.Generic.List<int> CameraCandidates = new();
 
-    /// <summary>Opens the shared camera controller, optionally selecting an entity independently of the property inspector.</summary>
+    /// <summary>Opens the Camera Controls window to pan, zoom and switch cameras, optionally preselecting a camera entity.</summary>
     public static void OpenCameraControls(int Entity = -1)
     {
         if (Instance == null) return;

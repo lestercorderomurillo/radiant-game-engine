@@ -1,4 +1,5 @@
 using System;
+using com.radiant.engine.runtime;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -7,11 +8,12 @@ using MonoGame.Framework.Utilities;
 namespace com.radiant.engine.core;
 
 /// <summary>Per-view native NRD resources. Uses the graphics frame command buffer and shared GPU images.</summary>
-internal sealed class VulkanNrdSession : IDisposable
+internal sealed class VulkanNrdSession : ITraceDenoiserSession
 {
     private const string Library = "mgruntime";
     private IntPtr Context;
-    private readonly Renderer Renderer;
+    private readonly IRenderer Renderer;
+    private readonly MonoGameGraphicsBackend Backend;
 
     public RenderTarget2D Output { get; private set; }
 
@@ -68,20 +70,23 @@ internal sealed class VulkanNrdSession : IDisposable
     }
 
     /// <summary>Creates an NRD session associated with the supplied native tracer.</summary>
-    public VulkanNrdSession(Renderer Renderer, VulkanPathTraceSession Trace, int Mode)
+    public VulkanNrdSession(IRenderer Renderer, MonoGameGraphicsBackend Backend, VulkanPathTraceSession Trace, int Mode)
     {
         this.Renderer = Renderer;
+        this.Backend = Backend;
         Context = Create(Trace.Context, (uint)Mode);
 
         if (Context == IntPtr.Zero) throw Error();
 
-        try { Output = Renderer.WrapVulkanTraceImage(Image(Context), Trace.Sample.Width, Trace.Sample.Height); }
+        try { Output = Backend.WrapImage(Image(Context), Trace.Sample.Width, Trace.Sample.Height); }
         catch { Destroy(Context); Context = IntPtr.Zero; throw; }
     }
 
     /// <summary>Runs native denoising with the current camera matrices and reset state.</summary>
-    public void Render(VulkanPathTraceSession Trace, TraceCamera Camera, bool Reset)
+    public void Render(IPathTraceSession trace, TraceCamera Camera, bool Reset)
     {
+        if (trace is not VulkanPathTraceSession Trace || !ReferenceEquals(Trace.Backend, Backend))
+            throw new ArgumentException("Tracing session belongs to a different backend.", nameof(trace));
         Renderer.SetTarget(null);
 
         var parameters = new Parameters { View = Camera.View, Projection = Camera.Projection, Reset = Reset ? 1u : 0u };

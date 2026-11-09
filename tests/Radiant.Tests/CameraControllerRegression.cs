@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 
@@ -15,13 +14,26 @@ internal static class CameraControllerRegression
         public int CameraEntity { get; set; }
     }
 
+    public class CameraRenderer : DispatchProxy
+    {
+        private readonly RenderView View = new(1280, 720);
+        protected override object Invoke(MethodInfo method, object[] arguments)
+        {
+            if (method.Name != nameof(IRenderer.TryGetWorldFit)) throw new NotSupportedException(method.Name);
+            bool fitted = View.TryGetWorldFit(out var center, out var size);
+            arguments[0] = center;
+            arguments[1] = size;
+            return fitted;
+        }
+    }
+
     /// <summary>Runs the headless camera-controller regression assertions.</summary>
     public static void Run()
     {
         using var fixture = new DisposableScene();
         var scene = fixture.Value;
         // Controller selection can be tested without creating GPU resources or a desktop window.
-        var inspector = new Inspector { Scene = scene, Renderer = (Renderer)RuntimeHelpers.GetUninitializedObject(typeof(Renderer)) };
+        var inspector = new Inspector { Scene = scene, Renderer = DispatchProxy.Create<IRenderer, CameraRenderer>() };
         var flags = BindingFlags.Instance | BindingFlags.NonPublic;
         void Set(string name, object value) => typeof(Inspector).GetField(name, flags)!.SetValue(inspector, value);
         T Get<T>(string name) => (T)typeof(Inspector).GetField(name, flags)!.GetValue(inspector)!;

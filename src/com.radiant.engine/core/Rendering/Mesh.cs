@@ -8,6 +8,11 @@ public sealed class Mesh
     internal readonly MeshVertex[] Vertices;
     internal readonly int[] Indices;
 
+    /// <summary>Read-only vertex data available to any graphics backend.</summary>
+    public ReadOnlySpan<MeshVertex> VertexData => Vertices;
+    /// <summary>Read-only triangle indices available to any graphics backend.</summary>
+    public ReadOnlySpan<int> IndexData => Indices;
+
     public int VertexCount => Vertices.Length;
     public int TriangleCount => Indices.Length / 3;
 

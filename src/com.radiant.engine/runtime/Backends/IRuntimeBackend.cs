@@ -13,7 +13,7 @@ public interface IRuntimeBackend
 /// <summary>
 /// Platform lifecycle boundary. The host owns presentation resources; GameLoop owns scenes
 /// and ECS scheduling. Invoke loop callbacks on one thread. Dispose the loop before the host.
-/// This is a runtime boundary, not yet a portable graphics resource API.
+/// Graphics sessions use the independent Radiant graphics backend contracts.
 /// </summary>
 public interface IRuntimeHost : IDisposable
 {

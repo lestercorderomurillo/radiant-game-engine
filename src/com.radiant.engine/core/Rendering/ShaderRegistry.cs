@@ -1,7 +1,6 @@
+using com.radiant.engine.graphics;
 using System;
 using System.Collections.Generic;
-using Microsoft.Xna.Framework.Content;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.core;
 
@@ -12,12 +11,12 @@ namespace com.radiant.engine.core;
 internal class ShaderRegistry : IDisposable
 {
     private readonly Dictionary<string, Effect> Cache = new();
-    private readonly ContentManager Content;
+    private readonly IGraphicsAssetLoader Assets;
 
-    /// <summary>Binds shader loading and caching to the supplied content manager.</summary>
-    public ShaderRegistry(ContentManager content)
+    /// <summary>Binds shader loading and caching to the supplied backend asset loader.</summary>
+    public ShaderRegistry(IGraphicsAssetLoader assets)
     {
-        Content = content;
+        Assets = assets;
     }
 
     /// <summary>
@@ -28,7 +27,7 @@ internal class ShaderRegistry : IDisposable
     {
         if (!Cache.TryGetValue(name, out var shader))
         {
-            shader = Content.Load<Effect>($"shaders/{name}");
+            shader = Assets.LoadEffect($"shaders/{name}");
             Cache[name] = shader;
         }
 

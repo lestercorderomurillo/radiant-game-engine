@@ -1,3 +1,4 @@
+using Window = com.radiant.engine.backends.monogame.MonoGameWindow;
 using System;
 using System.IO;
 using System.Linq;
@@ -272,7 +273,7 @@ internal sealed class PipelineRegressionWindow : Window
 
         if (texture.Format == SurfaceFormat.Vector4)
         {
-            using var preview = new Texture2D(texture.GraphicsDevice, texture.Width, texture.Height);
+            using var preview = Scene.Renderer.CreateTexture(texture.Width, texture.Height);
             preview.SetData(Pixels(texture));
             preview.SaveAsPng(stream, preview.Width, preview.Height);
         }

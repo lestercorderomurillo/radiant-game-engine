@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Content;
-using Microsoft.Xna.Framework.Graphics;
+using com.radiant.engine.graphics;
 
 namespace com.radiant.engine.core;
 
@@ -18,29 +16,29 @@ internal class TextureManager : IDisposable
     /// </summary>
     private sealed class ShapeEntry
     {
-        public readonly Func<GraphicsDevice, int, Texture2D> Generator;
+        public readonly Func<IGraphicsResourceFactory, int, Texture2D> Generator;
         public readonly int MinSize;
         public readonly Dictionary<int, Texture2D> Cache = new();
 
         /// <summary>Stores a procedural texture generator and its minimum cache size.</summary>
-        public ShapeEntry(Func<GraphicsDevice, int, Texture2D> generator, int minSize)
+        public ShapeEntry(Func<IGraphicsResourceFactory, int, Texture2D> generator, int minSize)
         {
             Generator = generator;
             MinSize = minSize;
         }
     }
 
-    private readonly GraphicsDevice Device;
-    private readonly ContentManager Content;
+    private readonly IGraphicsResourceFactory Resources;
+    private readonly IGraphicsAssetLoader Assets;
     private readonly Dictionary<string, Texture2D> ContentCache = new();
     private readonly Dictionary<(Color, int, int), Texture2D> SolidCache = new();
     private readonly Dictionary<string, ShapeEntry> ShapeEntries = new();
 
-    /// <summary>Binds procedural texture caching to the supplied graphics device.</summary>
-    public TextureManager(GraphicsDevice device, ContentManager content)
+    /// <summary>Binds procedural texture caching to the supplied resource factory.</summary>
+    public TextureManager(IGraphicsResourceFactory resources, IGraphicsAssetLoader assets)
     {
-        Device = device;
-        Content = content;
+        Resources = resources;
+        Assets = assets;
 
         RegisterShape("Circle", GenerateCircle, minSize: 1);
         RegisterShape("Triangle", GenerateTriangle, minSize: 4);
@@ -50,7 +48,7 @@ internal class TextureManager : IDisposable
     /// <summary>
     /// Registers a procedural shape texture generator with a minimum size clamp.
     /// </summary>
-    public void RegisterShape(string name, Func<GraphicsDevice, int, Texture2D> generator, int minSize = 1)
+    public void RegisterShape(string name, Func<IGraphicsResourceFactory, int, Texture2D> generator, int minSize = 1)
     {
         ShapeEntries[name] = new ShapeEntry(generator, minSize);
     }
@@ -65,7 +63,7 @@ internal class TextureManager : IDisposable
 
         if (!entry.Cache.TryGetValue(size, out var texture))
         {
-            texture = entry.Generator(Device, size);
+            texture = entry.Generator(Resources, size);
             entry.Cache[size] = texture;
         }
 
@@ -79,7 +77,7 @@ internal class TextureManager : IDisposable
     {
         if (!ContentCache.TryGetValue(name, out var texture))
         {
-            texture = Content.Load<Texture2D>(name);
+            texture = Assets.LoadTexture(name);
             ContentCache[name] = texture;
         }
 
@@ -95,7 +93,7 @@ internal class TextureManager : IDisposable
 
         if (!SolidCache.TryGetValue(key, out var texture))
         {
-            texture = new Texture2D(Device, width, height);
+            texture = Resources.CreateTexture(width, height);
 
             var data = new Color[width * height];
             Array.Fill(data, color);
@@ -107,9 +105,9 @@ internal class TextureManager : IDisposable
     }
 
     /// <summary>Rasterizes a reusable circle texture for shape drawing.</summary>
-    private static Texture2D GenerateCircle(GraphicsDevice device, int diameter)
+    private static Texture2D GenerateCircle(IGraphicsResourceFactory resources, int diameter)
     {
-        var texture = new Texture2D(device, diameter, diameter);
+        var texture = resources.CreateTexture(diameter, diameter);
         var data = new Color[diameter * diameter];
 
         float radius = diameter / 2f;
@@ -140,9 +138,9 @@ internal class TextureManager : IDisposable
     }
 
     /// <summary>Rasterizes a reusable triangle texture for shape drawing.</summary>
-    private static Texture2D GenerateTriangle(GraphicsDevice device, int size)
+    private static Texture2D GenerateTriangle(IGraphicsResourceFactory resources, int size)
     {
-        var texture = new Texture2D(device, size, size);
+        var texture = resources.CreateTexture(size, size);
         var data = new Color[size * size];
         float half = size / 2f;
         Vector2 a = new(half, size - 0.5f);
@@ -179,10 +177,10 @@ internal class TextureManager : IDisposable
     }
 
     /// <summary>Rasterizes a reusable rounded-rectangle texture for shape drawing.</summary>
-    private static Texture2D GenerateRoundedRect(GraphicsDevice device, int radius)
+    private static Texture2D GenerateRoundedRect(IGraphicsResourceFactory resources, int radius)
     {
         int size = radius * 2 + 2;
-        var texture = new Texture2D(device, size, size);
+        var texture = resources.CreateTexture(size, size);
         var data = new Color[size * size];
         float center = size / 2f;
         float innerDist = center - radius;

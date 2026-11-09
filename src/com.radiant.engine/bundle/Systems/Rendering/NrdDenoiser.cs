@@ -1,15 +1,14 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
 /// <summary>Official NRD diffuse REBLUR/RELAX using current hardware-traced signals.</summary>
 internal sealed class NrdDenoiser(PathTracer Source, int Mode) : IDenoisingBackend
 {
-    private VulkanNrdSession Session;
-    private VulkanPathTraceSession PreviousTrace;
+    private ITraceDenoiserSession Session;
+    private IPathTraceSession PreviousTrace;
     private long PreviousRevision = -1;
     private bool Reset = true;
     private Texture2D Fallback;
@@ -21,7 +20,7 @@ internal sealed class NrdDenoiser(PathTracer Source, int Mode) : IDenoisingBacke
         get
         {
             if (Source?.Renderer == null) { Status = "Assign an initialized Denoising.TraceSource."; return false; }
-            if (Source.Renderer.SupportsNrdDenoising(out var reason)) return true;
+            if (Source.Renderer.SupportsDenoising(out var reason)) return true;
 
             Status = reason;
 
@@ -61,7 +60,7 @@ internal sealed class NrdDenoiser(PathTracer Source, int Mode) : IDenoisingBacke
         if (Session?.Output.Width != trace.Sample.Width || Session.Output.Height != trace.Sample.Height)
         {
             Session?.Dispose();
-            Session = Frame.Renderer.CreateVulkanDenoiser(trace, Mode);
+            Session = Frame.Renderer.CreateDenoiser(trace, Mode);
             Reset = true;
         }
 

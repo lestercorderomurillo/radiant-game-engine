@@ -2,12 +2,19 @@ using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
 using com.radiant.engine.runtime;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Queues and draws diagnostic geometry and text overlays.</summary>
+/// <summary>Draws debug lines, circles, rectangles and labels over the scene. Queue them every frame from <c>Render</c> or <c>LateRender</c>; they clear on the next update.</summary>
+/// <example>
+/// The following example shows how to visualize an enemy's sight range:
+/// <code>
+/// var gizmos = ECS.GetSystem&lt;GizmosRenderer&gt;();
+/// gizmos.AddGizmoCircle(enemy, sightRange, Color.Gold);
+/// gizmos.AddGizmoLine(enemy, player, Color.Red, thickness: 2f);
+/// gizmos.AddGizmoText(enemy + new Vector2(0, -40), "alert", Color.White);
+/// </code>
+/// </example>
 public class GizmosRenderer : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.Overlay;
@@ -24,7 +31,7 @@ public class GizmosRenderer : core.System
     private const float TextPadding = 4f;
     private Color TextBackgroundColor = new(0, 0, 0, 180);
 
-    /// <summary>Toggles visibility of the diagnostic overlay.</summary>
+    /// <summary>Shows or hides all gizmos.</summary>
     public void ToggleGizmos() => Enabled = !Enabled;
 
     /// <inheritdoc/>
@@ -46,31 +53,31 @@ public class GizmosRenderer : core.System
         RectQueue.Clear();
     }
 
-    /// <summary>Queues a diagnostic line for the overlay pass.</summary>
+    /// <summary>Draws a line between two world points this frame.</summary>
     public void AddGizmoLine(Vector2 start, Vector2 end, Color color, float thickness = 1f)
     {
         LineQueue.Add(new LineGizmo(start, end, color, thickness));
     }
 
-    /// <summary>Queues a diagnostic circle for the overlay pass.</summary>
+    /// <summary>Draws a circle outline this frame.</summary>
     public void AddGizmoCircle(Vector2 center, float radius, Color color)
     {
         CircleQueue.Add(new CircleGizmo(center, radius, color));
     }
 
-    /// <summary>Queues a diagnostic arc for the overlay pass.</summary>
+    /// <summary>Draws part of a circle between two angles (radians) this frame, such as a view cone.</summary>
     public void AddGizmoArc(Vector2 center, float radius, float startAngle, float endAngle, Color color)
     {
         ArcQueue.Add(new ArcGizmo(center, radius, startAngle, endAngle, color));
     }
 
-    /// <summary>Queues a diagnostic rectangle for the overlay pass.</summary>
+    /// <summary>Draws a rectangle, outlined or filled, this frame.</summary>
     public void AddGizmoRect(Rectangle rect, Color color, bool filled = false)
     {
         RectQueue.Add(new RectGizmo(rect, color, filled));
     }
 
-    /// <summary>Queues a diagnostic text label for the overlay pass.</summary>
+    /// <summary>Draws a text label at a world position this frame.</summary>
     public void AddGizmoText(Vector2 position, string text, Color color)
     {
         TextQueue.Add(new TextGizmo(position, text, color));
@@ -94,7 +101,7 @@ public class GizmosRenderer : core.System
         }
 
         // Always render build number in bottom-left corner
-        var BuildText = Window.BuildTag;
+        var BuildText = RuntimeInfo.BuildTag;
         var TextSize = Renderer.MeasureString("Inter", FontSize, BuildText);
         var BuildPos = new Vector2(15, Renderer.VirtualHeight - TextSize.Y - 15);
 

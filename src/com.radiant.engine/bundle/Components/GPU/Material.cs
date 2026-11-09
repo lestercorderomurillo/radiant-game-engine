@@ -1,37 +1,49 @@
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Surface color, emission and texture for rendering.</summary>
+/// <summary>
+/// How an entity looks and interacts with light. <c>Emissive</c> makes it a light source; <c>Albedo</c> decides how
+/// much light it blocks and what color the light takes when passing through.
+/// </summary>
+/// <example>
+/// The following example shows a light, a solid wall and a pane of red glass:
+/// <code>
+/// ECS.AddComponent&lt;Material&gt;(lamp).Emissive = new Color(255, 200, 120);       // Alpha sets brightness
+/// ECS.AddComponent&lt;Material&gt;(wall).Albedo = Color.Black;                      // Blocks all light
+/// ECS.AddComponent&lt;Material&gt;(glass).Albedo = new Color(255, 60, 60, 160);   // Tints light red
+/// </code>
+/// </example>
 [ComponentDescription("Surface color, emission and texture for rendering.")]
 public struct Material : Component
 {
     private Color AlbedoColor;
     private Color EmissiveColor;
 
-    /// <summary>Optional texture that modulates the emissive color. Null = solid color (default).</summary>
+    /// <summary>Optional texture that patterns the emitted color. Leave null for a solid color.</summary>
     public Texture2D Texture;
 
+    /// <summary>Surface color. Darker colors block more light and the alpha sets how strongly; white lets light through untouched.</summary>
     public Color Albedo
     {
         readonly get => AlbedoColor;
         set { AlbedoColor = value; UpdateCached(); }
     }
 
+    /// <summary>Light emitted by the surface. The alpha is the brightness; black emits nothing.</summary>
     public Color Emissive
     {
         readonly get => EmissiveColor;
         set { EmissiveColor = value; UpdateCached(); }
     }
 
-    /// <summary>Auto-calculated: Albedo inverted, scaled by alpha. Used by HRC.</summary>
+    /// <summary>How much light the surface blocks, computed from <c>Albedo</c> and <c>Emissive</c>. Read-only.</summary>
     public Color Absorption { get; private set; }
 
-    /// <summary>Auto-calculated: Emissive RGB scaled by intensity (A), with alpha=255 for rendering.</summary>
+    /// <summary><c>Emissive</c> with its brightness applied, as the lighting system uses it. Read-only.</summary>
     public Color EmissiveScaled { get; private set; }
 
-    /// <summary>Creates material data and initializes its cached rendering values.</summary>
+    /// <summary>Creates a white, non-emissive material.</summary>
     public Material()
     {
         AlbedoColor = Color.White;

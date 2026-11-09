@@ -1,7 +1,5 @@
 using System;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using com.radiant.engine.input;
 
 namespace com.radiant.engine.bundle;

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace com.radiant.engine.bundle;
 
@@ -31,7 +29,7 @@ public sealed class SvgfDenoiser : IDenoisingBackend
     public void ResetHistory() { HistoryFrames = 0; PreviousRevision = -1; }
 
     /// <summary>Allocates or resizes SVGF intermediates for the current input.</summary>
-    private void Ensure(Renderer renderer, ref RenderTarget2D target, int width, int height, SurfaceFormat format = SurfaceFormat.Vector4)
+    private void Ensure(IRenderer renderer, ref RenderTarget2D target, int width, int height, SurfaceFormat format = SurfaceFormat.Vector4)
     {
         if (target?.Width == width && target.Height == height && target.Format == format) return;
 

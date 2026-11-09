@@ -4,18 +4,22 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using com.radiant.engine.core;
 using com.radiant.engine.runtime;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using RendererShape = com.radiant.engine.core.Shape;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Builds 2D material, motion, and distance-field buffers from ECS shapes.</summary>
+/// <summary>
+/// Turns your 2D entities into the images lighting needs: what glows, what blocks light and how things move.
+/// Every entity with a <c>Transform2D</c>, a shape (<c>Circle2D</c>, <c>Rectangle2D</c> or <c>Triangle2D</c>)
+/// and a <c>Material</c> is drawn automatically. Add it to any lit 2D scene.
+/// </summary>
 [CoreSystem]
 public class Geometry : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Resolution of the distance field relative to the screen. Lower is faster, higher is more precise.</summary>
     public float SDFScale = 0.5f;
+    /// <summary>Builds a distance field each frame for effects that need distance to the nearest shape.</summary>
     public bool EnableSDF = false;
 
     private RenderTarget2D JFATexture1;
@@ -31,29 +35,38 @@ public class Geometry : core.System
     private RenderTarget2D JFAResult;
     private RenderTarget2D JFAResultInterior;
 
+    /// <summary>This frame's glowing surfaces.</summary>
     public RenderTarget2D EmissiveTexture { get; private set; }
+    /// <summary>This frame's light-blocking surfaces.</summary>
     public RenderTarget2D AbsorptionTexture { get; private set; }
+    /// <summary>Distance to the nearest shape per pixel, when <c>EnableSDF</c> is on.</summary>
     public RenderTarget2D SDFTexture { get; private set; }
+    /// <summary>How far each pixel moved since last frame, for motion-aware effects.</summary>
     public RenderTarget2D MotionVectorTexture { get; private set; }
     /// <summary>Signed, unquantized world displacement for temporal reconstruction.</summary>
     public RenderTarget2D TemporalMotionTexture { get; private set; }
+    /// <summary>Produces <c>TemporalMotionTexture</c> for temporal upscalers.</summary>
     public bool TemporalMotionEnabled { get; set; }
 
     private readonly List<(float z, RendererShape shape)> TemporalMotionShapes = new();
 
+    /// <summary>An optional image drawn behind entities as glowing surfaces, such as a lava texture.</summary>
     public RenderTarget2D BackgroundEmissive { get; set; }
+    /// <summary>An optional image drawn behind entities as light-blocking surfaces, such as level walls.</summary>
     public RenderTarget2D BackgroundAbsorption { get; set; }
 
     private int EmissiveCount;
     private int AbsorptionCount;
 
     // Motion vector tracking with N-frame history (weighted: recent frames have more influence)
+    /// <summary>Frames used to estimate motion. More frames are smoother but react later.</summary>
     public int MotionHistoryFrames = 2;
 
     /// <summary>Selects which geometry buffer is shown for diagnostics.</summary>
     private enum DebugMode { None, Emissive, Absorption, SDF, JFADirection, JFARaw, MotionVectors }
     private DebugMode CurrentDebug = DebugMode.None;
 
+    /// <summary>True while a debug view is selected in the inspector.</summary>
     public bool IsDebugging => CurrentDebug != DebugMode.None;
     public bool IsDebugHidingGameplay => CurrentDebug != DebugMode.None
         && CurrentDebug != DebugMode.Emissive

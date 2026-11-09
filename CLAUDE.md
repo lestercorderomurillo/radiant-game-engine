@@ -648,6 +648,8 @@ Audio, physics engine, particles, skeletal animation, save/load, logging, asset 
 
 Pac-Man moved to the sibling `raytracing-pacman` repository, including its maze scene, generator, renderer, gameplay, HUD, textures, and PressStart2P font. The engine must not depend on game code. `radiant.csproj` is a library and excludes test scenes; the preserved lighting/tileset scenes run with `dotnet run --project tests/Radiant.Scenes -- lights` (or `tiles`).
 
+`radiant.csproj` compiles only `src/com.radiant.engine/runtime/Backends/MonoGame` and project-references `src/Radiant.Core/Radiant.Core.csproj`, which compiles every other engine source (except demo scenes) and must not reference MonoGame or FontStashSharp. The renderer drives the portable `IGraphicsBackend`, `IGeometryBackend`, `IShapeBatchBackend` and font interfaces in `core/Graphics`; the MonoGame backend implements them. `tests/Radiant.Portable` (CI `portable` job, also run by `eng/check-consumers.py`) fails if a native graphics assembly is referenced or loaded.
+
 Consumers import `eng/Radiant.Desktop.props` and project-reference `radiant.csproj`. Engine content propagates through the reference. `new GameClient().Run(new MyScene(), new WindowOptions { Title = "My game" })` hosts and disposes a scene. Window sizing uses MonoGame events; timer-resolution calls and GPU counters run only on Windows. Content resolves through MonoGame TitleContainer relative to the executable; keep Content.RootDirectory relative. Startup no longer writes build.txt.
 
 Build: `dotnet build radiant.sln -c Release`. All shaders compile natively through MGCB 3.8.6/DXC to DesktopVK. No Wine. Keep the MGCB manifest and MonoGame package versions aligned.

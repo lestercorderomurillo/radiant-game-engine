@@ -3,56 +3,87 @@ using com.radiant.engine.runtime;
 
 namespace com.radiant.engine.core;
 
-/// <summary>Owns a scene's entities and systems and exposes its lifecycle callbacks.</summary>
+/// <summary>
+/// A level, menu or demo: one set of systems and entities with its own lifecycle. Subclass it, register
+/// systems in <c>SetupECS</c>, create entities in <c>SetupScene</c>, and hand it to <c>GameClient.Run</c>.
+/// </summary>
+/// <example>
+/// The following example shows how to build a lit scene with one warm light:
+/// <code>
+/// public class Campfire : Scene
+/// {
+///     public override void SetupECS()
+///     {
+///         ECS.AddSystem&lt;Geometry&gt;();
+///         ECS.AddSystem&lt;HRCGI&gt;();
+///         base.SetupECS();
+///     }
+///
+///     public override void SetupScene()
+///     {
+///         var warm = new Color(255, 170, 90);
+///         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 80f, warm, warm);
+///         base.SetupScene();
+///     }
+/// }
+///
+/// new GameClient().Run(new Campfire());
+/// </code>
+/// </example>
 public class Scene : IGameObject
 {
+    /// <summary>Index of this scene in the game loop.</summary>
     public int Id { get; private set; }
 
+    /// <summary>The scene's entities and systems. Available from <c>SetupECS</c> onward.</summary>
     public ECS ECS { get; private set; }
 
+    /// <summary>Timing for the current callback: <c>Time.DeltaSeconds</c> is the step to advance by.</summary>
     public FrameTime Time { get; set; }
 
-    /// <summary>Input captured once for the current variable update by the runtime.</summary>
+    /// <summary>Keyboard, mouse and text input for this frame.</summary>
     public com.radiant.engine.input.InputFrame Controls { get; internal set; } = com.radiant.engine.input.InputFrame.Empty;
 
+    /// <summary>Seconds since the previous callback; the same value as <c>Time.DeltaSeconds</c>.</summary>
     public float DeltaTime { get; set; }
 
-    public Renderer Renderer { get; set; }
+    /// <summary>Draws shapes, sprites, text and shader passes. Null when running headless.</summary>
+    public IRenderer Renderer { get; set; }
 
-    /// <summary>Creates the ECS bound to this scene and its renderer.</summary>
+    /// <summary>Creates the scene's ECS. The game loop calls this before <c>SetupECS</c>.</summary>
     public void Initialize()
     {
         ECS = new ECS(this, Renderer);
     }
 
-    /// <summary>Releases the scene's ECS and system resources.</summary>
+    /// <summary>Releases every system and entity. <c>GameClient.Run</c> does this when the window closes.</summary>
     public void Dispose()
     {
         ECS?.Dispose();
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Registers scene systems; call the base implementation to initialize the ECS.</summary>
+    /// <summary>Register your systems here, then call <c>base.SetupECS()</c> to sort and initialize them.</summary>
     public virtual void SetupECS()
     {
         ECS.Initialize();
     }
 
-    /// <summary>Creates scene entities after system setup has completed.</summary>
+    /// <summary>Create your entities, lights and windows here, then call <c>base.SetupScene()</c>.</summary>
     public virtual void SetupScene()
     {
     }
 
-    /// <summary>Updates scene-specific state before ECS systems receive their frame update.</summary>
+    /// <summary>Runs every frame before the systems' <c>Update</c>. A good place for scene-wide input such as pausing.</summary>
     public virtual void Update() { }
 
-    /// <summary>Updates scene-specific simulation before the ECS fixed-timestep pass.</summary>
+    /// <summary>Runs 64 times per second before the systems' <c>FixedUpdate</c>. Put deterministic simulation here.</summary>
     public virtual void FixedUpdate() { }
 
-    /// <summary>Draws scene content before the ECS render pass.</summary>
+    /// <summary>Runs every frame before the systems' <c>Render</c>.</summary>
     public virtual void Render() { }
 
-    /// <summary>Draws scene overlays before the ECS late-render pass.</summary>
+    /// <summary>Runs every frame before the systems' <c>LateRender</c>, after all main rendering.</summary>
     public virtual void LateRender() { }
 
     /// <summary>Runs the scene update followed by the ECS update.</summary>
