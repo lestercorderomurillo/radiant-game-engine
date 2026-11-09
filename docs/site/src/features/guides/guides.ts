@@ -1,3 +1,4 @@
+import { readmeForGuide } from "./readme-guide.mjs"
 import { slugFromFile } from "./guide-slug.mjs"
 import GithubSlugger from "github-slugger"
 import { t, type MessageKey } from "@/common/i18n/t"
@@ -87,7 +88,7 @@ function parseGuide(path: string, source: string, slug: string, titleOverride?: 
 }
 
 const allGuides: Guide[] = [
-  ...Object.entries(readmeSources).map(([, source]) => parseGuide("README.md", source, "overview", t("guides.overviewTitle"))),
+  ...Object.entries(readmeSources).map(([, source]) => parseGuide("README.md", readmeForGuide(source), "overview", t("guides.overviewTitle"))),
   ...Object.entries(docsSources).map(([file, source]) => {
     const name = file.split("/").pop()!
     return parseGuide(`docs/${name}`, source, slugFromFile(name))
