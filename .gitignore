@@ -45,6 +45,8 @@ Ankh.NoLoad
 #=====================
 _ReSharper*/
 *.resharper
+.taste-skill/
+output/
 [Tt]est[Rr]esult*
 .svn
 

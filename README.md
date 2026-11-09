@@ -8,140 +8,78 @@
 
 [![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.3.1/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1)
 
-A C# 2D and 3D game engine for experimenting with real-time lighting, built on MonoGame and Vulkan.
+A C# framework for 2D and 3D games with real-time global illumination, built on MonoGame and Vulkan.
 
-- **2D and 3D rendering:** instanced geometry, radiance-cascade global illumination, raster lighting, and progressive path tracing.
-- **Scene tools:** an archetype ECS, in-game inspector, shared camera controls, and rendering settings.
-- **Playable examples:** a Cornell Box, interactive lighting scenes, [Pac-Man](https://github.com/lestercorderomurillo/raytracing-pacman), and [Zuma](https://github.com/lestercorderomurillo/raytracing-zuma).
+## Features
+
+- **Entities and components**: plain-struct components, fast parallel queries, spatial lookups and tags.
+- **Systems and scenes**: lifecycle callbacks, dependency ordering, pausing and switchable system groups.
+- **2D global illumination**: glowing shapes light the scene, solid shapes cast soft shadows and colored glass
+  tints the light, with no light lists or shadow maps.
+- **Composable rendering**: flat, lit or path-traced images in 2D and 3D, with optional hardware ray tracing.
+- **Image quality**: tone mapping, MSAA, SSAA, FXAA, SMAA, TAA, denoising and UDR upscaling.
+- **In-game inspector**: debug panels in a few lines, live entity editing and a free-flying camera.
+- **Runtime**: keyboard, mouse and text input, frame-rate independent timing, headless simulation and compute
+  shaders.
 
 ## Get Radiant
 
 **[Download v0.3.1 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.3.1.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.1)
 
-Radiant is an engine library built from source. Use the **v0.3.1 tag** for the branded borderless loader and About panel; those runtime changes are not yet on `main`. See [startup and future updater integration](https://github.com/lestercorderomurillo/radiant-game-engine/blob/v0.3.1/docs/Startup.md).
+You need the .NET 8 SDK or newer and a Vulkan-capable GPU. On Linux, also install the Vulkan loader and SDL2.
 
-## Cornell Box (3D)
+Add Radiant to your game project:
 
-![Cornell Box: path-traced blocks, red and green walls, soft shadows and indirect lighting](docs/images/CornellBoxScene.png)
-
-A Cornell Box with selectable flat, lit raster, and progressive diffuse path tracing. The demo starts maximized with path tracing selected and À-trous denoising enabled. AA, tonemapping and guided denoising are independent optional systems. F1 → View → Path tracing offers None, Joint bilateral, À-trous, temporal diffuse SVGF and optional OIDN neural denoising for either 2D or 3D. OIDN provides Fast/Balanced/High quality and CPU/GPU preferences through Neural denoising settings. Install its optional runtime with `python3 eng/install-oidn.py`, then rebuild/restart. Native vendor SDKs without integrations remain unavailable; see [denoising capabilities and costs](docs/Rendering.md#optional-path-denoising).
-
-```sh
-dotnet run --project tests/Radiant.3D -c Release
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../radiant-game-engine/eng/Radiant.Desktop.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../radiant-game-engine/radiant.csproj" />
+  </ItemGroup>
+</Project>
 ```
 
-Left/right orbit within the open front of the room; up/down zoom. **R** switches renderers. **Tab** cycles final output and geometry buffers. **F1** opens Metrics, the 3D pipeline and the View menu with shared Color Management and Antialiasing windows, and the framework ECS inspection tools.
+Then write a scene and run it. The following example opens a window with one warm light:
 
-The [3D sample](src/com.radiant.engine/tests/3D/CornellBoxScene.cs) uses `Transform3D`, `Mesh3D`, and `Camera3D` components with a `Geometry3D` system. The [3D pipeline notes](docs/3D.md) describe its outputs and extension points.
+```csharp
+using com.radiant.engine.bundle;
+using com.radiant.engine.core;
+using com.radiant.engine.math;
+using com.radiant.engine.runtime;
 
-## MegaLights
+new GameClient().Run(new Campfire(), new WindowOptions { Title = "Campfire" });
 
-Orbiting lights, translucent obstacles, and a light that follows your mouse. Paint more lights or blockers and try the different upscalers.
+public class Campfire : Scene
+{
+    public override void SetupECS()
+    {
+        ECS.AddSystem<Inspector>();
+        ECS.AddSystem<Geometry>();
+        ECS.AddSystem<HRCGI>();
+        base.SetupECS();
+    }
 
-![MegaLights: colored lights around nested triangles and columns of occluders](docs/images/MegaLightsScene-resized.png)
-
-## Run it
-
-You'll need the **.NET 8 SDK or newer**, a Vulkan-capable GPU and driver, and a desktop session. On Linux, install the Vulkan loader and SDL2 dependencies too.
-
-```sh
-dotnet build radiant.sln -c Release
-dotnet run --project tests/Radiant.Scenes -c Release --no-build -- triangles
+    public override void SetupScene()
+    {
+        var warm = new Color(255, 180, 100);
+        LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 100f, warm, warm);
+        base.SetupScene();
+    }
+}
 ```
 
-The first build restores dependencies and compiles shaders and content.
+Press **F1** in your game to open the inspector.
 
-| Control | Action |
-| --- | --- |
-| Mouse | Move the light |
-| Left click / drag | Paint rainbow lights |
-| Right click / drag | Paint blockers |
-| Space | Pause or resume orbiting lights |
-| F1 | Toggle the inspector |
-| F11 | Cycle upscalers: Bilinear, UDR1, UDR2, UDR3, UDR4 |
-| X | Add 100,000 lights for a stress test |
-| Escape | Exit |
+## Documentation
 
-## Simple lighting
+**[Read the Radiant documentation](https://lestercorderomurillo.github.io/radiant-game-engine/)**: guides for every
+feature and the complete C# API reference.
 
-One warm light. A small example to start from.
-
-![Simple lighting: a warm orange light against a dark background](docs/images/SimpleLightScene-resized.png)
-
-```sh
-dotnet run --project tests/Radiant.Scenes -c Release -- lights
-```
-
-## Modular 2D rendering
-
-The same flat/raster/path tracing choices, AA and tonemappers also work with compact 2D components:
-
-```sh
-dotnet run --project tests/Radiant.Scenes -c Release -- rendering2d
-```
-
-R switches renderers; F1 opens the pipeline controls. View → Color Management and View → Antialiasing expose the same optional settings windows as 3D. Geometry AA supports MSAA and SSAA; post AA supports FXAA, SMAA and TAA. Exposure works with or without a tonemapper. A 2D-only game does not need 3D entity components or 3D systems. See [rendering architecture, API composition and migration](docs/Rendering.md).
-
-## Build a game
-
-Start with `new GameClient().Run(new MyScene())`. The runtime accepts an
-`IRuntimeBackend`; simulation can also run with `HeadlessBackend` without a window.
-Scenes and ECS systems receive Radiant's `FrameTime` and `Controls` for keyboard, mouse and text. See [runtime backends and API migration](docs/RuntimeBackends.md) and [Radiant input](docs/Input.md). Vectors and matrices use [System.Numerics](docs/Math.md), and meshes accept Radiant `MeshVertex` data. Colors, points, rectangles and colored vertices are Radiant types (`com.radiant.engine.math` / `ColorVertex`). [Render states](docs/RenderStates.md) use immutable Radiant descriptions.
-
-Reference [`radiant.csproj`](radiant.csproj) and import [`eng/Radiant.Desktop.props`](eng/Radiant.Desktop.props) in your game project. Start with [SimpleLightScene.cs](src/com.radiant.engine/tests/2D/SimpleLightScene.cs) for scene setup, or [MegaLightsScene.cs](src/com.radiant.engine/tests/2D/MegaLightsScene.cs) for input and upscaling.
-
-[raytracing-pacman](https://github.com/lestercorderomurillo/raytracing-pacman) is a game built with Radiant. For the lighting internals, see the [HRC implementation notes](docs/HRC.md).
-
-## Tests
-
-Headless checks:
-
-```sh
-dotnet run --project tests/Radiant.Tests -c Release
-```
-
-Rendering checks require a desktop session and Vulkan:
-
-```sh
-dotnet run --project tests/Radiant.Scenes -c Release -- triangles --smoke
-dotnet run --project tests/Radiant.Scenes -c Release -- lights --smoke
-dotnet run --project tests/Radiant.Scenes -c Release -- --lighting-regression
-```
-
-Smoke tests render each scene, check resizing, and save screenshots to `artifacts/smoke/`. See [HRC validation](docs/HRC.md#validation) for the lighting regression checks.
-
-3D rendering and buffer regression checks (desktop/Vulkan):
-
-```sh
-dotnet run --project tests/Radiant.3D -c Release -- --smoke
-dotnet run --project tests/Radiant.3D -c Release -- --regression
-```
-
-Modular rendering and denoising regressions (2D and 3D):
-
-```sh
-dotnet run --project tests/Radiant.3D -c Release -- --pipeline-regression
-dotnet run --project tests/Radiant.3D -c Release -- --pipeline-regression --2d
-dotnet run --project tests/Radiant.3D -c Release -- --advanced-denoising-regression
-dotnet run --project tests/Radiant.3D -c Release -- --advanced-denoising-regression --2d
-```
-
-AA and stationary raster visibility checks:
-
-```sh
-dotnet run --project tests/Radiant.3D -c Release -- --raster-stability
-dotnet run --project tests/Radiant.3D -c Release -- --aa-regression
-dotnet run --project tests/Radiant.3D -c Release -- --aa-regression --2d
-```
-
-Capture the 3D showcase at 1280×720 after 128 progressive samples (desktop/Vulkan):
-
-```sh
-dotnet run --project tests/Radiant.3D -c Release -- --capture
-```
-
-The unedited final frame is saved to `artifacts/showcase/cornell-box.png`.
-
-## Online documentation
-
-[Read the Radiant documentation](https://lestercorderomurillo.github.io/radiant-game-engine/) — guides and the generated C# API reference. Automatically deployed from `main` by GitHub Actions.
+- [Getting started](docs/GettingStarted.md)
+- [Entities and components](docs/ECS.md) and [systems and scenes](docs/Systems.md)
+- [Input](docs/Input.md) and [inspector](docs/Inspector.md)
+- [Renderer](docs/Renderer.md) and [2D global illumination](docs/HRC.md)
+- [Rendering pipelines](docs/Rendering.md) and [3D rendering](docs/3D.md)
