@@ -75,7 +75,7 @@ Corrections made during continuation:
 The analytic furnace validates constant-field energy and temporal convergence;
 it cannot establish accuracy for varying radiance. The Cornell checks establish
 nonuniform illumination, color bleeding, environment/depth output and lifecycle
-behavior, not agreement with an offline reference. No general error bound has
+behavior. The independent-reference section below adds an offline Cornell comparison. No general error bound has
 been measured. Thin geometry, coarse normal tiles, angular undersampling and
 normal bias can still cause artifacts. With `LeakFix = false`, the furnace's
 dark external environment leaks inward; this mode is explicitly approximate.
@@ -174,3 +174,71 @@ switching away/back, depth and bounce contribution. Captures are written to
 `artifacts/radiance-cascades/cornell.png` and `cornell-bounced.png`.
 Reconstructed captures are `cornell-optimized.png` and
 `cornell-optimized-1080p.png`; each fixture run overwrites these diagnostics.
+
+## Independent path-traced reference and artifact correction
+
+The Cornell demo now selects 32³ probes and eight direction rows (128 directions
+per base probe). UDR4 Balanced remains the interactive reconstruction default.
+This raises field-update cost; the cached field still avoids repeated interval
+tracing. The earlier timing table describes the previous settings and must not
+be used as a benchmark for this preset.
+
+Irradiance tiles are now 10×5 (eight normal columns plus wrapping borders), with
+an equator row and columns aligned to the X/Z axes. All six axis normals can be
+sampled exactly, instead of blending tilted normals on vertical walls. Visibility
+starts just above the actual surface, independently of the interpolation bias,
+so increasing the bias cannot move the visibility ray past a nearby blocker.
+This is not a general solution to the limitations of sparse surface visibility.
+
+`--cascade-reference` exports the actual world-space triangles, linear diffuse
+materials, emission, camera and environment, together with native 1280×720 linear
+cascade output after 64 bounce updates. `eng/render-cascade-reference.py` imports
+that export into **Mitsuba 3.9.1**, using its MIS path integrator, **4,096 samples
+per pixel**, unlimited path depth, and no denoising, radiance clamping, tone
+mapping or upscaling. This follows [Mitsuba's reference-quality depth guidance](https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_integrators.html).
+Samples are rendered in bounded batches; alternating independent batches estimate
+remaining Monte Carlo noise. PNG previews clip linear RGB identically; EXR/NPY
+retain HDR radiance. The scene hash prevents comparisons with stale exports.
+
+Measured against this independent reference, the previous grid-16/four-row
+Cornell preset had linear RGB MAE **0.0107651**; the corrected grid-32/eight-row
+preset measured **0.00844113**, a **21.59% reduction**. Full-image RMSE changed
+from 0.0460276 to 0.0430028. Independent 2,048-sample reference halves differ by
+RMSE 0.00389607. These are single-scene measurements, not general accuracy bounds.
+The normal-map correction alone did not reduce full-image error; the denser
+preset is part of the measured improvement. Contact shadows and probe
+interpolation remain approximate, and emitter silhouette pixels also differ
+because the offline reference samples subpixel coverage.
+
+Reproduce on an isolated display (never the user's desktop):
+
+```sh
+dotnet build radiant.sln -c Release -m:1
+# Explicit shader build, including shared .fxh dependencies:
+dotnet mgcb /@:Content/Content.mgcb /workingDir:Content
+cp Content/bin/DesktopVK/shaders/RC/*.xnb tests/Radiant.3D/bin/Release/net8.0/Content/shaders/RC/
+xvfb-run -a env SDL_VIDEODRIVER=x11 MESA_VK_WSI_DEBUG=sw \
+  dotnet run --project tests/Radiant.3D -c Release --no-build -- --cascade-reference
+python -m venv /tmp/radiant-reference-venv
+/tmp/radiant-reference-venv/bin/pip install mitsuba==3.9.1 numpy pillow
+/tmp/radiant-reference-venv/bin/python eng/render-cascade-reference.py
+# After a renderer change, recapture, then compare without rerendering Mitsuba:
+/tmp/radiant-reference-venv/bin/python eng/render-cascade-reference.py --compare-only
+```
+
+Outputs are in `artifacts/radiance-reference/`: `reference.png`, `reference.exr`,
+`reference.npy`, `cascade.png`, raw little-endian RGB `cascade.f32`, `metrics.json`,
+and `comparison.png` (cascade / reference / absolute error ×4). To reproduce an
+improvement gate, save the pre-change capture as `cascade-before.f32` and pass
+`--compare-only --check-improvement`; the gate requires at least 4,096 reference
+samples and lower MAE. Baselines must use the same exported scene and resolution.
+
+Validation of the final preset passed the furnace and dense/native Cornell GPU
+fixtures, headless and portable suites, and Release solution build. The build had
+six NU1900 warnings because NuGet vulnerability metadata was unreachable, with
+zero errors. The GPU fixture measured 108.17 ms/frame during field updates and
+2.67 ms/frame when cached at 1920×1080 UDR4 Balanced on the RX 9070 XT. This
+is a real update-time tradeoff, not a 60 FPS dynamic-lighting result. Testing
+16³/eight rows and 32³/four rows did not improve MAE over the previous preset,
+so neither was selected as a cheaper default. Existing grid/direction controls
+remain available for performance tuning.

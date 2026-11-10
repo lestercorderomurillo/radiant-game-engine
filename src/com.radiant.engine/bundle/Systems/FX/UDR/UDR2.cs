@@ -3,12 +3,14 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Reconstructs HRC lighting and smooths it through temporal accumulation.</summary>
-/// <remarks>Combines a spatial pass with previous-frame history. Requires matching HRC geometry. Call ResetAccumulation after discontinuous scene changes. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <summary>Reconstructs a color image and smooths it through temporal accumulation.</summary>
+/// <remarks>Combines a spatial pass with previous-frame history. Uses spatial reconstruction when matching geometry guidance is unavailable. Call ResetAccumulation after discontinuous scene changes. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
 /// <seealso cref="Upscaling"/>
 public class UDR2 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Uses matching 2D Geometry buffers when available. Set false before initialization for image-only reconstruction.</summary>
+    public bool UseGeometryGuidance = true;
     // Spatial parameters
     /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.5f;
@@ -18,8 +20,6 @@ public class UDR2 : core.System
     // Temporal parameters (adjustable)
     /// <summary>Target temporal history length in frames. Longer history smooths the image but responds more slowly to change.</summary>
     public int FramesToAccumulate = 6;         // Number of frames to average together (1 = no temporal, 10 = very smooth)
-
-    private const int MaxFrames = 16;
 
     private RenderTarget2D SpatialTexture;
     private RenderTarget2D AccumulationTexture;  // Running sum of frames
@@ -34,7 +34,7 @@ public class UDR2 : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        Geometry = Scene.ECS.GetSystem<Geometry>();
+        Geometry = UseGeometryGuidance ? Scene.ECS.GetSystem<Geometry>() : null;
         OutputSize = Renderer.ScreenSize;
         CreateRenderTargets();
         ApplyRenderScale();
@@ -119,43 +119,55 @@ public class UDR2 : core.System
 
         if (UDRQuality.ScaleFactor == 100) return;
 
+        bool hasGeometry = Geometry is { Enabled: true, EmissiveTexture: not null, AbsorptionTexture: not null };
+        var black = Renderer.GetSolidTexture(Color.Transparent);
+
         // Pass 1: Spatial upscaling (Lanczos + edge refinement)
         Renderer
             .Reset()
             .SetShader("UDR/UDR2")
             .SetTechnique("Spatial")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.LinearClamp)
-            .SetTarget(SpatialTexture)
+            .SetTarget(hasGeometry ? SpatialTexture : SmoothTexture)
             .Clear(Color.Black)
             .SetParameter("InputTexture", input)
-            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture)
-            .SetParameter("SDFTexture", Geometry?.SDFTexture)
-            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture)
+            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture ?? black)
+            .SetParameter("SDFTexture", Geometry?.SDFTexture ?? black)
+            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture ?? black)
             .SetParameter("InputSize", inputSize)
             .SetParameter("OutputSize", OutputSize)
             .SetParameter("Sharpness", Sharpness)
-            .SetParameter("EdgeCorrection", EdgeCorrection ? 1f : 0f)
+            .SetParameter("PreserveAlpha", hasGeometry ? 0f : 1f)
+            .SetParameter("EdgeCorrection", EdgeCorrection && hasGeometry ? 1f : 0f)
             .SetParameter("DebugRays", DebugRays ? 1f : 0f)
             .Draw()
             .Commit()
             .SetTarget(null);
 
+        if (!hasGeometry)
+        {
+            FrameIndex = 0;
+            return;
+        }
+
         // Pass 2: Temporal accumulation (running average)
-        int effectiveFrames = Math.Min(FrameIndex + 1, FramesToAccumulate);
+        int effectiveFrames = Math.Min(FrameIndex + 1, Math.Clamp(FramesToAccumulate, 1, 16));
         float currentWeight = 1.0f / effectiveFrames;
 
         Renderer
             .Reset()
             .SetShader("UDR/UDR2")
             .SetTechnique("Temporal")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.LinearClamp)
             .SetTarget(SmoothTexture)
             .Clear(Color.Black)
             .SetParameter("InputTexture", SpatialTexture)
-            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture)
-            .SetParameter("SDFTexture", Geometry?.SDFTexture)
+            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture ?? black)
+            .SetParameter("SDFTexture", Geometry?.SDFTexture ?? black)
             .SetParameter("HistoryTexture", AccumulationTexture)
-            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture)
+            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture ?? black)
             .SetParameter("OutputSize", OutputSize)
             .SetParameter("CurrentWeight", currentWeight)
             .SetParameter("FrameCount", (float)effectiveFrames)
@@ -168,6 +180,7 @@ public class UDR2 : core.System
             .Reset()
             .SetShader("UDR/UDR2")
             .SetTechnique("Copy")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.LinearClamp)
             .SetTarget(AccumulationTexture)
             .Clear(Color.Black)
@@ -176,7 +189,7 @@ public class UDR2 : core.System
             .Commit()
             .SetTarget(null);
 
-        FrameIndex++;
+        FrameIndex = Math.Min(FrameIndex + 1, 16);
     }
 
     /// <inheritdoc/>
@@ -216,8 +229,7 @@ public class UDR2 : core.System
     {
         UDRQuality.Changed -= OnQualityChanged;
 
-        var geometry = Scene?.ECS?.GetSystem<Geometry>();
-        if (geometry != null) geometry.EnableSDF = false;
+        if (Geometry != null) Geometry.EnableSDF = false;
         Inspector.DestroyWindow("udr2");
         Renderer.RenderScale = 1.0f;
 

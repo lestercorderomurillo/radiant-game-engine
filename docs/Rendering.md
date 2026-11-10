@@ -4,6 +4,11 @@ Compose exactly the image you need from small, independent systems: produce an i
 then color-grade it, antialias it, denoise it, upscale it and present it. 2D and 3D use the same stages, and one
 game can mix them.
 
+Radiant is a general-purpose engine. A producer can render unlit content, evaluate lighting at runtime,
+use prebaked GI supplied by your game, or implement a custom technique. Image stages consume the resulting
+color image independently of that choice. Features that use depth, normals, geometry or motion require
+compatible buffers for the same view; those capabilities are separate from the lighting method.
+
 ## Building blocks
 
 | System | What it gives you |

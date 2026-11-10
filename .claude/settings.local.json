@@ -35,7 +35,19 @@
       "Bash(git fetch *)",
       "Bash(gh run *)",
       "Bash(echo \"docs exit=$?\")",
-      "Bash(echo \"build exit=$?\")"
+      "Bash(echo \"build exit=$?\")",
+      "Bash(python3 -)",
+      "Bash(npx tsc *)",
+      "Bash(eng/docs.sh build *)",
+      "Bash(eng/docs.sh preview *)",
+      "Bash(git commit *)",
+      "Bash(gh api *)",
+      "Bash(xargs cat)",
+      "Read(//mnt/M2_1/Projects/Repositories/**)",
+      "Read(//mnt/M2_1/Projects/Repositories/raytracing-pacman/**)",
+      "Bash(set -e)",
+      "Bash(sed -i 's|^\\\\\\(\\\\s*\\\\\\)ordering.Value.SetupECS\\(\\);|\\\\1ordering.Value.ECS.Initialize\\(\\);|; s|^Scene.SetupECS\\(\\);|Scene.ECS.Initialize\\(\\);|' tests/Radiant.Tests/Program.cs)",
+      "Bash(grep -vE \"base\\\\.SetupECS|^\\\\S+-\\\\s*}\\\\s*$|^\\\\S+-\\\\s*$|^--$|///\\\\s*}\")"
     ]
   }
 }

@@ -10,6 +10,7 @@ SamplerState Sampler : register(s0);
 float2 InputSize;
 float2 OutputSize;
 float Sharpness;
+float PreserveAlpha;
 float EdgeCorrection;
 float DebugRays;
 
@@ -475,7 +476,7 @@ float4 UDR1_PS(PixelShaderInput input) : SV_Target0
         }
     }
 
-    return float4(result, 1.0);
+    return float4(result, PreserveAlpha > 0.5 ? saturate(InputTexture.Sample(Sampler, uv).a) : 1.0);
 }
 
 // =============================================================================
@@ -514,7 +515,7 @@ float4 EdgeSmooth_PS(PixelShaderInput input) : SV_Target0
     // Not an edge - return original
     if (lumRange < threshold)
     {
-        return float4(colorM, 1.0);
+        return float4(colorM, InputTexture.Sample(Sampler, uv).a);
     }
 
     // Edge detected - apply Gaussian blur (9x9, sigma ~2.0)
@@ -539,7 +540,7 @@ float4 EdgeSmooth_PS(PixelShaderInput input) : SV_Target0
     blur /= totalWeight;
 
     float3 result = lerp(colorM, blur, SMOOTH_STRENGTH);
-    return float4(result, 1.0);
+    return float4(result, InputTexture.Sample(Sampler, uv).a);
 }
 
 technique Upscale

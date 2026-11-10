@@ -20,12 +20,12 @@ float2 EncodeDirection(float3 direction)
     return float2(frac(phi / RC_TWO_PI), saturate((direction.y + 1.0) * 0.5));
 }
 
-// Irradiance tiles place rows at the poles so a lookup along an axis-aligned normal is exact.
+// Odd row counts include the equator; columns align with X/Z so all six axis normals are exact.
 float3 IrradianceNormal(int2 texel, int2 tileSize)
 {
     int columns = tileSize.x - 2;
     int column = (texel.x + columns - 1) % columns;
-    float phi = (column + 0.5) / columns * RC_TWO_PI;
+    float phi = (float)column / columns * RC_TWO_PI;
     float y = 2.0 * texel.y / max(tileSize.y - 1, 1) - 1.0;
     float radius = sqrt(max(0.0, 1.0 - y * y));
     return float3(radius * cos(phi), y, radius * sin(phi));
@@ -76,7 +76,7 @@ bool ProbeOccluded(float3 origin, float3 direction, float maxDistance)
 float3 ProbeIrradiance(Texture2D volume, SamplerState linearSampler, float2 atlasSize, int2 origin, int2 tileSize, float3 normal)
 {
     float2 uv = EncodeDirection(normal);
-    float2 texel = float2(uv.x * (tileSize.x - 2) + 1.0, uv.y * (tileSize.y - 1) + 0.5);
+    float2 texel = float2(uv.x * (tileSize.x - 2) + 1.5, uv.y * (tileSize.y - 1) + 0.5);
     return volume.SampleLevel(linearSampler, (origin + texel) / atlasSize, 0).rgb;
 }
 
@@ -102,9 +102,11 @@ float3 SampleIrradiance(Texture2D volume, SamplerState linearSampler, float2 atl
 
         if (visibility && weight > 1e-5)
         {
-            float3 toProbe = probe - biased;
+            // Bias selects interpolation probes, but must not move visibility past a nearby blocker.
+            float3 visibilityOrigin = position + normal * (0.001 * spacing);
+            float3 toProbe = probe - visibilityOrigin;
             float probeDistance = max(length(toProbe), 1e-5);
-            if (ProbeOccluded(biased, toProbe / probeDistance, probeDistance)) weight *= 0.001;
+            if (ProbeOccluded(visibilityOrigin, toProbe / probeDistance, probeDistance)) weight *= 0.001;
         }
 
         total += weight * ProbeIrradiance(volume, linearSampler, atlasSize, TileOrigin(ProbeIndex(cell, gridSize), tilesPerRow, tileSize), tileSize, normal);

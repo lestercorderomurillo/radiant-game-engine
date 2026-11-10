@@ -27,7 +27,7 @@ public class AntiAliasingSettings : core.System
 
         if (Upscaler != null)
         {
-            UpscalingModes = Upscaler.HrcInput ? Enum.GetValues<UpscalingMode>() : [UpscalingMode.None, UpscalingMode.UDR4];
+            UpscalingModes = Enum.GetValues<UpscalingMode>();
             Inspector.AddDropdown(Id, "upscaler", "Reconstruction", Array.ConvertAll(UpscalingModes, mode => mode.ToString()), Array.IndexOf(UpscalingModes, Upscaler.Mode), index => { Upscaler.Select(UpscalingModes[index]); Source.ResetHistory(); });
             Inspector.AddDropdown(Id, "quality", "Reconstruction quality", UDRQuality.Names, UDRQuality.Index, index => { UDRQuality.Set(index); Source.ResetHistory(); });
             Inspector.AddLabel(Id, "reconstructionStatus", Upscaler.Status);

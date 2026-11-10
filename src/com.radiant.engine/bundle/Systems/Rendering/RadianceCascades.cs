@@ -86,7 +86,7 @@ public class RadianceCascades : ImageSystem
     private bool FieldValid;
 
     // Eight normal columns plus two wrap columns for hardware bilinear sampling.
-    private static readonly Point IrradianceTile = new(10, 4);
+    private static readonly Point IrradianceTile = new(10, 5);
 
     /// <summary>Registers cascade, irradiance and depth buffers for inspection.</summary>
     public RadianceCascades()

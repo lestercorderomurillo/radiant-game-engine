@@ -46,6 +46,13 @@ if (Array.IndexOf(args, "--vulkan-rt-regression") >= 0)
     return;
 }
 
+if (Array.IndexOf(args, "--cascade-reference") >= 0)
+{
+    using var window = new CascadeReferenceWindow();
+    window.Run();
+    return;
+}
+
 if (Array.IndexOf(args, "--radiance-cascades-regression") >= 0)
 {
     using var window = new RadianceCascadesRegressionWindow(Array.IndexOf(args, "--furnace") >= 0, Array.IndexOf(args, "--native") >= 0, Array.IndexOf(args, "--dense") >= 0);

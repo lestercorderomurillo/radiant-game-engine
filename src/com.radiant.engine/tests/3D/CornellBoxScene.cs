@@ -46,7 +46,7 @@ public class CornellBoxScene : Scene
         Tracer = ECS.AddSystem(new PathTracer { Backend = InitialTraceBackend, SeparateLighting = true, Geometry = Meshes, Channels = TraceChannels.All, ViewSize = () => Meshes.ViewSize, After = [Meshes] }, false);
         Denoiser = ECS.AddSystem(new Denoising { TraceSource = Tracer, Mode = InitialDenoiser, Input = () => Tracer.Enabled ? Tracer.GetOutput() : null, Albedo = () => Tracer.AlbedoTexture, Normals = () => Tracer.NormalTexture, Depth = () => Tracer.DepthTexture, Emission = () => Tracer.EmissionTexture, SingleSample = () => Tracer.SampleTexture, Camera = () => Tracer.Geometry.HasCamera ? Tracer.Geometry.Camera : null, Revision = () => Tracer.RadianceRevision, After = [Tracer] }, enabled: true);
         Lighting = ECS.AddSystem(new PathLighting { Source = Tracer, Input = Denoiser.GetOutput, After = [Tracer, Denoiser] });
-        Cascades = ECS.AddSystem(new RadianceCascades { Geometry = Meshes, GridSize = 16, ViewSize = () => Meshes.ViewSize, After = [Meshes] }, false);
+        Cascades = ECS.AddSystem(new RadianceCascades { Geometry = Meshes, GridSize = 32, BaseDirectionRows = 8, ViewSize = () => Meshes.ViewSize, After = [Meshes] }, false);
 
         ToneMap = ECS.AddSystem(new ToneMapping { Input = GetRenderedOutput, Mapper = ToneMapper.None, After = [Flat, Raster, Tracer, Denoiser, Lighting, Cascades] });
         AA = ECS.AddSystem(new AntiAliasing { Input = ToneMap.GetOutput, Mode = PostAAMode.None, OutputSize = () => Meshes.ViewSize, Camera = () => Meshes.Camera, Depth = () => RenderMethod switch { 2 => Lighting.DepthTexture ?? Tracer.DepthTexture, 3 => Cascades.DepthTexture, _ => Geometry.DepthTexture }, GeometryRevision = () => Meshes.Revision, After = [ToneMap] });

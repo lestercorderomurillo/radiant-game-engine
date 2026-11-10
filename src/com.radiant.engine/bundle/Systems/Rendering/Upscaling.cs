@@ -5,43 +5,50 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Selects a UDR reconstruction algorithm, independently of the resolution preset.</summary>
 /// <remarks>Use <see cref="UDRQuality"/> to choose Performance, Balanced or Native resolution.
-/// UDR1–UDR3 require HRC-derived input. UDR4 also supports generic 2D and 3D images through spatial reconstruction.</remarks>
+/// Every algorithm accepts a color image from any 2D or 3D rendering pipeline. Matching guidance enables additional reconstruction features.</remarks>
 public enum UpscalingMode
 {
     /// <summary>Passes the input through without reconstruction.</summary>
     None,
-    /// <summary>Spatial reconstruction using HRC geometry, without frame history.</summary>
+    /// <summary>Spatial reconstruction with optional geometry guidance, without frame history.</summary>
     UDR1,
-    /// <summary>Spatial reconstruction and temporal accumulation for HRC input.</summary>
+    /// <summary>Spatial reconstruction with temporal accumulation when guidance is available.</summary>
     UDR2,
-    /// <summary>Lanczos reconstruction, edge refinement and temporal accumulation for HRC input.</summary>
+    /// <summary>Lanczos reconstruction and sharpening, with optional guided refinement and temporal accumulation.</summary>
     UDR3,
-    /// <summary>Temporal reconstruction for HRC input, or spatial reconstruction for generic images.</summary>
+    /// <summary>Guided temporal reconstruction, with spatial reconstruction when guidance is unavailable.</summary>
     UDR4
 }
 
 /// <summary>Reconstructs an image at display resolution using one selected UDR algorithm.</summary>
 /// <remarks>
 /// Connect <c>Input</c> to the preceding image stage and present <see cref="GetOutput"/> separately.
-/// Set <see cref="HrcInput"/> before selecting a mode or initializing the system. HRC-derived images can use
-/// UDR1–UDR4; other 2D and 3D images use UDR4's spatial fallback. The stage owns and disposes its selected algorithm.
+/// Any color-image producer can use UDR1–UDR4. Optional guidance must describe the same view as the image.
+/// The stage owns and disposes its selected algorithm.
 /// </remarks>
 /// <seealso cref="UpscalingMode"/>
 /// <seealso cref="UDRQuality"/>
 [SystemTag("Rendering", "Upscaling")]
 public class Upscaling : ImageSystem
 {
-    /// <summary>Whether the input is derived from this scene's HRC lighting and matching geometry buffers.</summary>
+    /// <summary>Enables the existing HRC adapter, including matching 2D geometry guidance and UDR4 lighting jitter.</summary>
     /// <remarks>Set before selecting a mode or initializing the system. Do not enable for unrelated raster or path-traced images.</remarks>
     public bool HrcInput;
+    /// <summary>Uses this scene's matching 2D Geometry buffers for edge and temporal guidance, independently of the image's lighting technique.</summary>
+    /// <remarks>Set before selecting a mode or initializing the system. Leave false for images without compatible guidance.</remarks>
+    public bool UseGeometryGuidance;
     /// <summary>Gets the selected algorithm; use <see cref="Select"/> to change it. Defaults to <see cref="UpscalingMode.None"/>.</summary>
     public UpscalingMode Mode { get; private set; }
     /// <summary>Gets the per-axis render scale, or 1 when the stage is disabled or no algorithm is selected.</summary>
     public float Scale => !Enabled || Mode == UpscalingMode.None ? 1f : UDRQuality.ScaleNormalized;
-    /// <summary>Describes whether reconstruction is bypassed, HRC-guided or using the generic spatial fallback.</summary>
-    public string Status => Mode == UpscalingMode.None ? "Native / reconstruction off"
-        : HrcInput ? "HRC geometry guidance; temporal history in UDR2–4"
-        : "UDR4 spatial fallback; temporal guidance unavailable";
+    /// <summary>Describes whether reconstruction is bypassed, guided or spatial.</summary>
+    public string Status => !Enabled || Mode == UpscalingMode.None || UDRQuality.ScaleFactor == 100 ? "Native / reconstruction off"
+        : HasGeometryGuidance ? Mode == UpscalingMode.UDR1 ? "Spatial reconstruction with geometry guidance"
+            : "Geometry guidance; temporal history enabled"
+        : "Spatial reconstruction; no guidance connected";
+
+    private bool HasGeometryGuidance => (HrcInput || UseGeometryGuidance)
+        && Scene?.ECS.GetSystem<Geometry>() is { Enabled: true, EmissiveTexture: not null, AbsorptionTexture: not null };
 
     private core.System Backend;
     private Func<Texture2D> BackendOutput;
@@ -52,13 +59,10 @@ public class Upscaling : ImageSystem
     /// <summary>Selects an algorithm and releases the previous algorithm's resources.</summary>
     /// <param name="mode">Reconstruction algorithm, or <see cref="UpscalingMode.None"/> to bypass the stage.</param>
     /// <exception cref="ArgumentOutOfRangeException">The value is not a defined <see cref="UpscalingMode"/>.</exception>
-    /// <exception cref="InvalidOperationException">UDR1, UDR2 or UDR3 is selected without <see cref="HrcInput"/>.</exception>
     /// <remarks>Algorithm selection and resolution quality are independent. Change quality through <see cref="UDRQuality.Set"/>.</remarks>
     public void Select(UpscalingMode mode)
     {
         if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
-        if (!HrcInput && mode is UpscalingMode.UDR1 or UpscalingMode.UDR2 or UpscalingMode.UDR3)
-            throw new InvalidOperationException("UDR1–3 require an HRC input. Use UDR4 for a generic image source.");
         if (Mode == mode && (mode == UpscalingMode.None || Backend != null || !Initialized)) return;
 
         ReleaseBackend();
@@ -70,25 +74,31 @@ public class Upscaling : ImageSystem
         switch (mode)
         {
             case UpscalingMode.UDR1:
-                var spatial = new UDR1();
+                var spatial = new UDR1 { UseGeometryGuidance = HrcInput || UseGeometryGuidance };
                 spatial.SetInputSource(() => Input?.Invoke());
                 Backend = spatial;
                 BackendOutput = spatial.GetOutput;
                 break;
             case UpscalingMode.UDR2:
-                var temporal = new UDR2();
+                var temporal = new UDR2 { UseGeometryGuidance = HrcInput || UseGeometryGuidance };
                 temporal.SetInputSource(() => Input?.Invoke());
                 Backend = temporal;
                 BackendOutput = temporal.GetOutput;
                 break;
             case UpscalingMode.UDR3:
-                var lanczos = new UDR3();
+                var lanczos = new UDR3 { UseGeometryGuidance = HrcInput || UseGeometryGuidance };
                 lanczos.SetInputSource(() => Input?.Invoke());
                 Backend = lanczos;
                 BackendOutput = lanczos.GetOutput;
                 break;
             case UpscalingMode.UDR4:
-                var reconstruction = new UDR4 { Present = false, UseHrcGeometry = HrcInput, Temporal = HrcInput };
+                var reconstruction = new UDR4
+                {
+                    Present = false,
+                    UseHrcGeometry = HrcInput,
+                    UseGeometryGuidance = UseGeometryGuidance,
+                    Temporal = HrcInput || UseGeometryGuidance
+                };
                 reconstruction.SetInputSource(() => Input?.Invoke());
                 Backend = reconstruction;
                 BackendOutput = reconstruction.GetOutput;

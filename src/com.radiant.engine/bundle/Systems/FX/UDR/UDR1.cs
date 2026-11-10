@@ -3,12 +3,14 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Reconstructs HRC lighting spatially, with geometry-guided edge refinement and sharpening.</summary>
-/// <remarks>Uses only the current image; it does not accumulate previous frames. Requires the matching HRC geometry buffers. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <summary>Reconstructs a color image spatially, with geometry-guided edge refinement and sharpening.</summary>
+/// <remarks>Uses only the current image; it does not accumulate previous frames. Matching 2D geometry buffers optionally guide edge refinement. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
 /// <seealso cref="Upscaling"/>
 public class UDR1 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Uses matching 2D Geometry buffers when available. Set false before initialization for image-only reconstruction.</summary>
+    public bool UseGeometryGuidance = true;
     /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.5f;
     public bool EdgeCorrection = true;
@@ -24,7 +26,7 @@ public class UDR1 : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        Geometry = Scene.ECS.GetSystem<Geometry>();
+        Geometry = UseGeometryGuidance ? Scene.ECS.GetSystem<Geometry>() : null;
         OutputSize = Renderer.ScreenSize;
         CreateRenderTargets();
         ApplyRenderScale();
@@ -87,21 +89,26 @@ public class UDR1 : core.System
 
         if (UDRQuality.ScaleFactor == 100) return;
 
+        bool hasGeometry = Geometry is { Enabled: true, EmissiveTexture: not null, AbsorptionTexture: not null };
+        var black = Renderer.GetSolidTexture(Color.Transparent);
+
         Renderer
             .Reset()
             .SetShader("UDR/UDR1")
             .SetTechnique("Upscale")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.LinearClamp)
             .SetTarget(OutputTexture)
             .Clear(Color.Black)
             .SetParameter("InputTexture", input)
-            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture)
-            .SetParameter("SDFTexture", Geometry?.SDFTexture)
-            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture)
+            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture ?? black)
+            .SetParameter("SDFTexture", Geometry?.SDFTexture ?? black)
+            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture ?? black)
             .SetParameter("InputSize", inputSize)
             .SetParameter("OutputSize", OutputSize)
             .SetParameter("Sharpness", Sharpness)
-            .SetParameter("EdgeCorrection", EdgeCorrection ? 1f : 0f)
+            .SetParameter("PreserveAlpha", hasGeometry ? 0f : 1f)
+            .SetParameter("EdgeCorrection", EdgeCorrection && hasGeometry ? 1f : 0f)
             .SetParameter("DebugRays", DebugRays ? 1f : 0f)
             .Draw()
             .Commit()
@@ -112,6 +119,7 @@ public class UDR1 : core.System
             .Reset()
             .SetShader("UDR/UDR1")
             .SetTechnique("EdgeSmooth")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.LinearClamp)
             .SetTarget(SmoothTexture)
             .Clear(Color.Black)

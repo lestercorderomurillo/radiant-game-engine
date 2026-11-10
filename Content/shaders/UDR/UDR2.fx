@@ -11,6 +11,7 @@ SamplerState Sampler : register(s0);
 float2 InputSize;
 float2 OutputSize;
 float Sharpness;
+float PreserveAlpha;
 float EdgeCorrection;
 float DebugRays;
 
@@ -460,7 +461,7 @@ float4 UDR2_Spatial_PS(PixelShaderInput input) : SV_Target0
         }
     }
 
-    return float4(result, 1.0);
+    return float4(result, PreserveAlpha > 0.5 ? saturate(InputTexture.Sample(Sampler, uv).a) : 1.0);
 }
 
 // Temporal pass
@@ -548,6 +549,8 @@ float4 UDR2_Temporal_PS(PixelShaderInput input) : SV_Target0
 
     // Sample current frame (from spatial pass)
     float3 current = InputTexture.Sample(Sampler, uv).rgb;
+
+    if (CurrentWeight >= 1.0) return float4(current, 1.0);
 
     // Check if we're near an edge (extends further outside than edge correction)
     float edgeFactor = GetEdgeBlendFactor(uv, 2.0);  // 2x outer margin for temporal

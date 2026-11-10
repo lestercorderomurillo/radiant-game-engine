@@ -30,7 +30,7 @@ Three controls serve different purposes:
 - **Antialiasing** changes how edges are sampled or filtered.
 - **Upscaling quality** changes input resolution before reconstruction.
 
-The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [UDR](UDR4.md) for the compatibility table and setup.
+The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [UDR](UDR4.md) for the algorithms, optional guidance and setup. All four accept images from any producer; lighting technique does not restrict algorithm selection.
 
 For 3D radiance cascades, Cornell initially selects 16³ probes and UDR4 Balanced.
 Balanced shades at 50% of each display dimension and reconstructs the result at

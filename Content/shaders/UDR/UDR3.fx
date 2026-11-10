@@ -17,6 +17,7 @@ float CurrentWeight;
 float DebugEdges;
 float EdgeCorrection;
 float Sharpness;
+float PreserveAlpha;
 
 static const float PI = 3.14159265359;
 
@@ -248,6 +249,8 @@ float4 Temporal_PS(PixelShaderInput input) : SV_Target0
     float2 uv = input.UV;
 
     float3 current = InputTexture.Sample(Sampler, uv).rgb;
+
+    if (CurrentWeight >= 1.0) return float4(current, 1.0);
     float3 history = LastFrame.Sample(Sampler, uv).rgb;
 
     // Color difference for history validity
@@ -291,7 +294,7 @@ float4 RCAS_PS(PixelShaderInput input) : SV_Target0
     // Sharpen: center + (center - average) * strength
     float3 result = c + (c - avg) * Sharpness;
 
-    return float4(max(result, 0.0), 1.0);
+    return float4(max(result, 0.0), PreserveAlpha > 0.5 ? saturate(InputTexture.Sample(Sampler, uv).a) : 1.0);
 }
 
 technique UDR3_Stage1 // Spatial - Lanczos upsampling

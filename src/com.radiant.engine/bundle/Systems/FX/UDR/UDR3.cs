@@ -3,12 +3,14 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Reconstructs HRC lighting with Lanczos filtering, edge refinement and temporal accumulation.</summary>
-/// <remarks>Uses HRC geometry and motion buffers, then sharpens the reconstructed result. Use Upscaling.ResetHistory when hosted by the shared stage. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <summary>Reconstructs a color image with Lanczos filtering, edge refinement and temporal accumulation.</summary>
+/// <remarks>Uses optional matching 2D geometry guidance, then sharpens the reconstructed result. Use Upscaling.ResetHistory when hosted by the shared stage. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
 /// <seealso cref="Upscaling"/>
 public class UDR3 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
+    /// <summary>Uses matching 2D Geometry buffers when available. Set false before initialization for image-only reconstruction.</summary>
+    public bool UseGeometryGuidance = true;
     /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.5f;
     public bool EdgeCorrection = true;
@@ -31,7 +33,7 @@ public class UDR3 : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        Geometry = Scene.ECS.GetSystem<Geometry>();
+        Geometry = UseGeometryGuidance ? Scene.ECS.GetSystem<Geometry>() : null;
 
         OutputSize = Renderer.ScreenSize;
         CreateRenderTargets();
@@ -105,11 +107,15 @@ public class UDR3 : core.System
 
         if (UDRQuality.ScaleFactor == 100) return;
 
-        // Pass 1: Spatial (bilinear upsampling)
+        bool hasGeometry = Geometry is { Enabled: true, EmissiveTexture: not null, AbsorptionTexture: not null };
+        var black = Renderer.GetSolidTexture(Color.Transparent);
+
+        // Pass 1: Spatial (Lanczos upsampling)
         Renderer
             .Reset()
             .SetShader("UDR/UDR3")
             .SetTechnique("UDR3_Stage1")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.PointClamp)
             .SetTarget(SpatialTexture)
             .Clear(Color.Black)
@@ -119,76 +125,85 @@ public class UDR3 : core.System
             .Commit()
             .SetTarget(null);
 
-        // Pass 2: Edge reconstruction (SDF + motion vector guided sharpening)
-        Renderer
-            .Reset()
-            .SetShader("UDR/UDR3")
-            .SetTechnique("UDR3_Stage2")
-            .Configure(SamplerState.LinearClamp)
-            .SetTarget(EdgeTexture)
-            .Clear(Color.Black)
-            .SetParameter("InputTexture", SpatialTexture)
-            .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture)
-            .SetParameter("SDFTexture", Geometry?.SDFTexture)
-            .SetParameter("MotionVectorTexture", Geometry?.MotionVectorTexture)
-            .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture)
-            .SetParameter("InputSize", inputSize)
-            .SetParameter("OutputSize", OutputSize)
-            .SetParameter("EdgeCorrection", EdgeCorrection ? 1f : 0f)
-            .SetParameter("DebugEdges", (float)DebugEdges)
-            .Draw()
-            .Commit()
-            .SetTarget(null);
+        if (hasGeometry)
+        {
+            // Pass 2: Geometry-guided edge reconstruction
+            Renderer
+                .Reset()
+                .SetShader("UDR/UDR3")
+                .SetTechnique("UDR3_Stage2")
+                .Configure(BlendState.Opaque)
+                .Configure(SamplerState.LinearClamp)
+                .SetTarget(EdgeTexture)
+                .Clear(Color.Black)
+                .SetParameter("InputTexture", SpatialTexture)
+                .SetParameter("EmissiveTexture", Geometry?.EmissiveTexture ?? black)
+                .SetParameter("SDFTexture", Geometry?.SDFTexture ?? black)
+                .SetParameter("MotionVectorTexture", Geometry?.MotionVectorTexture ?? black)
+                .SetParameter("AbsorptionTexture", Geometry?.AbsorptionTexture ?? black)
+                .SetParameter("InputSize", inputSize)
+                .SetParameter("OutputSize", OutputSize)
+                .SetParameter("EdgeCorrection", EdgeCorrection && hasGeometry ? 1f : 0f)
+                .SetParameter("DebugEdges", (float)DebugEdges)
+                .Draw()
+                .Commit()
+                .SetTarget(null);
 
-        // Pass 3: Temporal accumulation
-        int effectiveFrames = Math.Min(FrameIndex + 1, FramesToAccumulate);
-        float currentWeight = 1.0f / effectiveFrames;
+            // Pass 3: Temporal accumulation
+            int effectiveFrames = Math.Min(FrameIndex + 1, Math.Clamp(FramesToAccumulate, 1, 16));
+            float currentWeight = 1.0f / effectiveFrames;
 
-        Renderer
-            .Reset()
-            .SetShader("UDR/UDR3")
-            .SetTechnique("UDR3_Stage3")
-            .Configure(SamplerState.LinearClamp)
-            .SetTarget(TemporalTexture)
-            .Clear(Color.Black)
-            .SetParameter("InputTexture", EdgeTexture)
-            .SetParameter("LastFrame", LastFrameTexture)
-            .SetParameter("MotionVectorTexture", Geometry?.MotionVectorTexture)
-            .SetParameter("OutputSize", OutputSize)
-            .SetParameter("CurrentWeight", currentWeight)
-            .Draw()
-            .Commit()
-            .SetTarget(null);
+            Renderer
+                .Reset()
+                .SetShader("UDR/UDR3")
+                .SetTechnique("UDR3_Stage3")
+                .Configure(BlendState.Opaque)
+                .Configure(SamplerState.LinearClamp)
+                .SetTarget(TemporalTexture)
+                .Clear(Color.Black)
+                .SetParameter("InputTexture", EdgeTexture)
+                .SetParameter("LastFrame", LastFrameTexture)
+                .SetParameter("MotionVectorTexture", Geometry?.MotionVectorTexture ?? black)
+                .SetParameter("OutputSize", OutputSize)
+                .SetParameter("CurrentWeight", currentWeight)
+                .Draw()
+                .Commit()
+                .SetTarget(null);
 
-        // Pass 4: Copy to LastFrame for next frame (unsharpened)
-        Renderer
-            .Reset()
-            .SetShader("UDR/UDR3")
-            .SetTechnique("UDR3_Stage4")
-            .Configure(SamplerState.LinearClamp)
-            .SetTarget(LastFrameTexture)
-            .Clear(Color.Black)
-            .SetParameter("InputTexture", TemporalTexture)
-            .Draw()
-            .Commit()
-            .SetTarget(null);
+            // Pass 4: Copy to LastFrame for next frame (unsharpened)
+            Renderer
+                .Reset()
+                .SetShader("UDR/UDR3")
+                .SetTechnique("UDR3_Stage4")
+                .Configure(BlendState.Opaque)
+                .Configure(SamplerState.LinearClamp)
+                .SetTarget(LastFrameTexture)
+                .Clear(Color.Black)
+                .SetParameter("InputTexture", TemporalTexture)
+                .Draw()
+                .Commit()
+                .SetTarget(null);
+        }
+        else FrameIndex = 0;
 
         // Pass 5: RCAS sharpening (reuse EdgeTexture for output)
         Renderer
             .Reset()
             .SetShader("UDR/UDR3")
             .SetTechnique("UDR3_Stage5")
+            .Configure(BlendState.Opaque)
             .Configure(SamplerState.PointClamp)
             .SetTarget(EdgeTexture)
             .Clear(Color.Black)
-            .SetParameter("InputTexture", TemporalTexture)
+            .SetParameter("InputTexture", hasGeometry ? TemporalTexture : SpatialTexture)
             .SetParameter("OutputSize", OutputSize)
             .SetParameter("Sharpness", Sharpness)
+            .SetParameter("PreserveAlpha", hasGeometry ? 0f : 1f)
             .Draw()
             .Commit()
             .SetTarget(null);
 
-        if (FrameIndex < FramesToAccumulate) FrameIndex++;
+        if (hasGeometry) FrameIndex = Math.Min(FrameIndex + 1, 16);
     }
 
     /// <inheritdoc/>

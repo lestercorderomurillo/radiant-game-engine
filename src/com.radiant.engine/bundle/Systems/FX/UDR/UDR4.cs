@@ -3,8 +3,8 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Reconstructs HRC lighting with temporal guidance, or generic images with spatial filtering.</summary>
-/// <remarks>Temporal guidance requires matching HRC geometry and motion. For standalone generic 2D or 3D sources, set UseHrcGeometry and Temporal to false before initialization. Call ResetHistory after scene cuts. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <summary>Reconstructs a color image with optional geometry and temporal guidance.</summary>
+/// <remarks>Geometry guidance is independent of the lighting technique. For standalone image-only sources, set UseHrcGeometry and UseGeometryGuidance to false before initialization. Call ResetHistory after scene cuts. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
 /// <seealso cref="Upscaling"/>
 [RunAfter(typeof(Geometry), typeof(HRCGI), typeof(ColorManagement))]
 public class UDR4 : core.System
@@ -12,10 +12,12 @@ public class UDR4 : core.System
     public override RenderLayer RenderLayer => RenderLayer.World;
     /// <summary>Disable automatic presentation when an explicit presentation stage consumes GetOutput.</summary>
     public bool Present = true;
-    /// <summary>Enables temporal reconstruction when matching HRC geometry is available; false selects spatial reconstruction.</summary>
+    /// <summary>Enables temporal reconstruction when matching geometry is available; false selects spatial reconstruction.</summary>
     public bool Temporal = true;
-    /// <summary>Uses the scene’s HRC geometry as guidance. Set false before initialization for generic raster or path-traced images.</summary>
+    /// <summary>Enables the HRC adapter for matching geometry and lighting jitter. Set false before initialization for other image producers.</summary>
     public bool UseHrcGeometry = true;
+    /// <summary>Uses matching 2D Geometry buffers without enabling HRC lighting jitter. Set before initialization.</summary>
+    public bool UseGeometryGuidance;
     /// <summary>Controls final edge contrast; higher values produce stronger sharpening.</summary>
     public float Sharpness = 0.25f;
     /// <summary>Target temporal history length in frames. Longer history smooths the image but responds more slowly to change.</summary>
@@ -26,6 +28,7 @@ public class UDR4 : core.System
     private Func<Texture2D> InputSource;
     private Geometry Geometry;
     private HRCGI Lighting;
+    private bool HasGeometry => Geometry is { Enabled: true, EmissiveTexture: not null, AbsorptionTexture: not null };
     private RenderTarget2D OutputTexture;
     private RenderTarget2D HistoryRead;
     private RenderTarget2D HistoryWrite;
@@ -44,9 +47,9 @@ public class UDR4 : core.System
         if (Initialized) return;
 
         Initialized = true;
-        Geometry = UseHrcGeometry ? Scene.ECS.GetSystem<Geometry>() : null;
+        Geometry = UseHrcGeometry || UseGeometryGuidance ? Scene.ECS.GetSystem<Geometry>() : null;
         Lighting = UseHrcGeometry ? Scene.ECS.GetSystem<HRCGI>() : null;
-        if (Geometry != null) Geometry.TemporalMotionEnabled = Temporal && UDRQuality.ScaleFactor != 100;
+        if (Geometry != null) Geometry.TemporalMotionEnabled = Temporal && Geometry.Enabled && UDRQuality.ScaleFactor != 100;
         UDRQuality.Changed += OnQualityChanged;
         Renderer.RenderScaleChanged += OnScaleChanged;
         Renderer.RenderScale = UDRQuality.ScaleNormalized;
@@ -82,11 +85,11 @@ public class UDR4 : core.System
     {
         if (!Initialized) return;
 
-        if (Geometry != null) Geometry.TemporalMotionEnabled = Temporal && UDRQuality.ScaleFactor != 100;
+        if (Geometry != null) Geometry.TemporalMotionEnabled = Temporal && Geometry.Enabled && UDRQuality.ScaleFactor != 100;
 
         if (Lighting == null) return;
 
-        Lighting.OutputJitter = !Temporal || UDRQuality.ScaleFactor == 100 ? Vector2.Zero : JitterSample(JitterIndex);
+        Lighting.OutputJitter = !Temporal || !HasGeometry || UDRQuality.ScaleFactor == 100 ? Vector2.Zero : JitterSample(JitterIndex);
     }
 
     /// <summary>Eight deterministic subpixel samples in input-texel units.</summary>
@@ -138,7 +141,8 @@ public class UDR4 : core.System
             return;
         }
 
-        EnsureTargets();
+        bool temporal = Temporal && HasGeometry;
+        EnsureTargets(temporal);
 
         var size = new Vector2(input.Width, input.Height);
         if (InputSize != size || !ReferenceEquals(PreviousInput, input)) ResetHistory();
@@ -149,19 +153,19 @@ public class UDR4 : core.System
         Texture2D emission = Geometry?.EmissiveTexture ?? black;
         Texture2D absorption = Geometry?.AbsorptionTexture ?? black;
         Texture2D motion = Geometry?.TemporalMotionTexture ?? black;
-        bool hasGeometry = Geometry?.Enabled == true && Geometry.EmissiveTexture != null;
+        bool hasGeometry = HasGeometry;
         Vector2 jitter = Lighting?.Enabled == true ? Lighting.LastOutputJitter : Vector2.Zero;
 
         Inspector.SetLabel("udr4", "resolution", $"{input.Width}x{input.Height} → {(int)OutputSize.X}x{(int)OutputSize.Y}");
         Renderer.Reset().SetShader("UDR/UDR4").SetTechnique("Spatial")
-            .Configure(BlendState.Opaque).Configure(SamplerState.LinearClamp).SetTarget(Temporal ? OutputTexture : HistoryWrite)
+            .Configure(BlendState.Opaque).Configure(SamplerState.LinearClamp).SetTarget(temporal ? OutputTexture : HistoryWrite)
             .SetParameter("InputTexture", input).SetParameter("InputSize", InputSize)
             .SetParameter("OutputSize", OutputSize).SetParameter("Jitter", jitter)
             .SetParameter("EmissiveTexture", emission).SetParameter("AbsorptionTexture", absorption)
             .SetParameter("HasGeometry", hasGeometry ? 1f : 0f)
             .Draw().Commit().SetTarget(null);
 
-        if (Temporal)
+        if (temporal)
         {
             Renderer.Reset().SetShader("UDR/UDR4").SetTechnique("Temporal")
                 .Configure(BlendState.Opaque).Configure(SamplerState.LinearClamp).SetTarget(HistoryWrite)
@@ -189,12 +193,12 @@ public class UDR4 : core.System
             .Configure(BlendState.Opaque).Configure(SamplerState.LinearClamp).SetTarget(OutputTexture)
             .SetParameter("InputTexture", HistoryWrite).SetParameter("OutputSize", OutputSize)
             .SetParameter("Sharpness", Math.Clamp(Sharpness, 0f, 1f))
-            .SetParameter("PreserveAlpha", Temporal ? 0f : 1f)
+            .SetParameter("PreserveAlpha", temporal ? 0f : 1f)
             .Draw().Commit().SetTarget(null);
 
-        if (Temporal) (HistoryRead, HistoryWrite) = (HistoryWrite, HistoryRead);
+        if (temporal) (HistoryRead, HistoryWrite) = (HistoryWrite, HistoryRead);
         PreviousView = Renderer.WorldTransform;
-        HistoryFrames = Temporal ? Math.Min(HistoryFrames + 1, 16) : 0;
+        HistoryFrames = temporal ? Math.Min(HistoryFrames + 1, 16) : 0;
         OutputReady = true;
         JitterIndex = (JitterIndex + 1) % 8;
         UpdateJitter();
@@ -210,16 +214,16 @@ public class UDR4 : core.System
     }
 
     /// <summary>Creates or resizes reconstruction targets for the current input and view.</summary>
-    private void EnsureTargets()
+    private void EnsureTargets(bool temporal)
     {
-        if (OutputTexture != null && OutputSize == Renderer.ScreenSize && (HistoryRead != null) == Temporal) return;
+        if (OutputTexture != null && OutputSize == Renderer.ScreenSize && (HistoryRead != null) == temporal) return;
 
         DisposeTargets();
         OutputSize = Renderer.ScreenSize;
         OutputTexture = CreateTarget();
         HistoryWrite = CreateTarget();
 
-        if (Temporal)
+        if (temporal)
         {
             HistoryRead = CreateTarget();
             GeometryHistory = CreateTarget();
