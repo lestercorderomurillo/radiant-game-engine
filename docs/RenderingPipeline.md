@@ -30,7 +30,7 @@ Three controls serve different purposes:
 - **Antialiasing** changes how edges are sampled or filtered.
 - **Upscaling quality** changes input resolution before reconstruction.
 
-The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [Upscaling](UDR4.md) for the compatibility table and setup.
+The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [UDR](UDR4.md) for the compatibility table and setup.
 
 ## Inspect the result
 
@@ -40,7 +40,7 @@ Compare the same camera view at native resolution and at the intended render sca
 
 ## Continue
 
-- [Lighting](HRC.md) — HRC, raster lighting and path tracing.
-- [Upscaling](UDR4.md) — algorithms, quality presets and history.
-- [Rendering pipelines](Rendering.md#denoise) — denoiser setup and guide buffers.
+- [Global illumination](HRC.md) — HRC, raster lighting and path tracing.
+- [UDR](UDR4.md) — algorithms, quality presets and history.
+- [Neural denoising](Denoising.md) — denoiser setup and guide buffers.
 - [Inspector](Inspector.md) — controls and diagnostic overlays.

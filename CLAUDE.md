@@ -74,6 +74,8 @@ radiant/
 │   ├── mplay/ (NetworkClient, NetworkManager, NetworkMessage)
 │   └── tests/2D/ (SimpleLightScene, TilesetScene)
 │
+├── AGENTS.md (index of agent skills to follow on every task)
+├── lester-skills/<skill>/SKILL.md (agent skills, e.g. communication-autonomy)
 ├── tests/Radiant.Scenes/ (test-scene runner)
 └── eng/Radiant.Desktop.props (shared DesktopVK build settings)
 ```
@@ -703,6 +705,7 @@ Tracing builds one BLAS over the existing world-triangle adapter plus an identit
 - `tools/Radiant.DocGen` (Roslyn, net8.0, not in `radiant.sln`) reads `radiant.csproj`, follows `ProjectReference`s, expands their `Compile` globs, binds package assemblies from each `obj/project.assets.json`, and writes `docs/site/public/generated/{index,search}.json` plus `types/<id>.json`. Public and protected API only; `inheritdoc` and undocumented overrides inherit base/interface docs; nested `<example>` tags are hoisted; crefs become `xref:` Markdown links. Navigation groups come from source folders under the common source root (`bundle/` is transparent, `mplay` → Multiplayer).
 - `docs/site` is Vite + React + TanStack Router (code routes) + Tailwind v4 with hand-written shadcn/ui primitives in `src/common/ui` (`components.json` allows `shadcn add`). Features: `guides` (every `docs/*.md` and `README.md` via `import.meta.glob`; order in `guides.ts`, unlisted files go to "More"), `reference` (API index and type pages), `search` (⌘K/Ctrl+K, `/`), `home`. UI copy goes through `t()` in `src/common/i18n/en.ts`.
 - `plugins/radiantDocGen.ts` runs DocGen before dev/build and reruns it when `.cs`/`.csproj`/`.props` files under `src/`, `eng/` or `radiant.csproj` change; the client refetches on the `radiant:api-updated` HMR event without reloading.
+- Guide sidebar sections (`guides.ts`): Getting started (Introduction = README, Quickstart), ECS (Introduction, Scenes, Systems, Queries, Dependency resolution, System control), General rendering (Introduction, Rendering pipelines, Resources and textures, 2D and 3D scenes, Render states, Image quality, Tone mapping, Anti-aliasing), Advanced rendering (Shaders, Global illumination, UDR, Neural denoising), Tools (Launcher, Asset Studio, Inspector, Cameras), Runtime (Introduction, Math, Input, Backend agnostic). Entries may carry a shorter `nav` label (`guides.nav.*`) shown in the sidebar while the page keeps its H1 title. Slugs come from file names (`HRC.md` → `lighting`, `UDR4.md` → `upscaling`, `Startup.md` → `startup`). `docs/AssetStudio.md` is descriptive only; the tool has no public API yet.
 - `docs/*.md` are user-facing feature guides: what you can do and how, each snippet introduced with "The following example shows how to …", no migration notes, validation commands or implementation history. Those engineering records live in `docs/internals/` (original per-subsystem notes, including regression commands), which the site does not show; add new design/migration/validation notes there.
 - Guides link to engine sources with relative paths (`../src/.../ECS.cs`): GitHub opens the file, the site routes to the type page.
 - `docs/site/node_modules`, `dist` and `public/generated` are ignored; `radiant.csproj` excludes `docs/site/**` and `tools/**` from default items.

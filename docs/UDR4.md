@@ -1,4 +1,4 @@
-# Upscaling
+# UDR
 
 Render fewer pixels and reconstruct an image at display resolution. Radiant provides four UDR algorithms behind the `Upscaling` system, with a separate quality setting that controls the input resolution.
 
@@ -109,6 +109,6 @@ UDR4 tracks camera motion and rejects history where geometry or lighting changes
 
 Check static detail, moving objects and abrupt light changes separately. Rotating or resizing geometry may appear softer while reconstructed from the current frame. Overlapping translucent objects moving in different directions can leave trails; reduce history when that tradeoff is visible.
 
-- [Lighting](HRC.md) — choose the image producer and its material model.
+- [Global illumination](HRC.md) — choose the image producer and its material model.
 - [Image quality](RenderingPipeline.md) — combine reconstruction with antialiasing and tone mapping.
 - [Rendering pipelines](Rendering.md) — connect stages and present their outputs.

@@ -51,7 +51,7 @@ The following example shows lit raster rendering:
 var raster = ECS.AddSystem(new RasterRenderer { Geometry = geometry, Input = geometry.GetOutput, After = [geometry] });
 ```
 
-For emissive 2D shapes, shadows and colored transmission, see the HRC technique in [Lighting](HRC.md#holographic-radiance-cascades).
+For emissive 2D shapes, shadows and colored transmission, see the HRC technique in [Global illumination](HRC.md#holographic-radiance-cascades).
 
 ## Path trace
 
@@ -90,110 +90,18 @@ shows which backend is active and its GPU time.
 
 ## Denoise
 
-Path tracing is noisy at low sample counts. `Denoising` cleans it up before tone mapping, without touching the
-tracer's own accumulation.
-
-| Mode | Best for |
-| --- | --- |
-| Joint bilateral | A fast, light cleanup |
-| À-trous | Strong cleanup of still or slow scenes |
-| SVGF (temporal) | Moving cameras |
-| OIDN (neural) | Highest-quality previews |
-| NRD REBLUR / RELAX | Hardware ray tracing on Vulkan |
-
-The following example shows à-trous denoising with the guide buffers it needs:
-
-```csharp
-tracer.Channels = TraceChannels.All;
-
-var denoiser = ECS.AddSystem(new Denoising
-{
-    Input = tracer.GetOutput,
-    Mode = DenoiserMode.Atrous,
-    Albedo = () => tracer.AlbedoTexture,
-    Normals = () => tracer.NormalTexture,
-    Depth = () => tracer.DepthTexture,
-    Emission = () => tracer.EmissionTexture,
-    After = [tracer]
-});
-var color = ECS.AddSystem(new ToneMapping { Input = denoiser.GetOutput, After = [denoiser] });
-ECS.AddSystem(new PathTracingSettings { Id = "mainPath", Source = tracer, Denoiser = denoiser });
-```
-
-The following example shows the extra connections for temporal SVGF:
-
-```csharp
-denoiser.SingleSample = () => tracer.SampleTexture;
-denoiser.Camera = () => tracer.Geometry.HasCamera ? tracer.Geometry.Camera : null;
-denoiser.Revision = () => tracer.RadianceRevision;
-denoiser.Mode = DenoiserMode.Svgf;
-```
-
-**OIDN** runs Intel Open Image Denoise. Install it once with `python3 eng/install-oidn.py`, rebuild, and pick
-Fast, Balanced or High quality on CPU or GPU under **Neural denoising settings**. It copies images through the
-CPU, so use it for stills and previews; prefer SVGF while the camera moves.
-
-**NRD** works with hardware ray tracing. Build the runtime with `python3 eng/build-vulkan-rt.py --nrd`, set
-`denoiser.TraceSource = tracer`, and select it with `denoiser.TrySelectBackend("nrd.reblur", out var reason)`.
-
-Plug in your own denoiser by registering a backend:
-
-```csharp
-denoiser.RegisterBackend("studio.neural", () => new StudioDenoiser());
-if (!denoiser.TrySelectBackend("studio.neural", out string reason)) Console.WriteLine(reason);
-```
+`Denoising` cleans path-traced noise before tone mapping, with bilateral, à-trous, SVGF, OIDN and NRD backends.
+See [Neural denoising](Denoising.md).
 
 ## Tone map and color grade
 
-`ToneMapping` turns bright linear light into a display-ready image.
-
-- **Operators**: None, Reinhard, ACES, ACES Fitted, AgX, Filmic, Uchimura and PBR Neutral.
-- **Exposure**: a brightness multiplier, applied even with operator None.
-- **Transfer**: Linear (default), sRGB or Gamma 2.2 output.
-
-The following example shows AgX tone mapping with an in-game color window:
-
-```csharp
-var color = ECS.AddSystem(new ToneMapping { Input = renderer.GetOutput, Mapper = ToneMapper.AgX, After = [renderer] });
-ECS.AddSystem(new ColorSettings { Id = "mainColor", Source = color });
-```
-
-The **Color Management** window appears under F1 → View. For 2D global illumination, `ColorManagement` gives you
-the same operators in the place UDR upscalers expect.
+`ToneMapping` turns linear light into a display-ready image with Reinhard, ACES, AgX, Filmic and other operators.
+See [Tone mapping](ToneMapping.md).
 
 ## Antialias
 
-Combine geometry antialiasing, which takes more samples while drawing, with post antialiasing, which filters the
-finished image.
-
-| Geometry (`RasterSampling.Mode`) | Post (`AntiAliasing.Mode`) |
-| --- | --- |
-| MSAA 2x / 4x / 8x: hardware multisampling | FXAA: fast edge smoothing |
-| SSAA 2x / 3x: render bigger, then average | SMAA: sharper, high-quality edges |
-| | TAA: smooth, stable edges using previous frames |
-
-The following example shows MSAA 4x combined with TAA:
-
-```csharp
-var sampling = ECS.AddSystem(new RasterSampling { Mode = RasterAAMode.MSAA4x });
-var meshes = ECS.AddSystem(new MeshGeometry3D { Sampling = sampling });
-var geometry = ECS.AddSystem(new Geometry3D { Source = meshes, Channels = GeometryChannels.All, After = [meshes] });
-var aa = ECS.AddSystem(new AntiAliasing
-{
-    Input = geometry.GetOutput,
-    Mode = PostAAMode.TAA,
-    Camera = () => meshes.Camera,
-    Depth = () => geometry.DepthTexture,
-    GeometryRevision = () => meshes.Revision,
-    OutputSize = () => meshes.ViewSize,
-    After = [geometry]
-});
-aa.SetSampling(sampling);
-ECS.AddSystem(new AntiAliasingSettings { Id = "mainAA", Source = aa, Sampling = sampling });
-```
-
-`RasterSampling.ActualSamples` reports what the GPU really used; some GPUs give 4x when you ask for 8x. In 2D,
-set `ShapeGeometry2D.CaptureDepth = true` to use TAA.
+`RasterSampling` (MSAA, SSAA) and `AntiAliasing` (FXAA, SMAA, TAA) combine geometry and post anti-aliasing.
+See [Anti-aliasing](AntiAliasing.md).
 
 ## Show several views
 

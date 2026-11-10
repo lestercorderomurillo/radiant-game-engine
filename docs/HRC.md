@@ -1,4 +1,4 @@
-# Lighting
+# Global illumination
 
 Choose how light interacts with your scene, then connect the result to the same image pipeline. Radiant provides lighting techniques for both 2D and 3D; the technique determines which geometry, materials and buffers it needs.
 
@@ -57,7 +57,7 @@ For example, `new Color(60, 255, 60, 160)` in `Albedo` creates green transmissio
 
 Open **F1 → View → Holographic Radiance Cascades**. Performance, Balanced, Ultra and Native change probe spacing; Ultra is the default. Wider spacing reduces lighting detail.
 
-These are **lighting quality** settings. They are separate from the resolution presets used by [Upscaling](UDR4.md).
+These are **lighting quality** settings. They are separate from the resolution presets used by [UDR](UDR4.md).
 
 `HRCGI.GetOutput()` supplies linear light. Connect it to `ColorManagement` before display, then add reconstruction when rendering below display resolution:
 
@@ -118,5 +118,5 @@ Lighting produces an image; it does not replace the rest of the rendering pipeli
 
 - [Rendering pipelines](Rendering.md) — connect geometry, lighting and image stages.
 - [Image quality](RenderingPipeline.md) — order denoising, tone mapping and antialiasing.
-- [Upscaling](UDR4.md) — compare UDR1–UDR4 and their input requirements.
-- [3D scenes](3D.md) — create meshes, cameras and surface buffers.
+- [UDR](UDR4.md) — compare UDR1–UDR4 and their input requirements.
+- [2D and 3D scenes](3D.md) — create meshes, cameras and surface buffers.

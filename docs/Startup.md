@@ -1,4 +1,4 @@
-# Radiant startup
+# Launcher
 
 Desktop `MonoGameWindow` / `GameClient` instances show the official Radiant splash by default
 in a temporary 768×512 borderless, non-resizable window, without native close/minimize/maximize

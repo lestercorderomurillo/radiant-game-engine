@@ -19,6 +19,8 @@ export interface GuideHeading {
 export interface Guide {
   slug: string
   title: string
+  /** Sidebar label; the page title unless the section gives a shorter one. */
+  navTitle: string
   /** Plain-text lead used for search; lead keeps its Markdown for the page header. */
   description: string
   lead: string
@@ -34,15 +36,23 @@ export interface GuideSection {
   guides: Guide[]
 }
 
+/** A sidebar entry: a guide slug, optionally shown under a shorter navigation label. */
+type SectionEntry = string | { slug: string; nav: MessageKey }
+
 /** Sidebar order. Markdown files not listed here are appended under "More" automatically. */
-const sectionOrder: { title: MessageKey; slugs: string[] }[] = [
-  { title: "guides.sections.start", slugs: ["overview", "getting-started", "startup"] },
-  { title: "guides.sections.engine", slugs: ["ecs", "systems", "input", "inspector", "camera-controls", "math"] },
+const sectionOrder: { title: MessageKey; entries: SectionEntry[] }[] = [
+  { title: "guides.sections.start", entries: [{ slug: "overview", nav: "guides.nav.introduction" }, "getting-started"] },
   {
-    title: "guides.sections.rendering",
-    slugs: ["renderer", "rendering", "lighting", "rendering-pipeline", "upscaling", "3d", "graphics-resources", "render-states", "compute-shaders"],
+    title: "guides.sections.ecs",
+    entries: [{ slug: "ecs", nav: "guides.nav.introduction" }, "scenes", "systems", "queries", "dependency-resolution", "system-control"],
   },
-  { title: "guides.sections.platform", slugs: ["runtime-backends", "renderer-contracts"] },
+  {
+    title: "guides.sections.generalRendering",
+    entries: [{ slug: "renderer", nav: "guides.nav.introduction" }, "rendering", "graphics-resources", "3d", "render-states", "rendering-pipeline", "tone-mapping", "anti-aliasing"],
+  },
+  { title: "guides.sections.advancedRendering", entries: [{ slug: "compute-shaders", nav: "guides.nav.shaders" }, "lighting", "upscaling", "denoising"] },
+  { title: "guides.sections.tools", entries: ["startup", "asset-studio", "inspector", "camera-controls"] },
+  { title: "guides.sections.runtime", entries: [{ slug: "runtime-backends", nav: "guides.nav.introduction" }, "math", "input", "renderer-contracts"] },
 ]
 
 /** Text content of inline Markdown, matching what rehype-slug sees when it assigns heading IDs. */
@@ -84,7 +94,7 @@ function parseGuide(path: string, source: string, slug: string, titleOverride?: 
     }
   }
 
-  return { slug, title, description: inlineText(lead.replace(/\n/g, " ")), lead, path, body: bodyLines.join("\n").trim(), headings }
+  return { slug, title, navTitle: title, description: inlineText(lead.replace(/\n/g, " ")), lead, path, body: bodyLines.join("\n").trim(), headings }
 }
 
 const allGuides: Guide[] = [
@@ -99,9 +109,18 @@ const guidesBySlug = new Map(allGuides.map((guide) => [guide.slug, guide]))
 const guidesByPath = new Map(allGuides.map((guide) => [guide.path.toLowerCase(), guide]))
 
 export const guideSections: GuideSection[] = (() => {
-  const listed = new Set(sectionOrder.flatMap((section) => section.slugs))
+  const entrySlug = (entry: SectionEntry) => (typeof entry === "string" ? entry : entry.slug)
+  const listed = new Set(sectionOrder.flatMap((section) => section.entries.map(entrySlug)))
   const sections = sectionOrder
-    .map((section) => ({ title: section.title, guides: section.slugs.map((slug) => guidesBySlug.get(slug)).filter((guide): guide is Guide => !!guide) }))
+    .map((section) => ({
+      title: section.title,
+      guides: section.entries
+        .map((entry) => {
+          const guide = guidesBySlug.get(entrySlug(entry))
+          return guide && typeof entry !== "string" ? { ...guide, navTitle: t(entry.nav) } : guide
+        })
+        .filter((guide): guide is Guide => !!guide),
+    }))
     .filter((section) => section.guides.length > 0)
   const unlisted = allGuides.filter((guide) => !listed.has(guide.slug)).sort((left, right) => left.title.localeCompare(right.title))
   return unlisted.length > 0 ? [...sections, { title: "nav.more", guides: unlisted }] : sections

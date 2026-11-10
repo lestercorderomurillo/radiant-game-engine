@@ -42,83 +42,18 @@ Every system can use `Time.DeltaSeconds`, `Controls` (input), `Renderer` and `Sc
 
 ## Order systems
 
-The following example shows how to run after the geometry is built and before the gizmos draw:
+Declare `[RunAfter(...)]` and `[RunBefore(...)]` on a system, or set `After` between instances, and the engine
+sorts the frame for you. `LateRender` output is additionally stacked by `RenderLayer`. See
+[Dependency resolution](DependencyResolution.md).
 
-```csharp
-[RunAfter(typeof(Geometry))]
-[RunBefore(typeof(GizmosRenderer))]
-public class FogOfWar : System { }
-```
+## Pause, group and switch
 
-Radiant sorts systems once when the scene starts, so registration order never matters. When a scene contains
-several instances of one system type, order them by instance with the `After` field.
-
-## Draw on the right layer
-
-`LateRender` output is stacked by `RenderLayer`: `World`, then `Gameplay` (the default), `Overlay` and `UI`.
-
-The following example shows a system whose overlay always draws above game visuals:
-
-```csharp
-public class Minimap : System
-{
-    public override RenderLayer RenderLayer => RenderLayer.Overlay;
-}
-```
-
-## Pause, tag and protect systems
-
-- `[Pausable]` stops a system while `ECS.GameplayPaused` is set; `[Pausable(PauseGroup.Animation)]` follows
-  `ECS.AnimationPaused` instead.
-- `[SystemTag("AI", "Gameplay")]` adds categories the System Inspector shows and filters by.
-- `[CoreSystem]` hides infrastructure from the System Inspector so nobody switches it off by accident.
-- `Enabled = false` skips a system's callbacks until you turn it back on.
-
-## Switch between alternatives
-
-A [`SystemGroup`](../src/com.radiant.engine/core/SystemGroup.cs) runs at most one of its systems at a time and
-handles setup and cleanup when you switch.
-
-The following example shows how to offer two upscalers and cycle them with F11:
-
-```csharp
-var upscaling = new SystemGroup("Upscaling",
-    ("Bilinear", ECS.AddSystem<Bilinear>()),
-    ("UDR3", ECS.AddSystem<UDR3>(enabled: false)));
-ECS.RegisterSystemGroup(upscaling);
-
-if (Controls.WasPressed(Key.F11)) upscaling.Toggle(); // Bilinear → UDR3 → off → Bilinear
-```
+`[Pausable]`, `Enabled`, `[SystemTag]`, `[CoreSystem]` and `SystemGroup` control which systems run and how the
+inspector shows them. See [System control](SystemControl.md).
 
 ## Build a scene
 
 A scene registers systems in `SetupECS` and creates content in `SetupScene`; the engine initializes the systems
-between the two, and no `base` call is needed in any scene override. Its own `Update`, `FixedUpdate`,
-`Render` and `LateRender` run just before the systems' callbacks of the same name, which makes them a good place
-for scene-wide logic.
-
-The following example shows a scene that spawns a player and toggles pause with P:
-
-```csharp
-public class Arena : Scene
-{
-    public override void SetupECS()
-    {
-        ECS.AddSystem<Movement2DSystem>();
-        ECS.AddSystem<Spinner>();
-    }
-
-    public override void SetupScene()
-    {
-        int player = ECS.CreateEntity(new Vector2(400, 300));
-        ECS.AddComponent<Movement2D>(player);
-    }
-
-    public override void Update()
-    {
-        if (Controls.WasPressed(Key.P)) ECS.GameplayPaused = !ECS.GameplayPaused;
-    }
-}
-```
+between the two. See [Scenes](Scenes.md).
 
 Use `ECS.GetSystem<T>()` to reach a registered system, for example `ECS.GetSystem<GizmosRenderer>()`.

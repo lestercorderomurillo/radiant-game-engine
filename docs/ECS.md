@@ -1,4 +1,4 @@
-# Entities
+# ECS architecture
 
 Everything in a Radiant scene is an entity: a lightweight ID you attach plain-data components to. Systems then
 query the entities that have the components they care about, in parallel.
@@ -60,35 +60,8 @@ public struct Health : Component
 
 ## Query entities
 
-`Query` runs your code on every entity that has all the requested components (one, two or three), spread
-across worker threads.
-
-The following example shows how to regenerate health on every entity that has it:
-
-```csharp
-float step = Time.DeltaSeconds;
-ECS.Query<Health>((int thread, int entity, ref Health health) =>
-    health.Current += health.RegenPerSecond * step);
-```
-
-> The callback runs on several threads at once. Change the components you receive, and collect anything else in
-> per-thread lists indexed by `thread`.
-
-## Find entities by position
-
-The following example shows the spatial queries:
-
-```csharp
-ReadOnlySpan<int> hit = ECS.InRadius(new Vector3(blastCenter, 0), 120f);              // Everything in a blast
-ReadOnlySpan<int> picked = ECS.InBox(new Vector3(dragStart, 0), new Vector3(dragEnd, 0)); // A selection box
-ReadOnlySpan<int> closest = ECS.Nearest(new Vector3(playerPosition, 0), count: 3);    // Three nearest, closest first
-int? cell = ECS.AtExact(32, 64, 0);                                                   // Exact grid cell
-```
-
-For 2D entities, the third coordinate is the draw layer, so query the layer your entities live on.
-
-When you move an entity by editing its transform, call `ECS.SetPosition` so these queries see the new position.
-The movement systems do this for you.
+`Query` runs your code on every entity that has the requested components, in parallel, and `InRadius`, `InBox`,
+`Nearest` and `AtExact` find entities by position with no allocation. See [Queries](Queries.md).
 
 ## Group entities with tags
 
@@ -111,11 +84,7 @@ ECS.DestroyEntitiesWithTag("projectile");
 
 ## Pause gameplay
 
-The following example shows how to pause movement and AI while rendering and UI keep running:
-
-```csharp
-ECS.GameplayPaused = true;   // Stops systems marked [Pausable]
-ECS.AnimationPaused = true;  // Stops systems marked [Pausable(PauseGroup.Animation)]
-```
+`ECS.GameplayPaused` and `ECS.AnimationPaused` stop systems marked `[Pausable]` while rendering and UI keep
+running. See [System control](SystemControl.md).
 
 A scene can use up to 64 component types.

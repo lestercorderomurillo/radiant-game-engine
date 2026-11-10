@@ -1,4 +1,4 @@
-# Getting started
+# Quickstart
 
 Add Radiant to your C# project, register systems and run your first scene. The same foundation supports games,
 simulations and interactive experiences; this guide starts with a small visual example.
@@ -76,10 +76,11 @@ to open the inspector.
 
 ## Next steps
 
-- [Entities and components](ECS.md): create things and query them fast.
-- [Systems and scenes](Systems.md): add behavior that runs every frame.
+- [ECS architecture](ECS.md): create things and query them fast.
+- [Scenes](Scenes.md): build levels in code or from data.
+- [Systems](Systems.md): add behavior that runs every frame.
 - [Input](Input.md): react to the keyboard and mouse.
-- [Lighting](HRC.md): choose HRC, raster lighting or path tracing.
+- [Global illumination](HRC.md): choose HRC, raster lighting or path tracing.
 - [Inspector and gizmos](Inspector.md): build debug panels in a few lines.
 
 Run `eng/docs.sh` to browse this documentation locally, with the API reference generated from the source.

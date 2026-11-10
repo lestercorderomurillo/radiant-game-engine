@@ -1,4 +1,4 @@
-# Graphics resources
+# Resources and textures
 
 Create textures and render targets through the renderer, fill them with pixels or draw into them, and use them
 anywhere a texture is accepted.

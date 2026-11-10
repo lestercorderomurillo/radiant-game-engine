@@ -76,7 +76,7 @@ function GuidesNav({ pathname }: { pathname: string }) {
             const active = pathname === `/guides/${guide.slug}`
             return (
               <Link key={guide.slug} to="/guides/$slug" params={{ slug: guide.slug }} className={linkClass(active)} data-active={active}>
-                <span className="truncate">{guide.title}</span>
+                <span className="truncate">{guide.navTitle}</span>
               </Link>
             )
           })}
