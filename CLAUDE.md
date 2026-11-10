@@ -75,7 +75,7 @@ radiant/
 │   └── tests/2D/ (SimpleLightScene, TilesetScene)
 │
 ├── AGENTS.md (index of agent skills to follow on every task)
-├── lester-skills/<skill>/SKILL.md (agent skills, e.g. communication-autonomy)
+├── skills/lester-skills/<skill>/SKILL.md (agent skills, e.g. communication-autonomy)
 ├── tests/Radiant.Scenes/ (test-scene runner)
 └── eng/Radiant.Desktop.props (shared DesktopVK build settings)
 ```
