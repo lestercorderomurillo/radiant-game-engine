@@ -9,12 +9,20 @@ Geometry AA belongs to the producer's `RasterSampling`. Reconstruction belongs t
 | Demo | Default | Reconstruction choices | Guidance |
 | --- | --- | --- | --- |
 | SimpleLight / MegaLights | UDR4 Balanced | None, UDR1–4 | HRC geometry and temporal buffers |
-| Rendering2D / CornellBox | None | None, UDR4 | Spatial reconstruction |
+| Rendering2D / CornellBox flat, raster, path tracing | None on startup | None, UDR4 | Spatial reconstruction |
+| CornellBox radiance cascades | UDR4 Balanced on first activation | None, UDR4 | Spatial reconstruction; 16³ lighting probes |
 | Tileset | None | None, UDR4 | Spatial reconstruction of cropped viewport |
 
 Open **Image quality** in the framework inspector for reconstruction, quality, post AA, geometry AA where supported, and history reset. The UDR backend windows retain algorithm-specific advanced controls. Sources without a camera omit TAA. MegaLights also supports F11 to cycle None / UDR1–4.
 
 `None` means native producer resolution with reconstruction disabled. `Native` retains the algorithm selection but bypasses reconstruction and returns the source texture directly. Performance and Balanced request 25% and 50% per dimension. Modern demos reduce the producer's view resolution, including its path tracer. Bypassing reconstruction restores an explicitly configured resolution. Tiles still rasterizes its padded world grid at tile resolution and reduces the final viewport; this does not reduce terrain iteration or CPU lighting work.
+
+Cornell applies the cascade defaults once, so switching away and back retains
+subsequent user choices, including None or Native. Its cascade output size follows
+`Meshes.ViewSize`; UDR scales gathering and later image stages, while the
+world-space probe grid stays independent. Probe-field reuse after 32 bounce
+updates is separate from reconstruction history. See
+[the 3D cascade investigation](RadianceCascades3D.md) for invalidation and timings.
 
 ## Integration
 
@@ -40,6 +48,11 @@ dotnet run --project tests/Radiant.Scenes -c Release --no-build -- triangles --u
 dotnet run --project tests/Radiant.Scenes -c Release --no-build -- tiles --upscaling-regression
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --upscaling-regression --2d
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --upscaling-regression
+dotnet run --project tests/Radiant.3D -c Release --no-build -- --radiance-cascades-regression
 ```
 
 GPU captures go to `artifacts/upscaling`. The selector regression exercises all supported reconstruction modes, all quality levels, FXAA/SMAA composition, identity bypass, switching off/on, finite outputs, nonempty presentation and resizing. Existing UDR4 and AA regressions retain their motion/history and edge-specific assertions.
+
+The cascade fixture writes to `artifacts/radiance-cascades` and checks the default
+UDR4 Balanced selection, reduced producer/full-size output, resize, None/Native
+bypass, re-enabling reconstruction, lighting-cache invalidation and 1080p output.

@@ -1,12 +1,12 @@
 <h1 align="center">Radiant</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.2"><img src="https://img.shields.io/badge/release-v0.4.2-E73C00?style=flat-square" alt="Release v0.4.2"></a>
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.5.0"><img src="https://img.shields.io/badge/release-v0.5.0-E73C00?style=flat-square" alt="Release v0.5.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
 </p>
 
-[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.4.2/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.2)
+[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.5.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.5.0)
 
 A complete C# game engine, from first prototype to final release.
 
@@ -29,7 +29,7 @@ debug while the game is running.
 - **ECS architecture**: a modern entity-component-system core built for massive worlds.
 - **Scenes**: build scenes in code or design them statically, in 2D or 3D.
 - **Rendering**: composable pipelines for flat, lit or path-traced images, in 2D and 3D.
-- **Global illumination**: real-time path-traced lighting with hardware ray tracing.
+- **Global illumination**: path-traced lighting with hardware ray tracing and experimental 3D radiance cascades.
 - **Tone mapping**: HDR rendering with filmic tone mapping and color management.
 - **Anti-aliasing**: MSAA, SSAA, FXAA, SMAA and TAA, selectable per project.
 - **Neural denoising**: clean path-traced images at low sample counts.
@@ -47,7 +47,7 @@ debug while the game is running.
 
 ## Get Radiant
 
-**[Download v0.4.2 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.4.2.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.2)
+**[Download v0.5.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.5.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.5.0)
 
 You need the .NET 8 SDK or newer and a Vulkan-capable GPU. On Linux, also install the Vulkan loader and SDL2.
 

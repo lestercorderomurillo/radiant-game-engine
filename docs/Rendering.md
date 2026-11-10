@@ -13,6 +13,7 @@ game can mix them.
 | `FlatRenderer` | The unlit image, as is |
 | `RasterRenderer` | Directional lighting with an adjustable light color and ambient term |
 | `PathTracer` | Progressive path-traced global illumination |
+| `RadianceCascades` | Experimental diffuse 3D lighting with reusable world-space probes |
 | `Denoising` | Cleans up path-traced noise |
 | `ToneMapping` | Exposure and filmic tone curves |
 | `RasterSampling` + `AntiAliasing` | MSAA, SSAA, FXAA, SMAA and TAA |
@@ -52,6 +53,41 @@ var raster = ECS.AddSystem(new RasterRenderer { Geometry = geometry, Input = geo
 ```
 
 For emissive 2D shapes, shadows and colored transmission, see the HRC technique in [Global illumination](HRC.md#holographic-radiance-cascades).
+
+## Light 3D meshes with radiance cascades
+
+`RadianceCascades` takes `MeshGeometry3D` directly as its trace geometry source.
+Its output contains linear HDR lighting and emission; it also exposes linear
+depth through `DepthTexture`. Raster geometry buffers and a denoiser are not
+required for this path.
+
+The following example shows how to connect the lighting stage to tone mapping:
+
+```csharp
+var cascades = ECS.AddSystem(new RadianceCascades
+{
+    Geometry = meshes,
+    ViewSize = () => meshes.ViewSize,
+    GridSize = 16,
+    After = [meshes]
+});
+var color = ECS.AddSystem(new ToneMapping
+{
+    Input = cascades.GetOutput,
+    After = [cascades]
+});
+```
+
+Here `meshes` is the scene's `MeshGeometry3D` system. Continue with antialiasing,
+[UDR4 reconstruction](UDR4.md#connect-3d-radiance-cascades) and presentation. When
+using TAA, supply `cascades.DepthTexture` to its depth provider and the mesh
+adapter's camera to its camera provider.
+
+The Cornell demo selects a 16³ probe grid and UDR4 Balanced when radiance cascades
+are first activated. The standalone lighting stage defaults to 32³ probes; a new
+`Upscaling` stage starts disabled until you select an algorithm. See
+[3D Radiance Cascades](HRC.md#3d-radiance-cascades) for materials, bounce caching
+and the limitations of this experimental technique.
 
 ## Path trace
 

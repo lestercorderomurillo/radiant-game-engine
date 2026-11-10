@@ -46,6 +46,13 @@ if (Array.IndexOf(args, "--vulkan-rt-regression") >= 0)
     return;
 }
 
+if (Array.IndexOf(args, "--radiance-cascades-regression") >= 0)
+{
+    using var window = new RadianceCascadesRegressionWindow(Array.IndexOf(args, "--furnace") >= 0, Array.IndexOf(args, "--native") >= 0, Array.IndexOf(args, "--dense") >= 0);
+    window.Run();
+    return;
+}
+
 if (Array.IndexOf(args, "--upscaling-regression") >= 0)
 {
     using var window = new UpscalingRegressionWindow(Array.IndexOf(args, "--2d") >= 0 ? new Rendering2DScene() : new CornellBoxScene());
@@ -146,7 +153,7 @@ foreach (var argument in args)
     if (argument.StartsWith("--path-backend=", StringComparison.Ordinal))
         traceBackend = Enum.Parse<PathTracingBackend>(argument["--path-backend=".Length..], true);
 
-Scene scene = regression ? new Geometry3DRegressionScene() : new CornellBoxScene { InitialTraceBackend = traceBackend, InitialRenderMethod = Array.IndexOf(args, "--smoke") >= 0 ? 0 : 2, InitialDenoiser = requestedDenoiser ?? (Array.IndexOf(args, "--smoke") >= 0 ? DenoiserMode.None : DenoiserMode.Atrous) };
+Scene scene = regression ? new Geometry3DRegressionScene() : new CornellBoxScene { InitialTraceBackend = traceBackend, InitialRenderMethod = Array.IndexOf(args, "--smoke") >= 0 ? 0 : Array.IndexOf(args, "--radiance-cascades") >= 0 ? 3 : 2, InitialDenoiser = requestedDenoiser ?? (Array.IndexOf(args, "--smoke") >= 0 ? DenoiserMode.None : DenoiserMode.Atrous) };
 
 if (regression || Array.IndexOf(args, "--smoke") >= 0)
 {

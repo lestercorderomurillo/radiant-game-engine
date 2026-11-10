@@ -4,7 +4,7 @@ using com.radiant.engine.input;
 
 namespace com.radiant.engine.core;
 
-/// <summary>Cornell-box demo for comparing flat, raster, and path-traced rendering.</summary>
+/// <summary>Cornell-box demo for comparing flat, raster, path-traced and radiance-cascade rendering.</summary>
 public class CornellBoxScene : Scene
 {
     public int InitialRenderMethod { get; init; }
@@ -15,6 +15,7 @@ public class CornellBoxScene : Scene
     public Geometry3D Geometry { get; private set; }
     public RasterRenderer Raster { get; private set; }
     public PathTracer Tracer { get; private set; }
+    public RadianceCascades Cascades { get; private set; }
     public Denoising Denoiser { get; private set; }
     public PathLighting Lighting { get; private set; }
     public Upscaling Upscaler { get; private set; }
@@ -28,6 +29,7 @@ public class CornellBoxScene : Scene
     private int Camera;
     private float Angle;
     private float Distance = 11;
+    private bool CascadeDefaultsApplied;
 
     /// <inheritdoc/>
     public override void SetupECS()
@@ -44,15 +46,17 @@ public class CornellBoxScene : Scene
         Tracer = ECS.AddSystem(new PathTracer { Backend = InitialTraceBackend, SeparateLighting = true, Geometry = Meshes, Channels = TraceChannels.All, ViewSize = () => Meshes.ViewSize, After = [Meshes] }, false);
         Denoiser = ECS.AddSystem(new Denoising { TraceSource = Tracer, Mode = InitialDenoiser, Input = () => Tracer.Enabled ? Tracer.GetOutput() : null, Albedo = () => Tracer.AlbedoTexture, Normals = () => Tracer.NormalTexture, Depth = () => Tracer.DepthTexture, Emission = () => Tracer.EmissionTexture, SingleSample = () => Tracer.SampleTexture, Camera = () => Tracer.Geometry.HasCamera ? Tracer.Geometry.Camera : null, Revision = () => Tracer.RadianceRevision, After = [Tracer] }, enabled: true);
         Lighting = ECS.AddSystem(new PathLighting { Source = Tracer, Input = Denoiser.GetOutput, After = [Tracer, Denoiser] });
+        Cascades = ECS.AddSystem(new RadianceCascades { Geometry = Meshes, GridSize = 16, ViewSize = () => Meshes.ViewSize, After = [Meshes] }, false);
 
-        ToneMap = ECS.AddSystem(new ToneMapping { Input = GetRenderedOutput, Mapper = ToneMapper.None, After = [Flat, Raster, Tracer, Denoiser, Lighting] });
-        AA = ECS.AddSystem(new AntiAliasing { Input = ToneMap.GetOutput, Mode = PostAAMode.None, OutputSize = () => Meshes.ViewSize, Camera = () => Meshes.Camera, Depth = () => RenderMethod == 2 ? Lighting.DepthTexture ?? Tracer.DepthTexture : Geometry.DepthTexture, GeometryRevision = () => Meshes.Revision, After = [ToneMap] });
+        ToneMap = ECS.AddSystem(new ToneMapping { Input = GetRenderedOutput, Mapper = ToneMapper.None, After = [Flat, Raster, Tracer, Denoiser, Lighting, Cascades] });
+        AA = ECS.AddSystem(new AntiAliasing { Input = ToneMap.GetOutput, Mode = PostAAMode.None, OutputSize = () => Meshes.ViewSize, Camera = () => Meshes.Camera, Depth = () => RenderMethod switch { 2 => Lighting.DepthTexture ?? Tracer.DepthTexture, 3 => Cascades.DepthTexture, _ => Geometry.DepthTexture }, GeometryRevision = () => Meshes.Revision, After = [ToneMap] });
         AA.SetSampling(Sampling);
         Upscaler = ECS.AddSystem(new Upscaling { Input = AA.GetOutput, After = [AA] });
 
         ECS.AddSystem(new ColorSettings { Id = "geometry3dColor", Source = ToneMap });
         ECS.AddSystem(new AntiAliasingSettings { Id = "geometry3dAA", Source = AA, Sampling = Sampling, Upscaler = Upscaler, Title = "Image quality" });
         ECS.AddSystem(new PathTracingSettings { Id = "pathTracing", Source = Tracer, Denoiser = Denoiser, Changed = AA.ResetHistory });
+        ECS.AddSystem(new RadianceCascadesSettings { Id = "radianceCascades", Source = Cascades, Changed = AA.ResetHistory });
 
         Pipeline = ECS.AddSystem(new RenderInspector { Id = "geometry3d", Title = "3D Pipeline", Input = Upscaler.GetOutput, After = [Upscaler] });
 
@@ -61,6 +65,7 @@ public class CornellBoxScene : Scene
         Pipeline.AddSource("Path tracing", Tracer);
         Pipeline.AddSource("Denoising", Denoiser);
         Pipeline.AddSource("Path lighting", Lighting);
+        Pipeline.AddSource("Radiance cascades", Cascades);
         Pipeline.AddSource("Reconstruction", Upscaler);
         Pipeline.AddSource("Tone mapping", ToneMap);
         Pipeline.AddSource("AA", AA);
@@ -75,7 +80,7 @@ public class CornellBoxScene : Scene
         ECS.AddComponent<Camera3D>(Camera) = new Camera3D { FarPlane = 40 };
         Meshes.CameraEntity = Camera;
 
-        Inspector.AddDropdown("geometry3d", "renderer", "Renderer", new[] { "Flat", "Raster", "Path tracing" }, 0, SelectRenderer);
+        Inspector.AddDropdown("geometry3d", "renderer", "Renderer", new[] { "Flat", "Raster", "Path tracing", "Radiance cascades" }, 0, SelectRenderer);
         Inspector.AddDropdown("geometry3d", "fpsCap", "FPS Limit", runtime.GameLoop.FpsOptionNames, 2, index => Renderer.GameLoop.SetTargetFps(runtime.GameLoop.FpsOptions[index]));
         Inspector.AddToggle("geometry3d", "throttleUnfocused", "Limit FPS when unfocused", Renderer.GameLoop.ThrottleUnfocused, enabled => Renderer.GameLoop.ThrottleUnfocused = enabled);
 
@@ -96,7 +101,7 @@ public class CornellBoxScene : Scene
         ECS.AddComponent<SurfaceEmission>(emitter) = new SurfaceEmission { Radiance = new Vector3(6) };
 
         Inspector.CreateSceneWindow("cornellBox", "Cornell Box", Visible: false);
-        Inspector.AddLabel("cornellBox", "rendering", "Flat / raster / diffuse path tracing");
+        Inspector.AddLabel("cornellBox", "rendering", "Flat / raster / path tracing / radiance cascades");
         Inspector.AddLabel("cornellBox", "camera", "Arrow keys: orbit / zoom");
         Inspector.AddLabel("cornellBox", "buffers", "Tab: available buffers | R: renderer");
         Inspector.AddLabel("cornellBox", "inspector", "F1: toggle framework inspector");
@@ -105,14 +110,21 @@ public class CornellBoxScene : Scene
         SelectRenderer(InitialRenderMethod);
     }
 
-    /// <summary>Returns the image from the currently selected flat, raster, or path-traced renderer.</summary>
-    public Texture2D GetRenderedOutput() => RenderMethod switch { 1 => Raster.GetOutput(), 2 => Lighting.GetOutput(), _ => Flat.GetOutput() };
+    /// <summary>Returns the image from the currently selected flat, raster, path-traced or radiance-cascade renderer.</summary>
+    public Texture2D GetRenderedOutput() => RenderMethod switch { 1 => Raster.GetOutput(), 2 => Lighting.GetOutput(), 3 => Cascades.GetOutput(), _ => Flat.GetOutput() };
 
     /// <summary>Activates the selected renderer and resets dependent image history and inspection.</summary>
     public void SelectRenderer(int index)
     {
-        if (index < 0 || index > 2) throw new ArgumentOutOfRangeException(nameof(index));
+        if (index < 0 || index > 3) throw new ArgumentOutOfRangeException(nameof(index));
         if (index == RenderMethod) return;
+
+        if (index == 3 && !CascadeDefaultsApplied)
+        {
+            UDRQuality.Set(1);
+            Upscaler.Select(UpscalingMode.UDR4);
+            CascadeDefaultsApplied = true;
+        }
 
         AA.JitterEnabled = index != 2;
         AA.ResetHistory();
@@ -120,11 +132,13 @@ public class CornellBoxScene : Scene
 
         Raster.Enabled = index == 1;
         Tracer.Enabled = index == 2;
+        Cascades.Enabled = index == 3;
 
         if (index != 1) Raster.Dispose();
         if (index != 2) Tracer.Dispose();
+        if (index != 3) Cascades.Dispose();
 
-        bool needGeometry = index != 2;
+        bool needGeometry = index < 2;
 
         if (Geometry.Enabled != needGeometry)
         {
@@ -178,7 +192,7 @@ public class CornellBoxScene : Scene
         if (keyboard.IsKeyDown(Key.Up)) Distance = global::System.Math.Max(9, Distance - DeltaTime * 5);
         if (keyboard.IsKeyDown(Key.Down)) Distance = global::System.Math.Min(16, Distance + DeltaTime * 5);
         if (Controls.WasPressed(Key.Tab)) Pipeline.SelectNextBuffer();
-        if (Controls.WasPressed(Key.R)) SelectRenderer((RenderMethod + 1) % 3);
+        if (Controls.WasPressed(Key.R)) SelectRenderer((RenderMethod + 1) % 4);
 
 
         if ((Angle != previousAngle || Distance != previousDistance) && Meshes.CameraEntity == Camera) UpdateCamera();

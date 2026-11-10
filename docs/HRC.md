@@ -7,6 +7,7 @@ Choose how light interacts with your scene, then connect the result to the same 
 | Technique | Scene | Use it for |
 | --- | --- | --- |
 | **Holographic Radiance Cascades** (`HRCGI`) | 2D shapes | Emissive lights, soft shadows and colored transmission |
+| **3D Radiance Cascades** (`RadianceCascades`, experimental) | 3D trace geometry | Deterministic diffuse lighting with world-space probes and optional bounce feedback |
 | **Raster lighting** (`RasterRenderer`) | 2D or 3D raster geometry | Directional diffuse shading with an ambient term |
 | **Path tracing** (`PathTracer`) | 2D or 3D trace geometry | Progressive diffuse global illumination |
 | **Unlit rendering** (`FlatRenderer`) | 2D or 3D images | Preserve authored colors without a lighting pass |
@@ -19,7 +20,7 @@ HRC is the current lighting technique for emissive 2D shapes. `Geometry` supplie
 
 ### Set up a 2D scene
 
-Register both systems before calling the base setup:
+The following example shows how to register lighting and create a light and wall:
 
 ```csharp
 public override void SetupECS()
@@ -70,6 +71,72 @@ var upscaler = ECS.AddSystem<UDR4>();
 color.SetInputSource(lighting.GetOutput);
 upscaler.SetInputSource(color.GetOutput);
 ```
+
+## 3D Radiance Cascades
+
+`RadianceCascades` lights diffuse meshes through a cube of world-space probes. It
+uses the same `ITraceGeometry` and `SurfaceEmission` inputs as path tracing.
+Primary surfaces are shaded at the requested view size; probe density controls
+lighting detail independently. No stochastic sampling or denoiser is required,
+but coarse probes and angular sampling can still cause visible artifacts.
+
+The following example shows how to connect the experimental stage to a 3D mesh
+adapter, tone mapping and presentation:
+
+```csharp
+var meshes = ECS.AddSystem<MeshGeometry3D>();
+var lighting = ECS.AddSystem(new RadianceCascades
+{
+    Geometry = meshes,
+    After = [meshes],
+    GridSize = 16,
+    BaseDirectionRows = 4,
+    MultiBounce = true
+});
+var color = ECS.AddSystem(new ToneMapping
+{
+    Input = lighting.GetOutput,
+    After = [lighting]
+});
+ECS.AddSystem(new RenderPresentation
+{
+    Input = color.GetOutput,
+    After = [color]
+});
+```
+
+Supply meshes and an active camera as described in [2D and 3D scenes](3D.md).
+The Cornell demo offers **Radiance cascades** in its renderer selector, with
+controls under **F1 → View → Radiance cascades**. It starts with a 16³ probe grid
+and **UDR4 → Balanced**, rendering at 50% of each display dimension and
+reconstructing to the full window size. Change reconstruction under
+**F1 → View → Image quality**; later renderer switches preserve that choice.
+UDR4 uses spatial reconstruction for this 3D input. Other scenes can register
+`RadianceCascadesSettings` with `Source = lighting` alongside their `Inspector`.
+
+- `GridSize` accepts 8, 16, 32 or 64 probes per axis; the standalone stage defaults to 32,
+  while Cornell selects 16 for interactive use. Doubling it increases base probe count eightfold.
+- `BaseDirectionRows` accepts 2, 4 or 8, corresponding to 8, 32 or 128 base
+  directions. A 64³ grid supports at most 4 rows. Inspector controls adjust the
+  other setting to keep the combination within the atlas limit.
+- `LeakFix` connects each upper probe separately. It reduces interpolation leaks
+  at a substantial tracing cost; disabling it can introduce light through walls.
+- `MultiBounce` feeds the previous frame's irradiance back into surface hits.
+  Disabling it leaves emission, environment and one diffuse reflection. Scene,
+  lighting and layout changes restart feedback; `ResetBounces()` restarts it manually.
+- `MaxBounceUpdates` defaults to 32. After that many updates, unchanged lighting
+  reuses the world-space probe field, including while the camera moves. Single-bounce
+  lighting is reused after its first update. Set the limit to 0 for continuous
+  updates, or increase it for very reflective materials that need more iterations.
+  This is an iteration budget, not a measured convergence threshold.
+- `Volume` can specify a cube as `(Center, Size)`; otherwise it fits geometry bounds.
+  `NormalBias` offsets lighting lookups in probe-spacing units.
+
+The output is linear HDR; `DepthTexture` supplies linear depth for image stages.
+This implementation uses GPU shader BVH traversal, without Vulkan ray-query
+acceleration. It is intended for bounded-scene experiments: large volumes, thin
+walls, small emitters and high probe counts need careful evaluation. It supports
+opaque diffuse materials only, and multiple bounces take successive frames to settle.
 
 ## Raster lighting
 

@@ -674,7 +674,7 @@ Cornell Box and Rendering2D use `PathLighting` after `Denoising` and before tone
 
 `Upscaling` is an `ImageSystem` stage between `AntiAliasing` and `RenderInspector` / `RenderPresentation`. It owns only the selected UDR backend, runs reconstruction in Render after its input producers, and releases the previous backend on selection changes. `None` and Native bypass reconstruction. `AntiAliasingSettings.Upscaler` adds the common Image quality selector; sources without a camera omit TAA. UDR1–3 are available only for an explicitly declared HRC input; generic inputs expose UDR4 spatial reconstruction with temporal accumulation disabled. UDR4 supports `Present`, `UseHrcGeometry`, and `Temporal` integration flags; spatial mode preserves alpha and uses two targets and two passes. Its default standalone behavior remains the HRC Update-phase path.
 
-All five interactive demos expose the same Image quality controls. `DemoRendering` shares the HRC / tiles image-stage wiring; SimpleLight and MegaLights default to UDR4. Rendering2D, CornellBox, and Tileset default to None and allow UDR4 selection. Modern scenes call `Upscaling.ResolveViewSize` before rendering to reduce producer resolution and restore explicit resolutions on bypass. Tileset can set `Present = false` and expose its cropped viewport through `GetOutput`. MegaLights F11 cycles None / UDR1–4.
+All five interactive demos expose the same Image quality controls. `DemoRendering` shares the HRC / tiles image-stage wiring; SimpleLight and MegaLights default to UDR4. Rendering2D, CornellBox flat/raster/path tracing, and Tileset start with None and allow UDR4 selection. First selection of Cornell radiance cascades enables UDR4 Balanced; subsequent switches preserve the user’s reconstruction choice. Modern scenes call `Upscaling.ResolveViewSize` before rendering to reduce producer resolution and restore explicit resolutions on bypass. Tileset can set `Present = false` and expose its cropped viewport through `GetOutput`. MegaLights F11 cycles None / UDR1–4.
 
 GPU selector regression: `tests/Radiant.Scenes <lights|triangles|tiles|rendering2d> --upscaling-regression` and `tests/Radiant.3D --upscaling-regression [--2d]`. These cover all supported modes and quality settings, AA composition, Native identity bypass, off/on, finite output and resize. See `docs/internals/RenderingPipeline.md` for integration and remaining per-view limitations.
 
@@ -687,6 +687,35 @@ Build the optional runtime with `python3 eng/build-vulkan-rt.py`, then use `-p:R
 Tracing builds one BLAS over the existing world-triangle adapter plus an identity TLAS, caches by source/revision, and writes an RGBA32F sample in MonoGame's command buffer. Its external texture feeds the existing accumulation/denoising/lighting/color pipeline without CPU image transfers. Flush before disposing external texture views; do not force-purge MonoGame's unrelated deferred resources. Native dispatch restores shader-read layout before raster consumers. Geometry changes, resizing and disposal synchronize; ordinary tracing frames do not wait for CPU readback. Guides/full-resolution PathLighting still use the existing software BVH. Material transport remains the existing diffuse integrator, and geometry changes currently rebuild rather than refit.
 
 `tests/Radiant.3D --vulkan-rt-regression` requires real Vulkan RT and checks analytic transport, software parity away from shared-edge roundoff, clipping, cameras, empty geometry, revisions, accumulation, texture sharing, resizing, switching and disposal. With the stock runtime use `--vulkan-rt-regression --expect-software` to check Auto fallback and rejection of explicit Vulkan. `--pipeline-regression [--2d]` exercises full integration. Interactive Cornell accepts `--path-backend=auto|software|vulkan`. Windows build support is provided but requires validation on Windows hardware; development validation uses Linux/RADV on RX 9070 XT.
+
+## Experimental 3D radiance cascades
+
+Introduced in the v0.5.0 source release; both engine project versions are 0.5.0.
+
+`RadianceCascades` is a separate world-space diffuse stage over `ITraceGeometry`,
+with dense probe atlases, equal-area directions, visibility-aware cascade merging,
+irradiance gather, linear depth and optional previous-frame bounce feedback.
+`TraceSceneBuffer` factors the shader BVH upload/binding out of `PathTracer`; each
+stage owns its buffer. All resources still use Renderer APIs. Cornell has renderer
+index 3, `--radiance-cascades` and `RadianceCascadesSettings`; 2D HRC is unchanged.
+Grid sizes are 8/16/32/64; direction rows 2/4/8 (64³ supports at most 4 rows).
+Scene revisions, lighting settings and layout changes reset feedback. Empty geometry
+or missing cameras clear output; switching renderers disposes resources. GPU regressions:
+`--radiance-cascades-regression [--furnace]`. See
+`docs/internals/RadianceCascades3D.md` for papers, validation and measured costs.
+This is an experimental GPU shader-BVH implementation, not sparse Split RC or
+hardware ray-query RC. Cornell now selects grid 16 and UDR4 Balanced on first
+activation. The stage defaults to 32 bounce updates, then reuses the probe field
+until invalidated; camera/resize changes only need a new gather. Set
+`MaxBounceUpdates = 0` for continuous updates. `ProbeUpdateCount` and
+`ReusedProbeField` expose this behavior. Visibility uses early-out occlusion rays;
+irradiance normal tiles have two wrap columns for single-fetch bilinear sampling.
+The GPU fixture covers cache invalidation, native/dense mode (`--dense --native`),
+UDR toggles and 1080p. User integration is in `docs/HRC.md`.
+`docs/Rendering.md`, `docs/3D.md`, `docs/RenderingPipeline.md` and `docs/UDR4.md`
+also describe cascade composition, emission, independent lighting/reconstruction
+controls and the Cornell defaults. Internal 3D and pipeline notes link to the
+investigation and its validation commands.
 
 ## Native NRD diffuse reconstruction
 
@@ -705,7 +734,7 @@ Tracing builds one BLAS over the existing world-triangle adapter plus an identit
 - `tools/Radiant.DocGen` (Roslyn, net8.0, not in `radiant.sln`) reads `radiant.csproj`, follows `ProjectReference`s, expands their `Compile` globs, binds package assemblies from each `obj/project.assets.json`, and writes `docs/site/public/generated/{index,search}.json` plus `types/<id>.json`. Public and protected API only; `inheritdoc` and undocumented overrides inherit base/interface docs; nested `<example>` tags are hoisted; crefs become `xref:` Markdown links. Navigation groups come from source folders under the common source root (`bundle/` is transparent, `mplay` → Multiplayer).
 - `docs/site` is Vite + React + TanStack Router (code routes) + Tailwind v4 with hand-written shadcn/ui primitives in `src/common/ui` (`components.json` allows `shadcn add`). Features: `guides` (every `docs/*.md` and `README.md` via `import.meta.glob`; order in `guides.ts`, unlisted files go to "More"), `reference` (API index and type pages), `search` (⌘K/Ctrl+K, `/`), `home`. UI copy goes through `t()` in `src/common/i18n/en.ts`.
 - `plugins/radiantDocGen.ts` runs DocGen before dev/build and reruns it when `.cs`/`.csproj`/`.props` files under `src/`, `eng/` or `radiant.csproj` change; the client refetches on the `radiant:api-updated` HMR event without reloading.
-- Guide sidebar sections (`guides.ts`): Getting started (Introduction = README, Quickstart), ECS (Introduction, Scenes, Systems, Queries, Dependency resolution, System control), General rendering (Introduction, Rendering pipelines, Resources and textures, 2D and 3D scenes, Render states, Image quality, Tone mapping, Anti-aliasing), Advanced rendering (Shaders, Global illumination, UDR, Neural denoising), Tools (Launcher, Asset Studio, Inspector, Cameras), Runtime (Introduction, Math, Input, Backend agnostic). Entries may carry a shorter `nav` label (`guides.nav.*`) shown in the sidebar while the page keeps its H1 title. Slugs come from file names (`HRC.md` → `lighting`, `UDR4.md` → `upscaling`, `Startup.md` → `startup`). `docs/AssetStudio.md` is descriptive only; the tool has no public API yet.
+- Guide sidebar sections (`guides.ts`): Getting started (Introduction = README, Quickstart), ECS (Introduction, Scenes, Systems, Queries, Dependency resolution, System control), General rendering (Introduction, Rendering pipelines, Resources and textures, 2D and 3D scenes, Render states, Image quality, Tone mapping, Anti-aliasing), Advanced rendering (Shaders, Global illumination, Universal Detail Reconstruction, Neural denoising), Tools (Launcher, Asset Studio, Inspector, Cameras), Runtime (Introduction, Math, Input, Backend agnostic). Entries may carry a shorter `nav` label (`guides.nav.*`) shown in the sidebar while the page keeps its H1 title. Slugs come from file names (`HRC.md` → `lighting`, `UDR4.md` → `upscaling`, `Startup.md` → `startup`). `docs/AssetStudio.md` is descriptive only; the tool has no public API yet.
 - `docs/*.md` are user-facing feature guides: what you can do and how, each snippet introduced with "The following example shows how to …", no migration notes, validation commands or implementation history. Those engineering records live in `docs/internals/` (original per-subsystem notes, including regression commands), which the site does not show; add new design/migration/validation notes there.
 - Guides link to engine sources with relative paths (`../src/.../ECS.cs`): GitHub opens the file, the site routes to the type page.
 - `docs/site/node_modules`, `dist` and `public/generated` are ignored; `radiant.csproj` excludes `docs/site/**` and `tools/**` from default items.

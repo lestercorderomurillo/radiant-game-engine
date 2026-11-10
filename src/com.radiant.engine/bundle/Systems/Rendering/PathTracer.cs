@@ -55,18 +55,15 @@ public class PathTracer : ImageSystem
     private PathTracingBackend ResolvedBackend = (PathTracingBackend)(-1);
 
     public long RadianceRevision { get; private set; }
-    public int BvhBuildCount { get; private set; }
-    public int NodeCount { get; private set; }
+    public int BvhBuildCount => SceneBuffer.BuildCount;
+    public int NodeCount => SceneBuffer.NodeCount;
 
-    private Texture2D SceneData;
+    private readonly TraceSceneBuffer SceneBuffer = new();
     private RenderTarget2D History;
-    private long UploadedRevision = -1;
-    private ITraceGeometry UploadedSource;
     private TraceCamera PreviousCamera;
     private Vector3 PreviousEnvironment;
     private int PreviousBounces;
     private bool PreviousSeparateLighting;
-    private int TriangleOffset;
     private int Sequence;
 
     /// <summary>Registers the tracer's radiance and guide buffers for inspection.</summary>
@@ -74,7 +71,7 @@ public class PathTracer : ImageSystem
     {
         BufferProviders["Single sample"] = () => SampleTexture;
         BufferProviders["History"] = () => History;
-        BufferProviders["BVH data"] = () => SceneData;
+        BufferProviders["BVH data"] = () => SceneBuffer.Data;
         BufferProviders["Albedo"] = () => AlbedoTexture;
         BufferProviders["Normals"] = () => NormalTexture;
         BufferProviders["Depth"] = () => DepthTexture;
@@ -88,26 +85,6 @@ public class PathTracer : ImageSystem
     public override void Initialize()
     {
         if (Geometry == null) throw new InvalidOperationException("PathTracer requires an ITraceGeometry source.");
-    }
-
-    /// <summary>Rebuilds and uploads tracing geometry when the source revision changes.</summary>
-    private void UploadGeometry()
-    {
-        var bvh = new TraceBvh(Geometry.Triangles);
-        var packed = bvh.Pack(out TriangleOffset);
-        int width = Math.Min(1024, Math.Max(1, packed.Length));
-        int height = Math.Max(1, (packed.Length + width - 1) / width);
-        var pixels = new Vector4[width * height];
-        Array.Copy(packed, pixels, packed.Length);
-        SceneData?.Dispose();
-        SceneData = Renderer.CreateTexture(width, height, SurfaceFormat.Vector4);
-        SceneData.SetData(pixels);
-        NodeCount = bvh.Nodes.Count;
-        BvhBuildCount++;
-        global::System.Diagnostics.Debug.WriteLine($"Trace BVH: {NodeCount} nodes, {bvh.Triangles.Length} triangles, {width}x{height}");
-        UploadedRevision = Geometry.Revision;
-        UploadedSource = Geometry;
-        ResetAccumulation();
     }
 
     /// <summary>Selects a supported tracing backend and records why a requested backend is unavailable.</summary>
@@ -165,7 +142,7 @@ public class PathTracer : ImageSystem
             ResetAccumulation();
         }
 
-        if (!ReferenceEquals(UploadedSource, Geometry) || UploadedRevision != Geometry.Revision || SceneData == null) UploadGeometry();
+        if (SceneBuffer.Update(Renderer, Geometry)) ResetAccumulation();
         Hardware?.Upload(Geometry);
 
         var camera = Geometry.Camera;
@@ -216,7 +193,7 @@ public class PathTracer : ImageSystem
         {
             Renderer.Reset().SetShader("PathTracer").SetTechnique(captureSample ? "WithSample" : "Default").Configure(SamplerState.PointClamp, 0).Configure(SamplerState.PointClamp, 1);
             if (captureSample) Renderer.SetTargets(Output, SoftwareSample); else Renderer.SetTarget(Output);
-            Renderer.SetParameter("SceneData", SceneData).SetParameter("History", History).SetParameter("DataWidth", SceneData.Width).SetParameter("DataSize", new Vector2(SceneData.Width, SceneData.Height)).SetParameter("TriangleOffset", TriangleOffset).SetParameter("NodeCount", NodeCount).SetParameter("SampleIndex", SampleCount).SetParameter("SequenceIndex", Sequence).SetParameter("MaxBounces", MaxBounces).SetParameter("InverseViewProjection", camera.InverseViewProjection).SetParameter("CameraPosition", camera.Position).SetParameter("Orthographic", camera.Orthographic).SetParameter("Environment", Environment).SetParameter("StablePrimary", SeparateLighting).SetParameter("OutputSize", new Vector2(width, height)).Draw().Commit().SetTarget(null);
+            SceneBuffer.Bind(Renderer).SetParameter("History", History).SetParameter("SampleIndex", SampleCount).SetParameter("SequenceIndex", Sequence).SetParameter("MaxBounces", MaxBounces).SetParameter("InverseViewProjection", camera.InverseViewProjection).SetParameter("CameraPosition", camera.Position).SetParameter("Orthographic", camera.Orthographic).SetParameter("Environment", Environment).SetParameter("StablePrimary", SeparateLighting).SetParameter("OutputSize", new Vector2(width, height)).Draw().Commit().SetTarget(null);
         }
 
         (Output, History) = (History, Output);
@@ -263,7 +240,10 @@ public class PathTracer : ImageSystem
     /// <summary>Draws the requested primary-surface channel into the active render target.</summary>
     internal void DrawSurface(int channel)
     {
-        if (Geometry.HasCamera) Renderer.SetShader("PathSurfaces").SetTechnique("Surface").Configure(SamplerState.PointClamp, 0).SetParameter("SceneData", SceneData).SetParameter("DataWidth", SceneData.Width).SetParameter("DataSize", new Vector2(SceneData.Width, SceneData.Height)).SetParameter("TriangleOffset", TriangleOffset).SetParameter("NodeCount", NodeCount).SetParameter("InverseViewProjection", Geometry.Camera.InverseViewProjection).SetParameter("SurfaceView", Geometry.Camera.View).SetParameter("SurfaceFar", Geometry.Camera.FarPlane).SetParameter("SurfaceChannel", channel).Draw().Commit();
+        if (!Geometry.HasCamera) return;
+
+        Renderer.SetShader("PathSurfaces").SetTechnique("Surface").Configure(SamplerState.PointClamp, 0);
+        SceneBuffer.Bind(Renderer).SetParameter("InverseViewProjection", Geometry.Camera.InverseViewProjection).SetParameter("SurfaceView", Geometry.Camera.View).SetParameter("SurfaceFar", Geometry.Camera.FarPlane).SetParameter("SurfaceChannel", channel).Draw().Commit();
     }
 
     /// <summary>Returns the stage's current output image, or its input when processing is bypassed.</summary>
@@ -281,13 +261,10 @@ public class PathTracer : ImageSystem
         Hardware = null;
         ResolvedBackend = (PathTracingBackend)(-1);
         ActiveBackend = PathTracingBackend.Software;
-        SceneData?.Dispose();
-        SceneData = null;
+        SceneBuffer.Dispose();
 
         for (int i = 0; i < Surfaces.Length; i++) { Surfaces[i]?.Dispose(); Surfaces[i] = null; }
 
-        UploadedRevision = -1;
-        UploadedSource = null;
         ResetAccumulation();
     }
 }

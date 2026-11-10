@@ -213,6 +213,24 @@
 /processorParam:DebugMode=Auto
 /build:shaders/Denoising.fx
 
+#begin RC/RC_Intervals.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/RC/RC_Intervals.fx
+
+#begin RC/RC_Irradiance.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/RC/RC_Irradiance.fx
+
+#begin RC/RC_Gather.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:shaders/RC/RC_Gather.fx
+
 #begin Denoising/SVGF.fx
 /importer:EffectImporter
 /processor:EffectProcessor

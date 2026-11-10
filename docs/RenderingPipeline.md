@@ -26,11 +26,19 @@ UI and gizmos are drawn afterwards at display resolution. Wire `Input` to the pr
 
 Three controls serve different purposes:
 
-- **Lighting quality** changes the producer's work, such as HRC probe spacing or path-tracing bounce count.
+- **Lighting quality** changes the producer's work, such as HRC probe spacing, the 3D radiance cascade grid or path-tracing bounce count.
 - **Antialiasing** changes how edges are sampled or filtered.
 - **Upscaling quality** changes input resolution before reconstruction.
 
 The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [UDR](UDR4.md) for the compatibility table and setup.
+
+For 3D radiance cascades, Cornell initially selects 16³ probes and UDR4 Balanced.
+Balanced shades at 50% of each display dimension and reconstructs the result at
+display resolution. It does not lower the probe count. The lighting stage reuses
+its world-space field after its bounce-update budget; geometry or lighting
+changes invalidate that field, while camera motion only needs new primary shading.
+Increase the budget or use continuous updates when highly reflective materials
+need more iterations. See [3D Radiance Cascades](HRC.md#3d-radiance-cascades).
 
 ## Inspect the result
 
@@ -40,7 +48,7 @@ Compare the same camera view at native resolution and at the intended render sca
 
 ## Continue
 
-- [Global illumination](HRC.md) — HRC, raster lighting and path tracing.
+- [Global illumination](HRC.md) — HRC, 3D radiance cascades, raster lighting and path tracing.
 - [UDR](UDR4.md) — algorithms, quality presets and history.
 - [Neural denoising](Denoising.md) — denoiser setup and guide buffers.
 - [Inspector](Inspector.md) — controls and diagnostic overlays.

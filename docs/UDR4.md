@@ -1,4 +1,4 @@
-# UDR
+# Universal Detail Reconstruction
 
 Render fewer pixels and reconstruct an image at display resolution. Radiant provides four UDR algorithms behind the `Upscaling` system, with a separate quality setting that controls the input resolution.
 
@@ -31,7 +31,7 @@ Balanced is the default. Native keeps the chosen algorithm but bypasses reconstr
 UDRQuality.Set(1); // Balanced; 0 = Performance, 2 = Native
 ```
 
-Changing this setting affects every active UDR system. These presets are independent of HRC's lighting probe quality.
+Changing this setting affects every active UDR system. These presets are independent of HRC's lighting probe quality and the 3D radiance cascade grid. A newly created `Upscaling` stage still needs an algorithm selected; the Balanced preset alone does not enable reconstruction.
 
 ## Connect an image pipeline
 
@@ -61,6 +61,40 @@ geometry.Resolution = upscaler.ResolveViewSize(geometry.Resolution);
 ```
 
 `ResolveViewSize` remembers an explicit view resolution and restores it when scaling is bypassed. Pass this stage to `AntiAliasingSettings.Upscaler` to expose algorithm and quality controls in **F1 → View → Image quality**.
+
+## Connect 3D radiance cascades
+
+The Cornell demo enables **UDR4 → Balanced** on its first switch to radiance
+cascades, including when launched with `--radiance-cascades`. It uses 16³ probes,
+renders primary shading at half the width and height, and reconstructs to the
+full display size. For example, a 1920×1080 window receives a 960×540 input.
+Later renderer switches preserve your reconstruction choice.
+
+In your own scene, use the image pipeline above with `HrcInput = false`, following
+`RadianceCascades → ToneMapping → AntiAliasing → Upscaling → RenderPresentation`.
+UDR4 uses spatial reconstruction here; the 3D cascade buffers do not supply the
+2D HRC motion and geometry guidance needed by UDR1–UDR3 or temporal UDR4.
+
+Keep references to the mesh adapter, lighting stage and upscaler in your scene.
+The following example shows how to bind the lighting output size during setup:
+
+```csharp
+cascades.ViewSize = () => meshes.ViewSize;
+upscaler.Select(UpscalingMode.UDR4);
+UDRQuality.Set(1);
+```
+
+The following example shows how to apply the selected resolution in the scene's
+`Update` hook, before the mesh adapter renders:
+
+```csharp
+meshes.Resolution = upscaler.ResolveViewSize(meshes.Resolution);
+```
+
+UDR reduces primary shading and subsequent image-stage work. Probe density,
+angular resolution and the bounce-update budget remain independent controls in
+[3D Radiance Cascades](HRC.md#3d-radiance-cascades). Reusing a settled probe field
+is a lighting optimization; it does not enable temporal reconstruction in UDR4.
 
 ## Connect HRC lighting
 
