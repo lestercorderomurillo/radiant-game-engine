@@ -25,15 +25,15 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
   }, [code, language])
 
   return (
-    <div className={cn("not-prose group relative my-5 overflow-hidden rounded-lg border bg-code", className)}>
-      <div className="flex h-9 items-center justify-between border-b px-3 text-[13px] text-muted-foreground">
+    <div className={cn("not-prose radiant-code group relative my-5 overflow-hidden rounded-[6px]", className)}>
+      <div className="radiant-code__bar flex h-9 items-center justify-between px-3 font-mono text-[12px]">
         <span>{language ?? "text"}</span>
         <CopyButton text={code} label={t("code.copy")} copiedLabel={t("code.copied")} className="-mr-1.5" />
       </div>
       {html ? (
         <div className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed scrollbar-thin [&_pre]:outline-none" dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
-        <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed">
+        <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed text-[#e8dcdf]">
           <code>{code}</code>
         </pre>
       )}

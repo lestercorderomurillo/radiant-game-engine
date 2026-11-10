@@ -1,12 +1,12 @@
 <h1 align="center">Radiant</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.0"><img src="https://img.shields.io/badge/release-v0.4.0-E73C00?style=flat-square" alt="Release v0.4.0"></a>
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.1"><img src="https://img.shields.io/badge/release-v0.4.1-E73C00?style=flat-square" alt="Release v0.4.1"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
 </p>
 
-[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.4.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.0)
+[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.4.1/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.1)
 
 A general-purpose C# engine for games, simulations and interactive experiences.
 
@@ -31,7 +31,7 @@ The capabilities below are available today; the toolkit will continue to grow ac
 
 ## Get Radiant
 
-**[Download v0.4.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.4.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.0)
+**[Download v0.4.1 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.4.1.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.4.1)
 
 You need the .NET 8 SDK or newer and a Vulkan-capable GPU. On Linux, also install the Vulkan loader and SDL2.
 

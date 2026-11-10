@@ -131,6 +131,26 @@
   color: var(--shiki-dark) !important;
 }
 
+/* Prism code editor: one dark skin in both site themes, spectral hairline across the tab bar. */
+.radiant-code {
+  background: #0a0607;
+  border: 1px solid #241417;
+  color: #e8dcdf;
+  color-scheme: dark;
+  box-shadow: 0 24px 48px -32px rgb(255 60 90 / 0.35);
+}
+
+.radiant-code__bar {
+  color: #8a6f77;
+  border-bottom: 1px solid #241417;
+  background:
+    linear-gradient(90deg, #ff2d55, #ff5a36, #ff9a3c, #ffc46b, #ff6ba8, #c46bff) top / 100% 2px no-repeat,
+    #0d0809;
+}
+
+.radiant-code__bar button { color: #8a6f77; }
+.radiant-code__bar button:hover { color: #e8dcdf; background: rgb(255 255 255 / 0.06); }
+
 .sx-k { color: var(--sx-keyword); }
 .sx-t { color: var(--sx-type); }
 .sx-m { color: var(--sx-member); }
