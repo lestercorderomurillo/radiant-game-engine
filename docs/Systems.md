@@ -109,35 +109,5 @@ Options describe what they select: `DenoiserMode`, `UpscalerMode`, `PTGIBackend`
 Inspector controls use their system's name plus `Settings`, such as `PTGISettings` and `ToneMapperSettings`.
 Operation names such as rendering, denoising and tone mapping still describe concepts in guides and UI.
 
-### Migrate existing code
-
-This cleanup changes public C# names. Update registrations, type references and custom denoiser signatures
-using the table below, then rebuild consumers. The old names are not compatibility aliases.
-
-| Previous API | Current API |
-| --- | --- |
-| `PathTracer` | `PTGI` |
-| `RadianceCascades` | `RCGI` |
-| `Denoising` | `Denoiser` |
-| `Upscaling` | `Upscaler` |
-| `ToneMapping` | `ToneMapper` |
-| `ToneMapper` enum | `ToneMapOperator` enum |
-| `ToneMapping.Mapper` | `ToneMapper.Operator` |
-| `RasterSampling` | `RasterSampler` |
-| `AntiAliasing` | `AntiAliaser` |
-| `RenderPresentation` | `RenderPresenter` |
-| `PathLighting` | `LightingReconstructor` |
-| `ColorManagement` | `HRCToneMapper` |
-| `Bilinear` | `BilinearUpscaler` |
-| `WorldGen` | `WorldGenerator` |
-| `UpscalingMode` | `UpscalerMode` |
-| `PathTracingBackend` | `PTGIBackend` |
-| `IDenoisingBackend` | `IDenoiserBackend` |
-| `DenoisingFrame` | `DenoiserFrame` |
-| `PathTracingSettings` | `PTGISettings` |
-| `RadianceCascadesSettings` | `RCGISettings` |
-| `ColorSettings` | `ToneMapperSettings` |
-| `AntiAliasingSettings` | `AntiAliaserSettings` |
-
-`HRCToneMapper` retains the Update-phase HRC/UDR adapter behavior; new Render-phase pipelines compose
-`ToneMapper` and `ToneMapperSettings`. Shader asset names and parameter bindings are unchanged.
+`HRCToneMapper` processes HRC/UDR images during Update. Render-phase pipelines compose
+`ToneMapper` and `ToneMapperSettings`.

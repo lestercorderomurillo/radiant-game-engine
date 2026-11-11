@@ -31,7 +31,7 @@ compatible buffers for the same view; those capabilities are separate from the l
 `RCGI` means Radiance Cascades Global Illumination. Its current implementation uses dense world-space
 probes. `SRCGI` is reserved for Split Radiance Cascades Global Illumination, a different algorithm that is
 not implemented here. `PTGI` means Path-Traced Global Illumination. See the
-[API naming and migration guide](Systems.md#api-names) for the naming convention and renamed types.
+[API naming guide](Systems.md#api-names) for system, technique and option names.
 
 Stages connect through `Input = previous.GetOutput` and run in order through `After = [previous]`. A disabled stage
 passes its input straight through, and nothing allocates GPU memory until it's needed.
