@@ -15,15 +15,17 @@ public sealed class SmokeWindow : Window
     private readonly Scene Scene;
     private readonly string Output;
     private readonly Action<Scene, int> Step;
+    private readonly Action<Scene, int> BeforeDraw;
     private int Frame;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public SmokeWindow(Scene Scene, string Output, Action<Scene, int> Step = null)
+    public SmokeWindow(Scene Scene, string Output, Action<Scene, int> Step = null, Action<Scene, int> BeforeDraw = null)
         : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant smoke test", Width = 960, Height = 540 })
     {
         this.Scene = Scene;
         this.Output = Output;
         this.Step = Step;
+        this.BeforeDraw = BeforeDraw;
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;
     }
@@ -38,6 +40,7 @@ public sealed class SmokeWindow : Window
     /// <inheritdoc/>
     protected override void Draw(GameTime GameTime)
     {
+        if (Frame > 0) BeforeDraw?.Invoke(Scene, Frame);
         base.Draw(GameTime);
         Frame++;
 

@@ -71,7 +71,7 @@ internal sealed class StartupSession : IProgress<LoadingProgress>, IDisposable
             Error = Failure;
             lock (Gate) AcceptReports = false;
             Volatile.Write(ref Current, new LoadingProgress("Startup failed. Press Escape to close."));
-            Console.Error.WriteLine($"Radiant startup failed: {Failure}");
+            core.EngineLog.Write($"Startup failed: {Failure}", core.LogLevel.Error, "Startup");
         }
     }
 

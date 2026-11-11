@@ -75,17 +75,16 @@ public partial class Inspector : core.System
     private const int WidgetSpacing = 18;
     private const int LabelSpacing = 6;
     private const int Padding = 20;
-    private const int CloseButtonSize = 34;
-    private const int CloseButtonWidth = 60;
+    private const int CloseButtonSize = 28;
     private const int AutoLayoutGap = 32;
     private const int SliderTrackHeight = 8;
     private const int SliderHandleSize = 22;
     private const int ToggleBoxSize = 34;
     private const int CornerRadius = 10;
     private const int MaxVisibleDropdownItems = 4;
-    private const int ResizeHandleSize = 24;
+    private const int ResizeHandleSize = 32;
     private const int MinWindowWidth = 340;
-    private const int MinWindowHeight = 360;
+    private const int MinWindowHeight = 180;
 
     private static float UIScaleBacking = 1.0f;
 
@@ -264,7 +263,8 @@ public partial class Inspector : core.System
             ZOrder = NextZOrder++,
             CreationIndex = NextCreationIndex++,
             LayoutOrder = LayoutOrder,
-            AutoPosition = AutoPosition
+            AutoPosition = AutoPosition,
+            Resizable = true
         };
         Windows[Id] = window;
         RenderOrder.Add(window);
@@ -687,6 +687,7 @@ public partial class Inspector : core.System
         UpdateEntityInspector();
         UpdateProperties();
         ComputeAllLayouts();
+        UpdateDebugger();
         UpdatePresentationViewport();
         UpdateCameraNavigation();
 
@@ -697,7 +698,7 @@ public partial class Inspector : core.System
             GlobalVisible = !GlobalVisible;
             UpdatePresentationViewport();
 
-            if (!GlobalVisible) { CancelTabDrag(); CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
+            if (!GlobalVisible) { CancelTabDrag(); ClosePanelMenu(); CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
         }
 
         if (!GlobalVisible)
@@ -722,6 +723,9 @@ public partial class Inspector : core.System
             return;
         }
 
+        if (UpdatePanelMenu(virtualMouse, leftPressed, keyboard))
+        { PrevKeyState = keyboard; PrevMouse = currentMouse; return; }
+
         bool menuHandled = UpdateMenuBar(virtualMouse, leftPressed, keyboard);
         PrevKeyState = keyboard;
         if (menuHandled)
@@ -731,6 +735,8 @@ public partial class Inspector : core.System
         }
 
         if (UpdateDockInput(virtualMouse, leftPressed, currentMouse.ScrollWheelValue - PrevMouse.ScrollWheelValue))
+        { PrevMouse = currentMouse; return; }
+        if (CurrentWorkspaceMode == WorkspaceMode.Windows && UpdateWindowScroll(virtualMouse, currentMouse.ScrollWheelValue - PrevMouse.ScrollWheelValue))
         { PrevMouse = currentMouse; return; }
 
         if (DraggingSlider && leftHeld)
@@ -744,6 +750,8 @@ public partial class Inspector : core.System
         {
             DraggingSlider = false;
         }
+
+        if (!Renderer.IsActive || keyboard.IsKeyDown(Key.Escape)) Dragging = Resizing = false;
 
         if (Dragging && leftHeld)
         {
@@ -772,10 +780,10 @@ public partial class Inspector : core.System
                 float screenH = Renderer.VirtualHeight / UIScale;
                 float deltaX = virtualMouse.X - ResizeStartMouse.X;
                 float deltaY = virtualMouse.Y - ResizeStartMouse.Y;
-                float maxW = screenW - resizeWin.Position.X;
-                float maxH = screenH - resizeWin.Position.Y;
-                resizeWin.Size = new Vector2(global::System.Math.Clamp(ResizeStartWidth + deltaX, MinWindowWidth, maxW), resizeWin.Size.Y);
-                resizeWin.ResizedHeight = global::System.Math.Clamp(ResizeStartHeight + deltaY, MinWindowHeight, maxH);
+                float maxW = Math.Max(1, screenW - resizeWin.Position.X);
+                float maxH = Math.Max(1, screenH - resizeWin.Position.Y);
+                resizeWin.Size = new Vector2(Math.Clamp(ResizeStartWidth + deltaX, Math.Min(MinWindowWidth, maxW), maxW), resizeWin.Size.Y);
+                resizeWin.ResizedHeight = Math.Clamp(ResizeStartHeight + deltaY, Math.Min(MinWindowHeight, maxH), maxH);
             }
 
             MouseOverUI = true;
@@ -870,7 +878,7 @@ public partial class Inspector : core.System
             }
         }
 
-        if (scrollDelta != 0) HandleListBoxScroll(virtualMouse, scrollDelta);
+        if (scrollDelta != 0 && OpenDropdownWindowId == null) HandleListBoxScroll(virtualMouse, scrollDelta);
 
         if (!Dragging && !DraggingSlider && !Resizing && OpenDropdownWindowId != null && leftPressed)
         {
@@ -1245,7 +1253,13 @@ public partial class Inspector : core.System
         DropdownTotalOptions = optionCount;
 
         int visibleCount = Math.Min(optionCount, MaxVisibleDropdownItems);
-        OpenDropdownPopupBounds = new Rectangle(Widget.Bounds.X, Widget.Bounds.Bottom, Widget.Bounds.Width, visibleCount * WidgetHeight);
+        int height = visibleCount * WidgetHeight;
+        int screenWidth = (int)(Renderer.VirtualWidth / UIScale);
+        int screenHeight = (int)(Renderer.VirtualHeight / UIScale);
+        int width = Math.Min(Widget.Bounds.Width, screenWidth);
+        int x = Math.Clamp(Widget.Bounds.X, 0, Math.Max(0, screenWidth - width));
+        int y = Widget.Bounds.Bottom + height <= screenHeight ? Widget.Bounds.Bottom : Widget.Bounds.Top - height;
+        OpenDropdownPopupBounds = new Rectangle(x, Math.Max(MenuBarHeight, y), width, height);
     }
 
     /// <summary>Closes the active widget dropdown popup.</summary>

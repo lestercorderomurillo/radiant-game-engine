@@ -1,28 +1,18 @@
 <h1 align="center">Radiant</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/release-v0.6.0-E73C00?style=flat-square" alt="Release v0.6.0"></a>
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.7.0"><img src="https://img.shields.io/badge/release-v0.7.0-E73C00?style=flat-square" alt="Release v0.7.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
 </p>
 
-[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.6.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.6.0)
+[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.7.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.7.0)
 
-A complete C# game engine, from first prototype to final release.
+A C# engine for 2D and 3D games, with an entity-component system, composable rendering pipelines,
+global illumination and live inspection tools.
 
-Most engines give you a renderer and leave the rest to you. Radiant takes the opposite approach.
-
-Everything you need ships with the engine and works together from day one. Entities, scenes, rendering, lighting,
-input, runtime services and a full suite of development tools are designed as one platform, with a shared
-architecture and a consistent API.
-
-Adding a feature to your game never means wiring a stack of unrelated libraries together.
-
-Build in 2D or 3D on the same foundation. Compose the systems your project needs, from physics and animation to
-global illumination and path tracing, and extend the engine with your own when the built-in ones are not enough.
-
-The in-game inspector, live entity editing and the free-flying camera are always a key press away. Test, tune and
-debug while the game is running.
+Build a scene in code, run it, and press **F1** to inspect entities, tune rendering or read diagnostics.
+The tools can float over the game or dock beside it.
 
 ## Features
 
@@ -39,7 +29,7 @@ debug while the game is running.
 - **System control**: pause, group and switch systems at runtime.
 - **Runtime**: keyboard, mouse and text input, fixed timestep, headless mode, compute shaders.
 - **Agentic development**: MCP and AI-assisted workflows for iteration and content generation.
-- **Inspector**: debug panels in a few lines, live entity editing and a free camera.
+- **Inspector**: movable panels, live entity editing, a free camera and searchable diagnostics.
 - **Asset Studio**: create shaders, sprites and 3D models directly in the engine.
 - **Visual graph**: build shaders, materials and gameplay logic with a node-based editor.
 - **Blender integration**: move assets between Blender and your project seamlessly.
@@ -47,7 +37,7 @@ debug while the game is running.
 
 ## Get Radiant
 
-**[Download v0.6.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.6.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.6.0)
+**[Download v0.7.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.7.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.7.0)
 
 You need the .NET 8 SDK or newer and a Vulkan-capable GPU. On Linux, also install the Vulkan loader and SDL2.
 
@@ -92,7 +82,28 @@ public class Campfire : Scene
 }
 ```
 
-Press **F1** in your game to open the inspector. Choose **View → Workspace Mode → Panels** for tabbed docks and a framed game viewport. Drag tabs to reorder them or move them between docks. Drag the borders beside the game to resize the docks; scroll over panel controls to reach overflowing content. **Windows** restores the floating layout.
+## Work with the Inspector
+
+Press **F1**, then choose **View → Workspace Mode → Panels**. Entity Inspector opens on the left,
+the game stays in the center, and Debugger shows diagnostics below it.
+
+![Radiant Inspector with Entity Inspector beside Game and searchable diagnostics below it](docs/images/inspector-workspace.png)
+
+| Control | What it does |
+| --- | --- |
+| **…** beside a tab | Move the panel left, right or below Game; reset panel sizes; or close it. |
+| **X** | Close that panel. Open it again from **View**. |
+| Tab title | Select a panel. Hold and drag it to move it; the highlighted area marks the destination. |
+| Divider grip | Resize the adjacent panels. |
+| **Clear** | Remove every retained log message, including messages hidden by a filter. |
+| **Follow latest** | Keep the newest matching messages in view. Turn it off to read older entries. |
+| **Search logs…** | Find text in messages, sources or the displayed timestamp. |
+| **All levels** | Show all messages, or only Info, Warnings or Errors. Works together with search. |
+
+Choose **View → Workspace Mode → Windows** for floating tools. Drag a window's title to move it
+or its bottom-right corner to resize it. **F1** hides the tools and returns the game to the full window.
+
+[Inspector guide: arrange panels, inspect entities and read logs](docs/Inspector.md)
 
 ## Documentation
 

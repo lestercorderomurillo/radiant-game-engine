@@ -6,15 +6,83 @@ draggable windows. Press **F1** to show or hide them.
 Add the [`Inspector`](../src/com.radiant.engine/bundle/Systems/UI/Inspector/Inspector.cs) system to your scene.
 Use its static widget helpers to build panels, then keep diagnostic overlays in the Gizmos section below.
 
-## Workspace mode
+## Open the workspace
 
-Choose **View → Workspace Mode → Panels** for docked tools around a framed Game viewport.
-Drag a tab to reorder it or move it to the other dock; the insertion marker shows its destination.
-Use the X inside a tab to close that panel, and reopen it from View. Drag a dock border to resize it,
-and scroll over its controls to reach content below the visible area.
+Press **F1** while the game is running, then choose **View → Workspace Mode → Panels**.
+Entity Inspector appears on the left, Game occupies the center, and Debugger opens below Game.
+Other tools share the side docks. Click a tab title to select its panel.
 
-**Windows** restores your floating window positions and sizes. **F1** hides the inspector and
-returns the game to the full window; showing the inspector restores the selected workspace mode.
+![Entity Inspector, Game, rendering controls and Debugger in the Panels workspace](images/inspector-workspace.png)
+
+**F1** hides the tools and gives the game the full window. Press it again to return to your workspace.
+To change text and control sizes, open the **Inspector** panel from **View** and adjust **UI Scale**.
+The **Theme** dropdown changes the workspace colors.
+
+## Arrange panels
+
+Use the **…** button beside a panel's X when you want to move it without dragging.
+
+![Entity Inspector's panel menu with move, reset and close actions](images/inspector-panel-menu.png)
+
+| Menu action | Result |
+| --- | --- |
+| **Move left** | Put the panel in the left dock and select its tab. |
+| **Move right** | Put the panel in the right dock and select its tab. |
+| **Move below Game** | Put the panel in the bottom dock, alongside Debugger. |
+| **Reset panel sizes** | Restore the default left, right and bottom proportions. Panels keep their assigned docks. |
+| **Close panel** | Hide the panel. Its entry in **View** opens it again. |
+
+The menu marks the panel's current dock. Use **↑** or **↓** to choose an action and **Enter** to apply it.
+**Escape** or a click outside the menu dismisses it.
+
+To move a panel with the mouse, hold its tab title and drag. Drop on another tab to change the order,
+on a panel body to join that dock, or on an empty workspace edge to open a dock there.
+The title follows the pointer and the destination is outlined before you release. **Escape** cancels the move.
+
+![Held Entity Inspector tab with the right dock outlined as its destination](images/inspector-drag-preview.png)
+
+Drag a divider's grip to change the space given to adjacent panels. The horizontal grip above Debugger
+changes its height. Scroll over a panel's controls when they do not all fit; scroll inside a list to browse its rows.
+
+The square **X** closes only its own panel. Choose its name from **View** to reopen it.
+
+## Read diagnostics
+
+Debugger retains the latest 2,000 log lines across scene changes. Graphics startup messages, including Vulkan
+diagnostics, appear here. Each line shows its time, severity, source and message.
+
+![Debugger's search, Follow latest and Clear controls with the severity menu open](images/inspector-debugger.png)
+
+| Control | How to use it |
+| --- | --- |
+| **Clear** | Empty the entire retained log. Search and severity settings stay selected. |
+| **Follow latest** | Keep the newest matching lines visible as messages arrive. Turn it off before scrolling back. |
+| **Search logs…** | Match part of a message, source, severity or displayed time. Search ignores letter case. Use the small X in the field to clear the search. |
+| **All levels** | Include every severity. Select **Info**, **Warnings** or **Errors** to show only that level. |
+| List scrollbar | Browse older matching messages with Follow latest off. |
+
+For example, choose **Warnings** and type `Graphics` to read warnings from graphics initialization.
+Choose **All levels** and clear the search field to show the whole retained log again.
+The severity menu opens upward when there is not enough room beneath it.
+
+Write messages from game code with `EngineLog`:
+
+```csharp
+using com.radiant.engine.core;
+
+EngineLog.Write("Level loaded", source: "Scene");
+EngineLog.Write("No spawn point found", LogLevel.Warning, "World");
+EngineLog.Write("Save failed", LogLevel.Error, "Save");
+```
+
+## Use floating windows
+
+Choose **View → Workspace Mode → Windows** to restore the floating arrangement.
+Drag a title bar to move a window and the **bottom-right grip** to resize it in both directions.
+Contents stay inside the window; scroll over its controls to reach anything below the visible area.
+
+Close a window with **X** and reopen it from **View**. **View → Reorder Windows** arranges the windows again.
+Switch back to **Panels** when you want tools docked around Game.
 
 ## Windows and widgets
 

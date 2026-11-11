@@ -6,6 +6,7 @@ using com.radiant.engine.core;
 using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 
+LoggingRegression.Run();
 RuntimeBackendRegression.Run();
 StartupRegression.Run();
 InputRegression.Run();
@@ -17,7 +18,7 @@ RenderViewRegression.Run();
 ResourceCacheRegression.Run();
 ShapeCollectionRegression.Run();
 FontServiceRegression.Run();
-PortableRendererRegression.Run();
+PortableRendererRegression.Run(DebuggerLayoutRegression.Run);
 
 var Scene = new Scene();
 Scene.Initialize();

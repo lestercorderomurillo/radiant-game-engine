@@ -33,6 +33,7 @@ public class MonoGameWindow : Game, IRuntimeHost, IWindow, IAboutWindow
     private bool AboutMouseDown;
     private bool SuppressEscape;
     private bool WaitForAboutRelease;
+    private NativeDiagnosticCapture GraphicsDiagnostics;
     private Color AboutCloseColor, AboutCloseHover, AboutCloseText;
     /// <summary>Whether the branded About panel is currently open.</summary>
     public bool IsAboutVisible => AboutVisible;
@@ -56,6 +57,12 @@ public class MonoGameWindow : Game, IRuntimeHost, IWindow, IAboutWindow
         BuildTag = $"Radiant {typeof(MonoGameWindow).Assembly.GetName().Version}";
 
         GraphicsDeviceManager = new GraphicsDeviceManager(this);
+        // Adapter enumeration initializes Vulkan before PreparingDeviceSettings is raised.
+        using (NativeDiagnosticCapture.Begin()) _ = GraphicsAdapter.Adapters;
+        GraphicsDeviceManager.PreparingDeviceSettings += (_, _) => GraphicsDiagnostics ??= NativeDiagnosticCapture.Begin();
+        GraphicsDeviceManager.DeviceCreated += (_, _) => FinishGraphicsDiagnostics();
+        GraphicsDeviceManager.DeviceReset += (_, _) => FinishGraphicsDiagnostics();
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
         Window.AllowUserResizing = !Options.ShowLoader;
         Window.IsBorderless = Options.ShowLoader;
@@ -246,11 +253,21 @@ public class MonoGameWindow : Game, IRuntimeHost, IWindow, IAboutWindow
         }
     }
 
+    private void FinishGraphicsDiagnostics()
+    {
+        GraphicsDiagnostics?.Dispose();
+        GraphicsDiagnostics = null;
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs args) => FinishGraphicsDiagnostics();
+
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            FinishGraphicsDiagnostics();
+            AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
             Startup?.Dispose();
             LoadingScreen?.Dispose();
             Window.ClientSizeChanged -= OnClientSizeChanged;

@@ -515,7 +515,7 @@ Quality: ProbeScale 4/3/2/1.
 
 ## Inspector (UI)
 
-Static API — safe even if Inspector not registered. Retained-mode windows, 375px default width, Inter font at 16px via FontStashSharp. Default theme: Radiant.
+Static API — safe even if Inspector not registered. Retained-mode windows, 600 virtual-unit default width, Inter font at 30 virtual units via FontStashSharp. Default theme: Carbon.
 
 ### Windows
 
@@ -578,6 +578,16 @@ Inspector.WindowsRestored += () => {}; // Fired by View > Reorder Windows
 ```
 
 Built-in themes: Solaris, Carbon, Midnight, Sentinel (light), Greenfields (olive), Neon, Nord. Carbon is the default, with red close buttons that brighten on hover; the Theme dropdown starts on Carbon.
+
+### Workspace controls and diagnostics
+
+Panels have square close buttons, an ellipsis menu (move left/right/below Game, reset sizes, close),
+divider resizing and held-drag previews, including drops onto empty sides. Floating windows resize from
+the bottom-right grip and clip overflowing content. Debugger occupies the bottom dock by default;
+its compact toolbar supports Clear, Follow latest, text search and exact severity filtering.
+`EngineLog` in `core/Diagnostics` retains 2,000 lines with synchronized writes and revision-based snapshots.
+Native graphics initialization output is captured into this log by the MonoGame host. See `docs/Inspector.md`
+for the user guide and `tests/Radiant.Tests/DebuggerLayoutRegression.cs` for interaction coverage.
 
 ### Menu Bar
 
@@ -771,4 +781,4 @@ dock widths and a letterboxed Game viewport. Floating bounds are preserved acros
 `IRenderer.ScenePresentationBounds` maps pointer coordinates into the preview; shape culling
 uses the corresponding scene bounds. F1 clears preview input mapping while hidden.
 `Radiant.Scenes --workspace-regression` covers menu selection, resize, restoring floating
-bounds, tab reordering and cross-dock moves. Both engine project versions are 0.6.0.
+bounds, tab reordering and cross-dock moves. Both engine project versions are 0.7.0.

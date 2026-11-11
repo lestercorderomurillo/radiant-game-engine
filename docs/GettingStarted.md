@@ -72,7 +72,11 @@ new GameClient().Run(new MyScene(), new WindowOptions { Title = "My game", Width
 ```
 
 `Run` returns when the player closes the window, after cleaning up the scene. Press **F1** while the game runs
-to open the inspector.
+to open the inspector. Choose **View → Workspace Mode → Panels** to keep Entity Inspector beside Game
+and Debugger underneath it. Use **…** beside a panel title to move it, drag the divider grips to resize it,
+and use Debugger's search and severity dropdown to find messages.
+
+See the [Inspector guide](Inspector.md) for screenshots and a control-by-control walkthrough.
 
 ## Next steps
 

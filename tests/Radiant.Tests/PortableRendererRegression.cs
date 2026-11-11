@@ -8,7 +8,7 @@ using com.radiant.engine.runtime;
 
 internal static class PortableRendererRegression
 {
-    public static void Run()
+    public static void Run(Action<IRenderer> inspect = null)
     {
         var backend = new Backend();
         using var loop = new GameLoop();
@@ -62,6 +62,7 @@ internal static class PortableRendererRegression
         Require(backend.Targets.Length == 0, "Presentation must bind backbuffer");
         renderer.PushTargets().SetTarget(a).PopTargets();
         Require(backend.Targets.Length == 0, "Presentation target snapshot");
+        inspect?.Invoke(renderer);
         renderer.Dispose();
         renderer.Dispose();
         Require(backend.Disposals == 1 && sceneTarget.IsDisposed, "Renderer/backend lifetime");

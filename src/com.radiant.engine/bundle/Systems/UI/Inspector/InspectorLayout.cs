@@ -181,6 +181,7 @@ public partial class Inspector
     private int ComputeWindowHeight(WindowData Window)
     {
         if (Window.Resizable && Window.ResizedHeight > 0) return (int)Window.ResizedHeight;
+        if (Window.Id == "debugger" && Window.WidgetIndex.ContainsKey("log")) return 440;
 
         int contentWidth = (int)Window.Size.X - Padding * 2;
         int height = WindowTitleHeight + WidgetSpacing;
@@ -313,12 +314,14 @@ public partial class Inspector
             if (!window.Visible) continue;
 
             ComputeLayout(window);
+            ApplyWindowScroll(window, window.WindowBounds.Bottom);
         }
     }
 
     /// <summary> Computes title bar, close button, widget, and overall bounds for a single window. </summary>
     private void ComputeLayout(WindowData Window)
     {
+        if (Window.Id == "debugger" && Window.WidgetIndex.ContainsKey("log")) { ComputeDebuggerLayout(Window); return; }
         int posX = (int)Window.Position.X;
         int posY = (int)Window.Position.Y;
         int windowWidth = (int)Window.Size.X;
@@ -327,7 +330,7 @@ public partial class Inspector
             ? ComputeDynamicListBoxHeight(Window) : -1;
 
         Window.TitleBarBounds = new Rectangle(posX, posY, windowWidth, WindowTitleHeight);
-        Window.CloseBounds = CurrentWorkspaceMode == WorkspaceMode.Panels ? default : new Rectangle(posX + windowWidth - CloseButtonWidth - 6, posY + (TitleBarHeight - CloseButtonSize) / 2, CloseButtonWidth, CloseButtonSize);
+        Window.CloseBounds = CurrentWorkspaceMode == WorkspaceMode.Panels ? default : DockTabCloseBounds(Window.TitleBarBounds);
 
         int contentWidth = windowWidth - Padding * 2;
         int widgetY = posY + WindowTitleHeight + WidgetSpacing;

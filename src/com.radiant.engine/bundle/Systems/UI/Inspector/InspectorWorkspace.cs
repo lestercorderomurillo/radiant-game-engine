@@ -23,12 +23,16 @@ public partial class Inspector
     private bool DragTabMoved;
     private string DropTabId;
     private bool DropTabAfter;
-    private readonly string[] ActiveDock = new string[2];
+    private int DropDock = -1;
+    private Vector2 DragTabMouse;
+    private readonly string[] ActiveDock = new string[3];
     private float LeftDockFraction = 0.26f;
     private float RightDockFraction = 0.26f;
+    private float BottomDockFraction = 0.30f;
     private int DraggingDock = -1;
     private Rectangle GameViewport;
     private Rectangle GamePane;
+    private Rectangle BottomPane;
     private RenderTarget2D WorkspaceSnapshot;
     private RenderTarget2D DockSurface;
 
@@ -40,6 +44,7 @@ public partial class Inspector
         Dragging = Resizing = DraggingSlider = DraggingListBox = DraggingScrollbar = false;
         DraggingDock = -1;
         CancelTabDrag();
+        ClosePanelMenu();
         CloseDropdown();
         ClearTextInputFocus();
         if (mode == WorkspaceMode.Panels)
@@ -47,6 +52,7 @@ public partial class Inspector
             FloatingLayout.Clear();
             foreach (var window in Windows.Values) SaveFloatingLayout(window);
             if (Renderer != null && !Windows.ContainsKey("entity_inspector")) OpenEntityInspector();
+            if (Renderer != null) CreateDebugger();
         }
         else
         {
@@ -70,7 +76,7 @@ public partial class Inspector
     }
 
     private int DockFor(WindowData window) => DockAssignments.TryGetValue(window.Id, out int dock)
-        ? dock : window.Id is "entity_inspector" or "system_inspector" ? 0 : 1;
+        ? dock : window.Id == "debugger" ? 2 : window.Id is "entity_inspector" or "system_inspector" ? 0 : 1;
     private void ActivateDock(WindowData window)
     {
         ActiveDock[DockFor(window)] = window.Id;
@@ -90,8 +96,11 @@ public partial class Inspector
             .GroupBy(DockFor).ToDictionary(g => g.Key, g => g.ToList());
         int left = groups.ContainsKey(0) ? Math.Max(1, (int)(width * LeftDockFraction)) : 0;
         int right = groups.ContainsKey(1) ? Math.Max(1, (int)(width * RightDockFraction)) : 0;
-        GamePane = new Rectangle(left, MenuBarHeight, Math.Max(1, width - left - right), height - MenuBarHeight);
-        var content = new Rectangle(GamePane.X + 2, GamePane.Y + TitleBarHeight, Math.Max(1, GamePane.Width - 4), Math.Max(1, GamePane.Height - TitleBarHeight - 2));
+        int availableHeight = height - MenuBarHeight;
+        int bottomHeight = groups.ContainsKey(2) ? Math.Max(1, (int)(availableHeight * BottomDockFraction)) : 0;
+        GamePane = new Rectangle(left, MenuBarHeight, Math.Max(1, width - left - right), availableHeight - bottomHeight);
+        BottomPane = new Rectangle(left, GamePane.Bottom, GamePane.Width, bottomHeight);
+        var content = new Rectangle(GamePane.X + 2, GamePane.Y + DockHeaderHeight, Math.Max(1, GamePane.Width - 4), Math.Max(1, GamePane.Height - DockHeaderHeight - 2));
         GameViewport = FitPreview(content, Renderer.ScreenWidth, Renderer.ScreenHeight);
         DockTabs.Clear();
         foreach (var pair in groups)
@@ -99,33 +108,31 @@ public partial class Inspector
             int dock = pair.Key;
             var windows = pair.Value;
             if (!windows.Any(w => w.Id == ActiveDock[dock])) ActiveDock[dock] = windows[0].Id;
-            int dockWidth = dock == 0 ? left : right;
-            int x = dock == 0 ? 0 : width - right;
-            int columns = Math.Max(1, dockWidth / 230);
-            int tabWidth = dockWidth / columns;
+            int dockWidth = dock == 2 ? BottomPane.Width : dock == 0 ? left : right;
+            int x = dock == 2 ? BottomPane.X : dock == 0 ? 0 : width - right;
+            int dockTop = dock == 2 ? BottomPane.Y : MenuBarHeight;
+            int minTabWidth = Math.Max(230, ChromeButtonExtent * 2 + 180);
+            int columns = Math.Min(windows.Count, Math.Max(1, dockWidth / minTabWidth));
             int rows = (windows.Count + columns - 1) / columns;
-            int top = MenuBarHeight + rows * MenuItemHeight;
+            int top = dockTop + rows * DockHeaderHeight;
             for (int i = 0; i < windows.Count; i++)
             {
                 var window = windows[i];
                 SaveFloatingLayout(window);
-                DockTabs.Add((window, new Rectangle(x + i % columns * tabWidth, MenuBarHeight + i / columns * MenuItemHeight, tabWidth, MenuItemHeight)));
+                int row = i / columns;
+                int column = i % columns;
+                int rowCount = Math.Min(columns, windows.Count - row * columns);
+                int tabLeft = x + column * dockWidth / rowCount;
+                int tabRight = x + (column + 1) * dockWidth / rowCount;
+                DockTabs.Add((window, new Rectangle(tabLeft, dockTop + row * DockHeaderHeight,
+                    tabRight - tabLeft, DockHeaderHeight)));
                 if (!IsWindowDisplayed(window)) continue;
                 window.Position = new Vector2(x, top);
                 window.Size = new Vector2(dockWidth, 0);
                 window.Resizable = true;
                 window.ResizedHeight = Math.Max(1, height - top);
                 ComputeLayout(window);
-                int bottom = window.Widgets.Where(w => w.Visible).Select(w => w.Bounds.Bottom).DefaultIfEmpty(top).Max() + Padding;
-                int maxScroll = Math.Max(0, bottom - height);
-                int scroll = Math.Clamp(DockScroll.GetValueOrDefault(window.Id), 0, maxScroll);
-                DockScroll[window.Id] = scroll;
-                for (int iWidget = 0; iWidget < window.Widgets.Count; iWidget++)
-                {
-                    var widget = window.Widgets[iWidget];
-                    widget.Bounds = new Rectangle(widget.Bounds.X, widget.Bounds.Y - scroll, widget.Bounds.Width, widget.Bounds.Height);
-                    window.Widgets[iWidget] = widget;
-                }
+                ApplyWindowScroll(window, height);
             }
         }
     }
@@ -149,20 +156,31 @@ public partial class Inspector
     private void UpdatePresentationViewport() => Renderer.ScenePresentationBounds =
         GlobalVisible && CurrentWorkspaceMode == WorkspaceMode.Panels ? WorkspacePixels(GameViewport) : null;
 
-    private static Rectangle DockTabCloseBounds(Rectangle tab) => new(
-        tab.Right - CloseButtonSize - 7, tab.Y + (tab.Height - CloseButtonSize) / 2,
-        CloseButtonSize, CloseButtonSize);
-
     private bool UpdateDockInput(Vector2 mouse, bool pressed, int scroll)
     {
         if (CurrentWorkspaceMode != WorkspaceMode.Panels) return false;
+        if (OpenDropdownWindowId != null) return false;
         float width = Renderer.VirtualWidth / UIScale;
         if (DraggingDock >= 0)
         {
+            if (!Renderer.IsActive || Controls.Keyboard.IsKeyDown(Key.Escape)) { DraggingDock = -1; return true; }
             if (Controls.Mouse.LeftButton == ButtonState.Pressed)
             {
-                if (DraggingDock == 0) LeftDockFraction = Math.Clamp(mouse.X / width, 0.18f, 0.38f);
-                else RightDockFraction = Math.Clamp((width - mouse.X) / width, 0.18f, 0.38f);
+                if (DraggingDock == 2)
+                {
+                    float height = Renderer.VirtualHeight / UIScale;
+                    float available = Math.Max(1, height - MenuBarHeight);
+                    float minimum = Math.Min(0.65f, Math.Max(0.20f, (DockHeaderHeight + 180) / available));
+                    BottomDockFraction = Math.Clamp((height - mouse.Y) / available, minimum, 0.65f);
+                }
+                else
+                {
+                    float other = DraggingDock == 0 ? (GamePane.Right < width ? RightDockFraction : 0) : (GamePane.X > 0 ? LeftDockFraction : 0);
+                    float minimum = Math.Min(0.26f, MinWindowWidth / width);
+                    float maximum = Math.Max(minimum, Math.Min(0.50f, 1 - other - Math.Max(0.24f, MinWindowWidth / width)));
+                    if (DraggingDock == 0) LeftDockFraction = Math.Clamp(mouse.X / width, minimum, maximum);
+                    else RightDockFraction = Math.Clamp((width - mouse.X) / width, minimum, maximum);
+                }
                 ComputeDockLayout();
                 UpdatePresentationViewport();
             }
@@ -170,10 +188,12 @@ public partial class Inspector
             MouseOverUI = true;
             return true;
         }
-        if (pressed && mouse.Y > MenuBarHeight && OpenDropdownWindowId == null)
+        if (pressed && mouse.Y > MenuBarHeight && OpenDropdownWindowId == null &&
+            !DockTabs.Any(tab => tab.Bounds.Contains(mouse) && (DockTabCloseBounds(tab.Bounds).Contains(mouse) || DockTabMenuBounds(tab.Bounds).Contains(mouse))))
         {
-            if (GamePane.X > 0 && Math.Abs(mouse.X - GamePane.X) <= 6) DraggingDock = 0;
-            else if (GamePane.Right < width && Math.Abs(mouse.X - GamePane.Right) <= 6) DraggingDock = 1;
+            if (GamePane.X > 0 && Math.Abs(mouse.X - GamePane.X) <= 10) DraggingDock = 0;
+            else if (GamePane.Right < width && Math.Abs(mouse.X - GamePane.Right) <= 10) DraggingDock = 1;
+            else if (BottomPane.Height > 0 && mouse.X >= BottomPane.X && mouse.X < BottomPane.Right && Math.Abs(mouse.Y - BottomPane.Y) <= 10) DraggingDock = 2;
             if (DraggingDock >= 0) { MouseOverUI = true; return true; }
         }
         foreach (var tab in DockTabs)
@@ -187,11 +207,12 @@ public partial class Inspector
                         if (OpenDropdownWindowId == tab.Window.Id) CloseDropdown();
                         SyncViewToggleValues();
                     }
+                    else if (DockTabMenuBounds(tab.Bounds).Contains(mouse)) OpenPanelMenu(tab.Window, tab.Bounds);
                     else
                     {
                         ActivateDock(tab.Window);
                         DragTabId = tab.Window.Id;
-                        DragTabStart = mouse;
+                        DragTabStart = DragTabMouse = mouse;
                         DragTabMoved = false;
                     }
                     ComputeDockLayout();
@@ -200,29 +221,21 @@ public partial class Inspector
                 MouseOverUI = true;
                 return true;
             }
-        if (scroll != 0 && OpenDropdownWindowId == null)
-            foreach (var window in Windows.Values)
-            {
-                if (!IsWindowDisplayed(window) || !window.WindowBounds.Contains(mouse)) continue;
-                // Lists keep their own scrolling; the rest of a panel scrolls as one document.
-                if (window.Widgets.Any(w => w.Visible && w.Type == WidgetType.ListBox && w.Bounds.Contains(mouse))) return false;
-                DockScroll[window.Id] = Math.Max(0, DockScroll.GetValueOrDefault(window.Id) - Math.Sign(scroll) * 90);
-                ComputeDockLayout();
-                return true;
-            }
-        return false;
+        return UpdateWindowScroll(mouse, scroll);
     }
 
     private void CancelTabDrag()
     {
         DragTabId = DropTabId = null;
         DragTabMoved = false;
+        DropDock = -1;
     }
 
     // Capture the pointer through release, including when it leaves the tab strip.
     private bool UpdateDockTabDrag(Vector2 mouse, bool held)
     {
         if (DragTabId == null) return false;
+        DragTabMouse = mouse;
         MouseOverUI = true;
         if (!Renderer.IsActive || Controls.Keyboard.IsKeyDown(Key.Escape) ||
             !Windows.TryGetValue(DragTabId, out var source) || !source.Visible)
@@ -232,14 +245,17 @@ public partial class Inspector
         }
         if (Vector2.Distance(mouse, DragTabStart) >= 8) DragTabMoved = true;
         DropTabId = null;
+        DropDock = -1;
         if (DragTabMoved)
             foreach (var tab in DockTabs)
                 if (tab.Window.Id != DragTabId && tab.Bounds.Contains(mouse))
                 {
                     DropTabId = tab.Window.Id;
                     DropTabAfter = mouse.X >= tab.Bounds.Center.X;
+                    DropDock = DockFor(tab.Window);
                     break;
                 }
+        if (DragTabMoved && DropDock < 0) DropDock = DockDropTarget(mouse);
         if (!held)
         {
             if (DropTabId != null && Windows.TryGetValue(DropTabId, out var target))
@@ -247,11 +263,11 @@ public partial class Inspector
                 DockTabOrder.Remove(DragTabId);
                 int index = DockTabOrder.IndexOf(DropTabId) + (DropTabAfter ? 1 : 0);
                 DockTabOrder.Insert(index, DragTabId);
-                DockAssignments[DragTabId] = DockFor(target);
-                ActivateDock(source);
-                ComputeDockLayout();
-                UpdatePresentationViewport();
+                MovePanel(source, DockFor(target));
             }
+            else if (DropDock >= 0) MovePanel(source, DropDock);
+            ComputeDockLayout();
+            UpdatePresentationViewport();
             CancelTabDrag();
         }
         return true;
@@ -279,37 +295,27 @@ public partial class Inspector
         var solid = Renderer.GetSolidTexture(Color.White);
         Renderer.BeginDraw(transform: scale);
         Renderer.DrawSprite(solid, GamePane, Color.Black);
-        Renderer.DrawSprite(solid, new Rectangle(GamePane.X, GamePane.Y, GamePane.Width, TitleBarHeight), OpaqueWorkspaceColor(TitleBarColor));
-        DrawTextBold("Game", new Vector2(GamePane.X + Padding, GamePane.Y + 12), TextColor);
+        Renderer.DrawSprite(solid, new Rectangle(GamePane.X, GamePane.Y, GamePane.Width, DockHeaderHeight), OpaqueWorkspaceColor(TitleBarColor));
+        DrawTextBold("Game", new Vector2(GamePane.X + Padding, GamePane.Y + (DockHeaderHeight - MeasureText("Game").Y) / 2), TextColor);
         Renderer.DrawSprite(WorkspaceSnapshot, GameViewport, Color.White);
         Renderer.EndDraw();
         foreach (var window in RenderOrder)
         {
             if (!IsWindowDisplayed(window)) continue;
-            Renderer.SetTarget(DockSurface).Clear(OpaqueWorkspaceColor(WindowBg));
-            Renderer.BeginDraw(transform: scale);
-            DrawWindow(window, mouse, OpenMenuId != null || OpenDropdownWindowId != null);
-            Renderer.EndDraw();
-            Renderer.SetTarget(null);
-            var pixels = WorkspacePixels(window.WindowBounds);
-            Renderer.BeginDraw();
-            Renderer.DrawSprite(DockSurface, pixels, pixels, Color.White);
-            Renderer.EndDraw();
+            DrawClippedWindow(window, mouse, OpenMenuId != null || OpenDropdownWindowId != null || PanelMenuWindowId != null || DragTabId != null, scale);
         }
         Renderer.BeginDraw(transform: scale);
         foreach (var tab in DockTabs)
         {
             Renderer.DrawSprite(solid, tab.Bounds, OpaqueWorkspaceColor(IsWindowDisplayed(tab.Window) ? ButtonHover : TitleBarColor));
             var close = DockTabCloseBounds(tab.Bounds);
-            var (label, size) = FitMenuItemText(tab.Window.Title, close.X - tab.Bounds.X - 20);
-            Renderer.DrawString("Inter", size, label, new Vector2(tab.Bounds.X + 10, tab.Bounds.Y + 8), IsWindowDisplayed(tab.Window) ? TextColor : LabelDim);
-            bool closeHovered = OpenMenuId == null && OpenDropdownWindowId == null && close.Contains(mouse);
-            Renderer.DrawRoundedRect(close, closeHovered ? CloseHover : CloseColor, CornerRadius);
-            const float closeSize = FontSize * 0.8f;
-            var textSize = Renderer.MeasureString("Inter-Bold", closeSize, "X");
-            Renderer.DrawString("Inter-Bold", closeSize, "X", new Vector2(
-                close.X + (close.Width - textSize.X) / 2,
-                close.Y + (close.Height - textSize.Y) / 2 - 2), CloseText, bold: true);
+            var menu = DockTabMenuBounds(tab.Bounds);
+            var (label, size) = FitMenuItemText(tab.Window.Title, menu.X - tab.Bounds.X - 18);
+            var labelSize = Renderer.MeasureString("Inter", size, label);
+            Renderer.DrawString("Inter", size, label, new Vector2(tab.Bounds.X + 10, tab.Bounds.Y + (tab.Bounds.Height - labelSize.Y) / 2), IsWindowDisplayed(tab.Window) ? TextColor : LabelDim);
+            bool canHover = OpenMenuId == null && OpenDropdownWindowId == null && PanelMenuWindowId == null && DragTabId == null;
+            DrawChromeButton(close, canHover && close.Contains(mouse), true);
+            DrawChromeButton(menu, canHover && menu.Contains(mouse), false);
         }
         if (DragTabMoved && DropTabId != null)
             foreach (var tab in DockTabs)
@@ -317,12 +323,13 @@ public partial class Inspector
                     Renderer.DrawSprite(solid, new Rectangle(
                         (DropTabAfter ? tab.Bounds.Right : tab.Bounds.Left) - 2,
                         tab.Bounds.Top + 3, 4, tab.Bounds.Height - 6), TextColor);
-        if (GamePane.X > 0) Renderer.DrawSprite(solid, new Rectangle(GamePane.X - 1, MenuBarHeight, 2, GamePane.Height), ButtonHover);
-        if (GamePane.Right < Renderer.VirtualWidth / UIScale) Renderer.DrawSprite(solid, new Rectangle(GamePane.Right - 1, MenuBarHeight, 2, GamePane.Height), ButtonHover);
+        DrawDockDividers(mouse);
+        DrawDockDragPreview();
         DrawDropdownPopup(mouse);
         DrawMenuBar(mouse);
         DrawMenuDropdown(mouse);
         DrawWorkspaceSubmenu(mouse);
+        DrawPanelMenu(mouse);
         Renderer.EndDraw();
     }
 }

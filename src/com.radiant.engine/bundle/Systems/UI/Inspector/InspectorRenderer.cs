@@ -61,9 +61,7 @@ public partial class Inspector
 
             if (BlurResult != null) DrawWindowBlurQuad(window);
 
-            Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: scale);
-            DrawWindow(window, virtualMouse, window.Id != hoveredWindowId);
-            Renderer.EndDraw();
+            DrawClippedWindow(window, virtualMouse, window.Id != hoveredWindowId, scale);
         }
 
         Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: scale);
@@ -120,7 +118,7 @@ public partial class Inspector
         {
             var widget = Window.Widgets[i];
 
-            if (!widget.Visible) continue;
+            if (!widget.Visible || !widget.Bounds.Intersects(Window.WindowBounds)) continue;
 
             switch (widget.Type)
             {
@@ -151,22 +149,17 @@ public partial class Inspector
 
         float titleTextHeight = Renderer.MeasureString("Inter-Bold", FontSize, Window.Title).Y;
         var titlePos = new Vector2(Window.TitleBarBounds.X + Padding, Window.TitleBarBounds.Y + (TitleBarHeight - titleTextHeight) / 2);
-        DrawTextBold(TruncateText(Window.Title, Window.TitleBarBounds.Width - CloseButtonWidth - Padding * 2), titlePos, TextColor);
+        DrawTextBold(TruncateText(Window.Title, Window.CloseBounds.X - Window.TitleBarBounds.X - Padding * 2), titlePos, TextColor);
 
         bool closeHovered = !HoverBlocked && Window.CloseBounds.Contains((int)Mouse.X, (int)Mouse.Y);
-        Renderer.DrawRoundedRect(Window.CloseBounds, closeHovered ? CloseHover : CloseColor, CornerRadius);
-
-        const float closeFontSize = FontSize * 0.8f;
-        var closeTextSize = Renderer.MeasureString("Inter-Bold", closeFontSize, "X");
-        var closeTextPos = new Vector2(
-            Window.CloseBounds.X + (Window.CloseBounds.Width - closeTextSize.X) / 2,
-            Window.CloseBounds.Y + (Window.CloseBounds.Height - closeTextSize.Y) / 2 - 2);
-        Renderer.DrawString("Inter-Bold", closeFontSize, "X", closeTextPos, CloseText, bold: true);
+        DrawChromeButton(Window.CloseBounds, closeHovered, true);
 
         if (CurrentWorkspaceMode == WorkspaceMode.Windows && Window.Resizable)
         {
             var solid = Renderer.GetSolidTexture(Color.White);
-            Color gripColor = new Color(TextColor.R, TextColor.G, TextColor.B, (byte)160);
+            bool gripHovered = !HoverBlocked && new Rectangle(Window.WindowBounds.Right - ResizeHandleSize,
+                Window.WindowBounds.Bottom - ResizeHandleSize, ResizeHandleSize, ResizeHandleSize).Contains(Mouse);
+            Color gripColor = gripHovered || (Resizing && ResizeWindowId == Window.Id) ? TextColor : LabelDim;
             int bx = Window.WindowBounds.Right - 7;
             int by = Window.WindowBounds.Bottom - 7;
             Renderer.DrawSprite(solid, new Rectangle(bx, by, 4, 4), gripColor);
@@ -428,7 +421,7 @@ public partial class Inspector
 
         if (items == null || items.Length == 0)
         {
-            string emptyText = "No results";
+            string emptyText = Widget.ListBoxEmptyText ?? "No results";
             var emptySize = MeasureText(emptyText);
             var emptyPos = new Vector2(
                 Widget.Bounds.X + (Widget.Bounds.Width - emptySize.X) / 2,
@@ -591,16 +584,18 @@ public partial class Inspector
         bool hovered = !Widget.Disabled && !HoverBlocked && Widget.Bounds.Contains((int)Mouse.X, (int)Mouse.Y);
         Color bgColor = Widget.Disabled ? Dim(ButtonColor) : (hovered ? ButtonHover : ButtonColor);
         bool isOpen = OpenDropdownWindowId == WindowId && OpenDropdownWidgetId == Widget.Id;
+        bool opensAbove = isOpen && OpenDropdownPopupBounds.Bottom <= Widget.Bounds.Top;
         var borderRect = new Rectangle(Widget.Bounds.X - 1, Widget.Bounds.Y - 1, Widget.Bounds.Width + 2, Widget.Bounds.Height + 3);
         byte borderAlpha = Widget.Disabled ? (byte)25 : (byte)50;
         float borderFactor = borderAlpha / 255f;
         var borderColor = new Color((byte)(TextColor.R * borderFactor), (byte)(TextColor.G * borderFactor), (byte)(TextColor.B * borderFactor), borderAlpha);
-        Renderer.DrawRoundedRect(borderRect, borderColor, CornerRadius + 1, isOpen ? RoundedCorners.Top : RoundedCorners.All);
-        Renderer.DrawRoundedRect(Widget.Bounds, bgColor, CornerRadius, isOpen ? RoundedCorners.Top : RoundedCorners.All);
+        var controlCorners = !isOpen ? RoundedCorners.All : opensAbove ? RoundedCorners.Bottom : RoundedCorners.Top;
+        Renderer.DrawRoundedRect(borderRect, borderColor, CornerRadius + 1, controlCorners);
+        Renderer.DrawRoundedRect(Widget.Bounds, bgColor, CornerRadius, controlCorners);
 
         string selectedLabel = Widget.DropdownOptions != null && Widget.DropdownSelected < Widget.DropdownOptions.Length
             ? Widget.DropdownOptions[Widget.DropdownSelected] : "?";
-        string displayText = $"{Widget.Text}: {selectedLabel}";
+        string displayText = string.IsNullOrEmpty(Widget.Text) ? selectedLabel : $"{Widget.Text}: {selectedLabel}";
 
         const int triSize = 8;
         float availableWidth = Widget.Bounds.Width - Padding * 2 - triSize - 4;
@@ -631,13 +626,15 @@ public partial class Inspector
         var widget = window.Widgets[index];
 
         if (widget.DropdownOptions == null) return;
+        bool opensAbove = OpenDropdownPopupBounds.Bottom <= widget.Bounds.Top;
+        var popupCorners = opensAbove ? RoundedCorners.Top : RoundedCorners.Bottom;
 
         var popupBorderRect = new Rectangle(OpenDropdownPopupBounds.X - 1, OpenDropdownPopupBounds.Y, OpenDropdownPopupBounds.Width + 2, OpenDropdownPopupBounds.Height + 1);
         byte popupBorderAlpha = 50;
         float popupBorderFactor = popupBorderAlpha / 255f;
         var popupBorderColor = new Color((byte)(TextColor.R * popupBorderFactor), (byte)(TextColor.G * popupBorderFactor), (byte)(TextColor.B * popupBorderFactor), popupBorderAlpha);
-        Renderer.DrawRoundedRect(popupBorderRect, popupBorderColor, CornerRadius + 1, RoundedCorners.Bottom);
-        Renderer.DrawRoundedRect(OpenDropdownPopupBounds, WindowBg, CornerRadius, RoundedCorners.Bottom);
+        Renderer.DrawRoundedRect(popupBorderRect, popupBorderColor, CornerRadius + 1, popupCorners);
+        Renderer.DrawRoundedRect(OpenDropdownPopupBounds, WindowBg, CornerRadius, popupCorners);
 
         int visibleCount = Math.Min(widget.DropdownOptions.Length - DropdownScrollOffset, MaxVisibleDropdownItems);
         bool scrollable = widget.DropdownOptions.Length > MaxVisibleDropdownItems;
@@ -649,16 +646,15 @@ public partial class Inspector
             bool optionHovered = optionRect.Contains((int)Mouse.X, (int)Mouse.Y);
             bool isSelected = optionIndex == widget.DropdownSelected;
 
-            RoundedCorners optionCorners = visibleCount == 1 ? RoundedCorners.Bottom :
-                i == visibleCount - 1 ? RoundedCorners.Bottom : RoundedCorners.None;
+            bool outerRow = opensAbove ? i == 0 : i == visibleCount - 1;
+            RoundedCorners optionCorners = outerRow ? popupCorners : RoundedCorners.None;
             Renderer.DrawRoundedRect(optionRect, ButtonColor, CornerRadius, optionCorners);
 
             if (isSelected || optionHovered)
             {
-                bool isLast = i == visibleCount - 1;
                 int highlightWidth = scrollable ? OpenDropdownPopupBounds.Width - 10 : OpenDropdownPopupBounds.Width;
                 var highlightRect = new Rectangle(OpenDropdownPopupBounds.X, optionRect.Y, highlightWidth, WidgetHeight);
-                RoundedCorners highlightCorners = isLast ? (scrollable ? RoundedCorners.BL : RoundedCorners.Bottom) : RoundedCorners.None;
+                RoundedCorners highlightCorners = outerRow ? (scrollable ? (opensAbove ? RoundedCorners.TL : RoundedCorners.BL) : popupCorners) : RoundedCorners.None;
                 Renderer.DrawRoundedRect(highlightRect, isSelected ? SliderFill : ButtonHover, CornerRadius, highlightCorners);
             }
 
