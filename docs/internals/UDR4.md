@@ -6,11 +6,11 @@ Pac-Man selects UDR4 by default at Balanced (50% per dimension). Its Pipeline in
 
 ## Integration
 
-Register `Geometry`, `HRCGI`, `ColorManagement`, and `UDR4`. `ColorManagement` is the Update-phase adapter for the same `ToneMapping` color operators and settings used by the generic 2D/3D pipelines; its defaults retain PBR Neutral and Gamma22. Connect the tonemapper to `HRCGI.GetOutput` and UDR4 to `ColorManagement.GetOutput`. The system ordering attributes put UDR4 after these producers. UDR4 also accepts linear HRC output directly. Add `MotionTrackable` to moving rectangles, circles, and triangles.
+Register `Geometry`, `HRCGI`, `HRCToneMapper`, and `UDR4`. `HRCToneMapper` is the Update-phase adapter for the same `ToneMapper` color operators and settings used by the generic 2D/3D pipelines; its defaults retain PBR Neutral and Gamma22. Connect the tonemapper to `HRCGI.GetOutput` and UDR4 to `HRCToneMapper.GetOutput`. The system ordering attributes put UDR4 after these producers. UDR4 also accepts linear HRC output directly. Add `MotionTrackable` to moving rectangles, circles, and triangles.
 
 ```csharp
 lighting = ECS.AddSystem<HRCGI>();
-tonemapper = ECS.AddSystem<ColorManagement>();
+tonemapper = ECS.AddSystem<HRCToneMapper>();
 upscaler = ECS.AddSystem<UDR4>();
 // After system initialization:
 tonemapper.SetInputSource(lighting.GetOutput);

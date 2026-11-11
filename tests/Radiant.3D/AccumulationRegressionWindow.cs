@@ -40,16 +40,16 @@ internal sealed class AccumulationGeometry : ITraceGeometry
 /// <summary>Connects the accumulation geometry fixture to a path tracer.</summary>
 internal sealed class AccumulationScene : Scene
 {
-    public PathTracer Tracer;
-    public AntiAliasing AA;
+    public PTGI Tracer;
+    public AntiAliaser AA;
 
     /// <inheritdoc/>
     public override void SetupECS()
     {
-        Tracer = ECS.AddSystem(new PathTracer { Geometry = new AccumulationGeometry(), MaxBounces = 1, ResolutionScale = 1, Environment = Vector3.Zero });
+        Tracer = ECS.AddSystem(new PTGI { Geometry = new AccumulationGeometry(), MaxBounces = 1, ResolutionScale = 1, Environment = Vector3.Zero });
 
-        var tone = ECS.AddSystem(new ToneMapping { Input = Tracer.GetOutput, Mapper = ToneMapper.None, Exposure = 2, After = [Tracer] });
-        AA = ECS.AddSystem(new AntiAliasing { Input = tone.GetOutput, Mode = PostAAMode.TAA, Camera = () => Tracer.Geometry.Camera, JitterEnabled = false, After = [tone] });
+        var tone = ECS.AddSystem(new ToneMapper { Input = Tracer.GetOutput, Operator = ToneMapOperator.None, Exposure = 2, After = [Tracer] });
+        AA = ECS.AddSystem(new AntiAliaser { Input = tone.GetOutput, Mode = PostAAMode.TAA, Camera = () => Tracer.Geometry.Camera, JitterEnabled = false, After = [tone] });
     }
 }
 

@@ -11,20 +11,22 @@ using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Graphics.PackedVector;
-using Microsoft.Xna.Framework.Input;
 
 namespace Radiant.Testing;
 
-/// <summary>Stable scene, camera, cursor and frame count for comparisons between engine builds.</summary>
-sealed class FrozenMegaLightsScene : MegaLightsScene
+/// <summary>Stable scene, camera and frame count for comparisons between engine builds.</summary>
+sealed class FrozenRadianceScene : RadianceScene
 {
-    /// <inheritdoc/>
-    public override void Update()
+    public override void SetupECS()
     {
-        DeltaTime = 0;
-        Mouse.SetPosition(80, 80);
-        base.Update();
+        base.SetupECS();
+        var inspector = ECS.GetSystem<Inspector>();
+        inspector.Visible = false;
+        inspector.ShowAllOnStartup = false;
     }
+    /// <inheritdoc/>
+    public override void Update() { }
+    internal override void HandleInput() { }
 }
 
 /// <summary>Runs lighting capture checks and records diagnostic frames.</summary>
@@ -53,7 +55,7 @@ sealed class LightingCaptureWindow : Window
 
         if (++Frame == 30)
         {
-            Capture(Scene is MegaLightsScene ? "megalights" : "reference");
+            Capture(Scene is RadianceScene ? "radiance" : "reference");
             if (Scene is LightingReferenceScene reference) reference.SetBlocker(0);
             else Exit();
         }

@@ -14,7 +14,7 @@ internal static class DebuggerLayoutRegression
         scene.Initialize();
         try
         {
-            var inspector = scene.ECS.AddSystem<Inspector>();
+            var inspector = scene.ECS.AddSystem(new Inspector { StartupWorkspaceMode = WorkspaceMode.Windows, ShowAllOnStartup = false, Visible = false });
             inspector.Initialize();
             const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
             object Field(string name) => typeof(Inspector).GetField(name, flags).GetValue(inspector);
@@ -51,6 +51,35 @@ internal static class DebuggerLayoutRegression
             var debugger = windows["debugger"];
             if (!debugger.Widgets[debugger.WidgetIndex["log"]].ListBoxItems.Any(line => line.Contains("Debugger layout regression")))
                 throw new Exception("Debugger did not receive engine logs.");
+            // Following reacts to incoming messages, never to idle frames or a filter change.
+            for (int i = 0; i < EngineLog.Capacity; i++) EngineLog.Write($"Follow regression {i}");
+            Call("UpdateDebugger");
+            int logIndex = debugger.WidgetIndex["log"];
+            var history = debugger.Widgets[logIndex];
+            if (history.ListBoxScroll == 0) throw new Exception("New messages did not follow the log tail.");
+            history.ListBoxScroll = 2;
+            debugger.Widgets[logIndex] = history;
+            Call("UpdateDebugger");
+            if (debugger.Widgets[logIndex].ListBoxScroll != 2) throw new Exception("Idle follow prevented reading older logs.");
+            debugger.Widgets[debugger.WidgetIndex["search"]].TextInputCallback("Follow regression");
+            Call("UpdateDebugger");
+            if (debugger.Widgets[logIndex].ListBoxScroll != 2) throw new Exception("Filtering forced the log to the bottom.");
+            EngineLog.Write("Follow regression after ring rollover");
+            Call("UpdateDebugger");
+            if (debugger.Widgets[logIndex].ListBoxScroll <= 2) throw new Exception("Follow missed a new message at log capacity.");
+            debugger.Widgets[debugger.WidgetIndex["follow"]].ToggleCallback(false);
+            history = debugger.Widgets[logIndex];
+            history.ListBoxScroll = 2;
+            debugger.Widgets[logIndex] = history;
+            EngineLog.Write("Follow regression with following off");
+            Call("UpdateDebugger");
+            if (debugger.Widgets[logIndex].ListBoxScroll != 2) throw new Exception("New message scrolled with follow disabled.");
+            debugger.Widgets[debugger.WidgetIndex["follow"]].ToggleCallback(true);
+            Call("UpdateDebugger");
+            if (debugger.Widgets[logIndex].ListBoxScroll != 2) throw new Exception("Enabling follow scrolled without a new message.");
+            debugger.Widgets[debugger.WidgetIndex["search"]].TextInputCallback("");
+            EngineLog.Clear();
+            Call("UpdateDebugger");
             Inspector.HideWindow("debugger");
             Call("ComputeDockLayout");
             if (((Rectangle)Field("GamePane")).Height != game.Height + bottom.Height)

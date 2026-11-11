@@ -154,11 +154,11 @@ if (Array.IndexOf(args, "--pipeline-regression") >= 0)
 }
 
 bool regression = Array.IndexOf(args, "--regression") >= 0;
-var traceBackend = PathTracingBackend.Auto;
+var traceBackend = PTGIBackend.Auto;
 
 foreach (var argument in args)
     if (argument.StartsWith("--path-backend=", StringComparison.Ordinal))
-        traceBackend = Enum.Parse<PathTracingBackend>(argument["--path-backend=".Length..], true);
+        traceBackend = Enum.Parse<PTGIBackend>(argument["--path-backend=".Length..], true);
 
 Scene scene = regression ? new Geometry3DRegressionScene() : new CornellBoxScene { InitialTraceBackend = traceBackend, InitialRenderMethod = Array.IndexOf(args, "--smoke") >= 0 ? 0 : Array.IndexOf(args, "--radiance-cascades") >= 0 ? 3 : 2, InitialDenoiser = requestedDenoiser ?? (Array.IndexOf(args, "--smoke") >= 0 ? DenoiserMode.None : DenoiserMode.Atrous) };
 

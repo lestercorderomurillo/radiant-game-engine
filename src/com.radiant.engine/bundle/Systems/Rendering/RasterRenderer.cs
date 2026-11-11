@@ -7,7 +7,7 @@ namespace com.radiant.engine.bundle;
 /// <remarks>With <see cref="Geometry"/> supplied, shades covered samples before MSAA resolve.
 /// Otherwise lights the input image using optional normals. This technique does not compute HRC transmission or path-traced indirect light.</remarks>
 /// <seealso cref="HRCGI"/>
-/// <seealso cref="PathTracer"/>
+/// <seealso cref="PTGI"/>
 [SystemTag("Rendering")]
 public class RasterRenderer : ImageSystem
 {

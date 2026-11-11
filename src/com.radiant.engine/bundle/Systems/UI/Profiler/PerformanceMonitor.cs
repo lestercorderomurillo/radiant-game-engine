@@ -24,6 +24,7 @@ public class PerformanceMonitor : core.System
     private const int FrameHistoryMask = FrameHistorySize - 1;
     private readonly float[] FrameTimeHistory = new float[FrameHistorySize];
     private int FrameHistoryIndex;
+    private int FrameHistoryCount;
     private float FrameTimeSum;
     private float FrameTimeAverage;
 
@@ -49,7 +50,6 @@ public class PerformanceMonitor : core.System
 
     // Precomputed constants
     private const float BytesToMB = 1f / (1024f * 1024f);
-    private const float FrameHistorySizeInv = 1f / FrameHistorySize;
 
     // Cached string builders - eliminates per-frame allocations
     private readonly StringBuilder FpsBuilder = new(32);
@@ -72,18 +72,19 @@ public class PerformanceMonitor : core.System
         if (OperatingSystem.IsWindows()) InitializeGpuCounters();
         StartSamplerThread();
 
-        Inspector.CreateWindow("perf", "Metrics", 1);
+        Inspector.CreateWindow("perf", "Profiling", 1);
 
         Inspector.AddSectionLabel("perf", "perfHeader", "Performance");
-        Inspector.AddLabel("perf", "fps", "Frames Per Second: -");
-        Inspector.AddLabel("perf", "frame", "Frame Time: -");
-        Inspector.AddLabel("perf", "target", "Target: -");
-        Inspector.AddLabel("perf", "cpu", "CPU: -");
-        Inspector.AddLabel("perf", "gpu", "GPU: -");
+        Inspector.AddMetric("perf", "fps", "FPS: -");
+        Inspector.AddMetric("perf", "frame", "Frame time: -");
+        Inspector.AddMetric("perf", "target", "Target: -");
+        Inspector.AddMetric("perf", "cpu", "CPU: -");
+        Inspector.AddMetric("perf", "gpu", "GPU: -");
 
         Inspector.AddSectionLabel("perf", "memHeader", "Memory");
-        Inspector.AddLabel("perf", "ram", "RAM: -");
-        Inspector.AddLabel("perf", "peak", "Peak: -");
+        Inspector.AddMetric("perf", "ram", "RAM: -");
+        Inspector.AddMetric("perf", "peak", "Peak: -");
+        Inspector.SetFrameHistory(FrameTimeHistory, 0, 0, 0);
     }
 
     /// <summary>Starts background collection of process and device metrics.</summary>
@@ -222,7 +223,8 @@ public class PerformanceMonitor : core.System
         FrameTimeSum += DeltaMs;
 
         FrameHistoryIndex = (FrameHistoryIndex + 1) & FrameHistoryMask;
-        FrameTimeAverage = FrameTimeSum * FrameHistorySizeInv;
+        FrameHistoryCount = Math.Min(FrameHistorySize, FrameHistoryCount + 1);
+        FrameTimeAverage = FrameTimeSum / FrameHistoryCount;
     }
 
     /// <summary>Refreshes the profiler's labels and graphs from cached samples.</summary>
@@ -238,16 +240,16 @@ public class PerformanceMonitor : core.System
 
         int DisplayFps = (int)MathF.Round(SmoothedDisplayFps);
 
-        FpsBuilder.Clear().Append("Frames Per Second: ").Append(DisplayFps);
+        FpsBuilder.Clear().Append("FPS: ").Append(DisplayFps);
         if (!Uncapped) FpsBuilder.Append('/').Append(TargetFps);
         Inspector.SetLabel("perf", "fps", FpsBuilder.ToString());
 
-        FrameTimeBuilder.Clear().Append("Frame Time: ").AppendFormat("{0:F2}", FrameTimeAverage).Append("ms");
+        FrameTimeBuilder.Clear().Append("Frame time: ").AppendFormat("{0:F2}", FrameTimeAverage).Append(" ms");
         Inspector.SetLabel("perf", "frame", FrameTimeBuilder.ToString());
 
         if (!Uncapped)
         {
-            TargetBuilder.Clear().Append("Target: ").AppendFormat("{0:F2}", 1000f / TargetFps).Append("ms (").Append(TargetFps).Append(" fps)");
+            TargetBuilder.Clear().Append("Target: ").Append(TargetFps).Append(" fps");
             Inspector.SetLabel("perf", "target", TargetBuilder.ToString());
         }
         else
@@ -255,7 +257,9 @@ public class PerformanceMonitor : core.System
             Inspector.SetLabel("perf", "target", "Target: Uncapped");
         }
 
-        CpuBuilder.Clear().Append("CPU: ").AppendFormat("{0:F1}", CpuUsage).Append("% (").Append(CpuCoreCount).Append(" cores)");
+        CpuBuilder.Clear().Append("CPU: ");
+        if (CpuUsage < 0) CpuBuilder.Append("Unavailable");
+        else CpuBuilder.AppendFormat("{0:F1}", CpuUsage).Append("%");
         Inspector.SetLabel("perf", "cpu", CpuBuilder.ToString());
 
         GpuBuilder.Clear().Append("GPU: ");
@@ -263,11 +267,12 @@ public class PerformanceMonitor : core.System
         else GpuBuilder.AppendFormat("{0:F1}", GpuUsage).Append('%');
         Inspector.SetLabel("perf", "gpu", GpuBuilder.ToString());
 
-        RamBuilder.Clear().Append("RAM: ").AppendFormat("{0:F1}", MemoryMB).Append("MB");
+        RamBuilder.Clear().Append("RAM: ").AppendFormat("{0:F1}", MemoryMB).Append(" MB");
         Inspector.SetLabel("perf", "ram", RamBuilder.ToString());
 
-        PeakBuilder.Clear().Append("Peak: ").AppendFormat("{0:F1}", PeakMemoryMB).Append("MB");
+        PeakBuilder.Clear().Append("Peak: ").AppendFormat("{0:F1}", PeakMemoryMB).Append(" MB");
         Inspector.SetLabel("perf", "peak", PeakBuilder.ToString());
+        Inspector.SetFrameHistory(FrameTimeHistory, FrameHistoryIndex, FrameHistoryCount, Uncapped ? 0 : 1000f / TargetFps);
     }
 
     #region Public API

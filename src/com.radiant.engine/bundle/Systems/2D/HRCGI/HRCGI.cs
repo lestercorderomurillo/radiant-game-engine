@@ -3,10 +3,10 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Computes 2D global illumination using Holographic Radiance Cascades.</summary>
+/// <summary>Holographic Radiance Cascades Global Illumination (HRCGI) for 2D shapes.</summary>
 /// <remarks>
 /// Pair with <see cref="com.radiant.engine.bundle.Geometry"/>. Emissive shapes contribute light; material transmission controls blockers and colored glass.
-/// This is one lighting technique, alongside <see cref="RasterRenderer"/> and <see cref="PathTracer"/>.
+/// This is one lighting technique, alongside <see cref="RasterRenderer"/> and <see cref="PTGI"/>.
 /// The HRC quality presets control probe spacing, independently of <see cref="UDRQuality"/> resolution presets.
 /// Pass the linear-light output to color management before display.
 /// </remarks>

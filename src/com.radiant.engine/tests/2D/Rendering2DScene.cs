@@ -10,14 +10,14 @@ namespace com.radiant.engine.core;
 public class Rendering2DScene : Scene
 {
     public ShapeGeometry2D Geometry { get; private set; }
-    public PathTracer Tracer { get; private set; }
-    public Denoising Denoiser { get; private set; }
-    public PathLighting Lighting { get; private set; }
+    public PTGI Tracer { get; private set; }
+    public Denoiser Denoiser { get; private set; }
+    public LightingReconstructor Lighting { get; private set; }
     public RasterRenderer Raster { get; private set; }
-    public Upscaling Upscaler { get; private set; }
-    public AntiAliasing AA { get; private set; }
-    public RasterSampling Sampling { get; private set; }
-    public ToneMapping ToneMap { get; private set; }
+    public Upscaler Upscaler { get; private set; }
+    public AntiAliaser AA { get; private set; }
+    public RasterSampler Sampling { get; private set; }
+    public ToneMapper ToneMap { get; private set; }
     public RenderInspector Pipeline { get; private set; }
     public int RenderMethod { get; private set; }
 
@@ -26,26 +26,25 @@ public class Rendering2DScene : Scene
     /// <inheritdoc/>
     public override void SetupECS()
     {
-        ECS.AddSystem<Inspector>();
-        ECS.AddSystem<PerformanceMonitor>();
+        ECS.AddSystemCollection(SystemCollections.Debugging);
 
-        Sampling = ECS.AddSystem<RasterSampling>();
+        Sampling = ECS.AddSystem<RasterSampler>();
         Geometry = ECS.AddSystem(new ShapeGeometry2D { Sampling = Sampling });
 
         Flat = ECS.AddSystem(new FlatRenderer { Input = Geometry.GetOutput, After = [Geometry] });
         Raster = ECS.AddSystem(new RasterRenderer { Geometry = Geometry, Input = Geometry.GetOutput, After = [Geometry] }, false);
-        Tracer = ECS.AddSystem(new PathTracer { SeparateLighting = true, Geometry = Geometry, Channels = TraceChannels.All, ViewSize = () => Geometry.ViewSize, After = [Geometry], Environment = Vector3.One }, false);
-        Denoiser = ECS.AddSystem(new Denoising { TraceSource = Tracer, Input = () => Tracer.Enabled ? Tracer.GetOutput() : null, Albedo = () => Tracer.AlbedoTexture, Normals = () => Tracer.NormalTexture, Depth = () => Tracer.DepthTexture, Emission = () => Tracer.EmissionTexture, SingleSample = () => Tracer.SampleTexture, Camera = () => Tracer.Geometry.HasCamera ? Tracer.Geometry.Camera : null, Revision = () => Tracer.RadianceRevision, After = [Tracer] });
-        Lighting = ECS.AddSystem(new PathLighting { Source = Tracer, Input = Denoiser.GetOutput, After = [Tracer, Denoiser] });
+        Tracer = ECS.AddSystem(new PTGI { SeparateLighting = true, Geometry = Geometry, Channels = TraceChannels.All, ViewSize = () => Geometry.ViewSize, After = [Geometry], Environment = Vector3.One }, false);
+        Denoiser = ECS.AddSystem(new Denoiser { TraceSource = Tracer, Input = () => Tracer.Enabled ? Tracer.GetOutput() : null, Albedo = () => Tracer.AlbedoTexture, Normals = () => Tracer.NormalTexture, Depth = () => Tracer.DepthTexture, Emission = () => Tracer.EmissionTexture, SingleSample = () => Tracer.SampleTexture, Camera = () => Tracer.Geometry.HasCamera ? Tracer.Geometry.Camera : null, Revision = () => Tracer.RadianceRevision, After = [Tracer] });
+        Lighting = ECS.AddSystem(new LightingReconstructor { Source = Tracer, Input = Denoiser.GetOutput, After = [Tracer, Denoiser] });
 
-        ToneMap = ECS.AddSystem(new ToneMapping { Input = GetRenderedOutput, Mapper = ToneMapper.None, After = [Flat, Raster, Tracer, Denoiser, Lighting] });
-        AA = ECS.AddSystem(new AntiAliasing { Input = ToneMap.GetOutput, Mode = PostAAMode.None, OutputSize = () => Geometry.ViewSize, Camera = () => Geometry.Camera, Depth = () => RenderMethod == 2 ? Lighting.DepthTexture ?? Tracer.DepthTexture : Geometry.DepthTexture, GeometryRevision = () => Geometry.Revision, After = [ToneMap] });
+        ToneMap = ECS.AddSystem(new ToneMapper { Input = GetRenderedOutput, Operator = ToneMapOperator.None, After = [Flat, Raster, Tracer, Denoiser, Lighting] });
+        AA = ECS.AddSystem(new AntiAliaser { Input = ToneMap.GetOutput, Mode = PostAAMode.None, OutputSize = () => Geometry.ViewSize, Camera = () => Geometry.Camera, Depth = () => RenderMethod == 2 ? Lighting.DepthTexture ?? Tracer.DepthTexture : Geometry.DepthTexture, GeometryRevision = () => Geometry.Revision, After = [ToneMap] });
         AA.SetSampling(Sampling);
-        Upscaler = ECS.AddSystem(new Upscaling { Input = AA.GetOutput, After = [AA] });
+        Upscaler = ECS.AddSystem(new Upscaler { Input = AA.GetOutput, After = [AA] });
 
-        ECS.AddSystem(new ColorSettings { Id = "rendering2dColor", Source = ToneMap });
-        ECS.AddSystem(new AntiAliasingSettings { Id = "rendering2dAA", Source = AA, Sampling = Sampling, Upscaler = Upscaler, Title = "Image quality" });
-        ECS.AddSystem(new PathTracingSettings { Id = "rendering2dPath", Source = Tracer, Denoiser = Denoiser, Changed = AA.ResetHistory });
+        ECS.AddSystem(new ToneMapperSettings { Id = "rendering2dColor", Source = ToneMap });
+        ECS.AddSystem(new AntiAliaserSettings { Id = "rendering2dAA", Source = AA, Sampling = Sampling, Upscaler = Upscaler, Title = "Image quality" });
+        ECS.AddSystem(new PTGISettings { Id = "rendering2dPath", Source = Tracer, Denoiser = Denoiser, Changed = AA.ResetHistory });
 
         Pipeline = ECS.AddSystem(new RenderInspector { Id = "rendering2d", Title = "2D Pipeline", Input = Upscaler.GetOutput, After = [Upscaler] });
 
@@ -58,7 +57,7 @@ public class Rendering2DScene : Scene
         Pipeline.AddSource("Tone mapping", ToneMap);
         Pipeline.AddSource("AA", AA);
 
-        ECS.AddSystem(new RenderPresentation { Input = Pipeline.GetOutput, ClearColor = new Color(18, 22, 30), Blend = BlendState.AlphaBlend, After = [Pipeline] });
+        ECS.AddSystem(new RenderPresenter { Input = Pipeline.GetOutput, ClearColor = new Color(18, 22, 30), Blend = BlendState.AlphaBlend, After = [Pipeline] });
     }
 
     /// <inheritdoc/>

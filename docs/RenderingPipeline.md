@@ -6,13 +6,13 @@ Control noise, jagged edges, brightness and resolution as separate stages. The s
 
 | Image problem | Stage | What to adjust |
 | --- | --- | --- |
-| Path-traced noise | `Denoising` | Backend, guide buffers and temporal settings |
-| Exposure or highlights | `ToneMapping` or HRC's `ColorManagement` | Exposure and tone curve |
-| Jagged geometry edges | `RasterSampling` and `AntiAliasing` | Geometry samples or image-space method |
-| Rendering cost at high resolution | `Upscaling` | UDR algorithm and resolution preset |
+| Path-traced noise | `Denoiser` | Backend, guide buffers and temporal settings |
+| Exposure or highlights | `ToneMapper` or HRC's `HRCToneMapper` | Exposure and tone curve |
+| Jagged geometry edges | `RasterSampler` and `AntiAliaser` | Geometry samples or image-space method |
+| Rendering cost at high resolution | `Upscaler` | UDR algorithm and resolution preset |
 | Need to inspect intermediate images | `RenderInspector` | Select a registered buffer |
 
-Upscaling does not replace lighting, and antialiasing does not replace denoising. Start with the stage that addresses the visible problem.
+Upscaler does not replace lighting, and antialiasing does not replace denoising. Start with the stage that addresses the visible problem.
 
 ## Order the pipeline
 
@@ -28,7 +28,7 @@ Three controls serve different purposes:
 
 - **Lighting quality** changes the producer's work, such as HRC probe spacing, the 3D radiance cascade grid or path-tracing bounce count.
 - **Antialiasing** changes how edges are sampled or filtered.
-- **Upscaling quality** changes input resolution before reconstruction.
+- **Upscaler quality** changes input resolution before reconstruction.
 
 The UDR algorithms are UDR1, UDR2, UDR3 and UDR4. Performance, Balanced and Native are their shared resolution presets. See [UDR](UDR4.md) for the algorithms, optional guidance and setup. All four accept images from any producer; lighting technique does not restrict algorithm selection.
 
@@ -42,7 +42,7 @@ need more iterations. See [3D Radiance Cascades](HRC.md#3d-radiance-cascades).
 
 ## Inspect the result
 
-Add `Inspector` and the relevant settings systems to expose controls under **F1 → View**. `AntiAliasingSettings.Upscaler` connects the selected `Upscaling` stage to the **Image quality** window.
+Add `Inspector` and the relevant settings systems to expose controls under **F1 → View**. `AntiAliaserSettings.Upscaler` connects the selected `Upscaler` stage to the **Image quality** window.
 
 Compare the same camera view at native resolution and at the intended render scale. Check silhouettes, fine detail, moving objects and changes in light. Use `RenderInspector` to distinguish a problem in lighting from one introduced by a later image stage.
 

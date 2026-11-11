@@ -21,12 +21,14 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0 || Array.IndexOf(args, "-
         Invoke(inspector, "UpdateMenuBar", new Vector2(submenu.X + 20, submenu.Y + 24 + (int)mode * 48), true, default(com.radiant.engine.input.KeyboardState));
         if (inspector.CurrentWorkspaceMode != mode || Field(inspector, "OpenMenuId") != null) throw new Exception("Workspace submenu selection failed.");
     }
-    using var window = new SmokeWindow(highResolution ? new MegaLightsScene() : new SimpleLightScene(), "artifacts/workspace", (scene, frame) =>
+    using var window = new SmokeWindow(new RadianceScene(), "artifacts/workspace", (scene, frame) =>
     {
         var inspector = scene.ECS.GetSystem<Inspector>();
         var windows = (global::System.Collections.Generic.Dictionary<string, WindowData>)Field(inspector, "Windows");
         if (frame == 1)
         {
+            inspector.SetWorkspaceMode(WorkspaceMode.Windows);
+            foreach (var tool in windows.Values) tool.Visible = tool.Id is "inspector" or "perf" or "entity_inspector" or "debugger";
             floatingPosition = windows["inspector"].Position;
             floatingSize = windows["inspector"].Size;
             typeof(Inspector).GetField("GlobalVisible", global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance).SetValue(inspector, true);
@@ -183,6 +185,8 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0 || Array.IndexOf(args, "-
             Inspector.SetDropdownValue("debugger", "level", 0);
             debugger.Widgets[debugger.WidgetIndex["level"]].DropdownCallback(0);
         }
+        if (frame == 78) Invoke(inspector, "ActivateDock", windows["perf"]);
+        if (frame == 79) CaptureReview("profiling");
         if (frame > 35 && scene.Renderer.ScenePresentationBounds is not { Width: > 0, Height: > 0 })
             throw new Exception("Panels mode lost its viewport after resize.");
     }, (scene, frame) =>
@@ -206,6 +210,36 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0 || Array.IndexOf(args, "-
     }, Width: highResolution ? 2560 : 960, Height: highResolution ? 1440 : 540,
         ResizeWidth: highResolution ? 2560 : 1024, ResizeHeight: highResolution ? 1440 : 640);
     window.Run();
+    return;
+}
+
+if (Array.IndexOf(args, "--viewport-startup-case") >= 0)
+{
+    using var window = new ViewportStartupRegressionWindow(
+        Array.IndexOf(args, "--no-loader") < 0, Array.IndexOf(args, "--maximized") >= 0,
+        Array.IndexOf(args, "--resize") >= 0, Array.IndexOf(args, "--settled") >= 0);
+    window.Run();
+    throw new Exception("Viewport startup capture exited before validation.");
+}
+
+if (Array.IndexOf(args, "--viewport-startup-regression") >= 0)
+{
+    // Isolate GPU backbuffer readback from normal presentation; see the fixture.
+    foreach (string option in new[] { "", "--no-loader", "--maximized", "--no-loader --maximized", "--maximized --settled", "--no-loader --maximized --settled", "--resize" })
+    {
+        var start = new global::System.Diagnostics.ProcessStartInfo(Environment.ProcessPath) { UseShellExecute = false };
+        if (global::System.IO.Path.GetFileNameWithoutExtension(Environment.ProcessPath) == "dotnet")
+            start.ArgumentList.Add(typeof(ViewportStartupRegressionWindow).Assembly.Location);
+        start.ArgumentList.Add("--viewport-startup-case");
+        foreach (string argument in option.Split(' ', StringSplitOptions.RemoveEmptyEntries)) start.ArgumentList.Add(argument);
+        using var process = global::System.Diagnostics.Process.Start(start);
+        if (!process.WaitForExit(30000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new Exception($"Viewport startup case timed out: {option}");
+        }
+        if (process.ExitCode != 0) throw new Exception($"Viewport startup case failed: {option}");
+    }
     return;
 }
 
@@ -235,8 +269,9 @@ if (Array.IndexOf(args, "--udr4-regression") >= 0)
 
 if (args.Length >= 2 && args[0] == "--lighting-captures")
 {
-    Scene captureScene = args.Length > 2 && args[2] == "triangles"
-        ? new FrozenMegaLightsScene() : new LightingReferenceScene();
+    Scene captureScene = args.Length <= 2 || args[2] == "radiance"
+        ? new FrozenRadianceScene() : args[2] == "reference" ? new LightingReferenceScene()
+        : throw new ArgumentException("Choose a lighting capture: radiance or reference.");
     using var window = new LightingCaptureWindow(captureScene, args[1]);
     window.Run();
 
@@ -250,12 +285,20 @@ if (Array.IndexOf(args, "--lighting-regression") >= 0)
     return;
 }
 
-Scene Scene = args.Length == 0 || args[0] == "lights" ? new SimpleLightScene()
+if (Array.IndexOf(args, "--radiance-regression") >= 0)
+{
+    using var window = new SmokeWindow(new RadianceScene(), "artifacts/radiance", (scene, frame) =>
+    {
+        if (frame == 2 || frame == 20) RadianceInteractionRegression.Run((RadianceScene)scene);
+    });
+    window.Run();
+    return;
+}
+
+Scene Scene = args.Length == 0 || args[0] == "radiance" ? new RadianceScene()
     : args[0] == "rendering2d" ? new Rendering2DScene()
     : args[0] == "tiles" ? new TilesetScene()
-    : args[0] == "triangles" ? new MegaLightsScene()
-    : args[0] == "triangle-example" ? new TriangleScene()
-    : throw new ArgumentException("Choose a test scene: lights, tiles, triangles, triangle-example, or rendering2d.");
+    : throw new ArgumentException("Choose a test scene: radiance, tiles, or rendering2d.");
 
 if (Array.IndexOf(args, "--upscaling-regression") >= 0)
 {
@@ -266,7 +309,7 @@ else if (args.Length > 1 && args[1] == "--smoke")
 {
     using var Window = new SmokeWindow(Scene, "artifacts/smoke", (ActiveScene, Frame) =>
     {
-        if (ActiveScene is SimpleLightScene or MegaLightsScene)
+        if (ActiveScene is RadianceScene)
         {
             var renderer = ActiveScene.Renderer;
             var center = renderer.VirtualSize / 2;
@@ -276,7 +319,10 @@ else if (args.Length > 1 && args[1] == "--smoke")
 
             if (MathF.Abs(horizontalScale - verticalScale) > 0.001f || Vector2.Distance(projectedCenter, renderer.ScreenSize / 2) > 0.01f)
                 throw new Exception("Lighting demo is stretched or off-center.");
-            if (Vector2.Distance(renderer.ScreenToWorld(projectedCenter), center) > 0.01f)
+            var pointerCenter = projectedCenter;
+            if (renderer.ScenePresentationBounds is Rectangle viewport)
+                pointerCenter = new Vector2(viewport.X, viewport.Y) + projectedCenter * new Vector2(viewport.Width, viewport.Height) / renderer.ScreenSize;
+            if (Vector2.Distance(renderer.ScreenToWorld(pointerCenter), center) > 0.01f)
                 throw new Exception("Demo input mapping does not follow the fitted view.");
         }
 
@@ -284,7 +330,7 @@ else if (args.Length > 1 && args[1] == "--smoke")
         // so the tiles smoke exercises terrain instead of only the sky clear color.
         if (Frame == 1 && ActiveScene is TilesetScene)
         {
-            var World = ActiveScene.ECS.GetSystem<WorldGen>();
+            var World = ActiveScene.ECS.GetSystem<WorldGenerator>();
             ActiveScene.ECS.GetSystem<Tileset>().CameraPosition =
                 new Vector2(0, 100 * World.TileSize - ActiveScene.Renderer.ScreenHeight / 3f);
         }

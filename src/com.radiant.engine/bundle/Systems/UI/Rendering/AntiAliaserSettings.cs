@@ -5,14 +5,14 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Optional per-view AA controls shared by 2D and 3D pipelines.</summary>
 [SystemTag("Rendering", "Tools")]
-public class AntiAliasingSettings : core.System
+public class AntiAliaserSettings : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.UI;
-    public AntiAliasing Source;
-    public RasterSampling Sampling;
-    public Upscaling Upscaler;
+    public AntiAliaser Source;
+    public RasterSampler Sampling;
+    public Upscaler Upscaler;
 
-    private UpscalingMode[] UpscalingModes;
+    private UpscalerMode[] UpscalingModes;
     private PostAAMode[] PostModes;
 
     public string Id = "antialiasing";
@@ -21,13 +21,13 @@ public class AntiAliasingSettings : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        if (Source == null) throw new InvalidOperationException("AntiAliasingSettings requires an AntiAliasing source.");
+        if (Source == null) throw new InvalidOperationException("AntiAliaserSettings requires an AntiAliaser source.");
 
         Inspector.CreateWindow(Id, Title, Visible: false);
 
         if (Upscaler != null)
         {
-            UpscalingModes = Enum.GetValues<UpscalingMode>();
+            UpscalingModes = Enum.GetValues<UpscalerMode>();
             Inspector.AddDropdown(Id, "upscaler", "Reconstruction", Array.ConvertAll(UpscalingModes, mode => mode.ToString()), Array.IndexOf(UpscalingModes, Upscaler.Mode), index => { Upscaler.Select(UpscalingModes[index]); Source.ResetHistory(); });
             Inspector.AddDropdown(Id, "quality", "Reconstruction quality", UDRQuality.Names, UDRQuality.Index, index => { UDRQuality.Set(index); Source.ResetHistory(); });
             Inspector.AddLabel(Id, "reconstructionStatus", Upscaler.Status);
@@ -55,7 +55,7 @@ public class AntiAliasingSettings : core.System
         {
             Inspector.SetDropdownValue(Id, "upscaler", Array.IndexOf(UpscalingModes, Upscaler.Mode));
             Inspector.SetDropdownValue(Id, "quality", UDRQuality.Index);
-            Inspector.SetWidgetEnabled(Id, "quality", Upscaler.Mode != UpscalingMode.None);
+            Inspector.SetWidgetEnabled(Id, "quality", Upscaler.Mode != UpscalerMode.None);
             Inspector.SetLabel(Id, "reconstructionStatus", Upscaler.Status);
         }
 

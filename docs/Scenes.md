@@ -74,7 +74,7 @@ for headless execution and scene transitions.
 
 The same scene type hosts both. Create entities with a `Vector2` for 2D (a `Transform2D` with a draw layer) or a
 `Vector3` for 3D (a `Transform3D`), and register the matching producers: `Geometry` and `HRCGI` for lit 2D,
-`MeshGeometry3D` and `Geometry3D` or `PathTracer` for 3D. See [2D and 3D scenes](3D.md) for the 3D setup.
+`MeshGeometry3D` and `Geometry3D` or `PTGI` for 3D. See [2D and 3D scenes](3D.md) for the 3D setup.
 
 ## Continue
 

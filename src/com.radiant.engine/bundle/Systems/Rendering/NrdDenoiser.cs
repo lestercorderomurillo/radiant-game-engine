@@ -5,7 +5,7 @@ using com.radiant.engine.core;
 namespace com.radiant.engine.bundle;
 
 /// <summary>Official NRD diffuse REBLUR/RELAX using current hardware-traced signals.</summary>
-internal sealed class NrdDenoiser(PathTracer Source, int Mode) : IDenoisingBackend
+internal sealed class NrdDenoiser(PTGI Source, int Mode) : IDenoiserBackend
 {
     private ITraceDenoiserSession Session;
     private IPathTraceSession PreviousTrace;
@@ -19,7 +19,7 @@ internal sealed class NrdDenoiser(PathTracer Source, int Mode) : IDenoisingBacke
     {
         get
         {
-            if (Source?.Renderer == null) { Status = "Assign an initialized Denoising.TraceSource."; return false; }
+            if (Source?.Renderer == null) { Status = "Assign an initialized Denoiser.TraceSource."; return false; }
             if (Source.Renderer.SupportsDenoising(out var reason)) return true;
 
             Status = reason;
@@ -38,7 +38,7 @@ internal sealed class NrdDenoiser(PathTracer Source, int Mode) : IDenoisingBacke
     public void ResetHistory() => Reset = true;
 
     /// <summary>Processes native diffuse signals with the selected NRD backend.</summary>
-    public void Render(in DenoisingFrame Frame)
+    public void Render(in DenoiserFrame Frame)
     {
         if (!ReferenceEquals(Source.Renderer, Frame.Renderer)) throw new InvalidOperationException("NRD and its trace source must use the same renderer.");
 

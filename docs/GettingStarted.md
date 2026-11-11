@@ -27,73 +27,50 @@ The following example shows a minimal game project file:
 </Project>
 ```
 
-## Write your first scene
+## Run the radiance example
 
-A [`Scene`](../src/com.radiant.engine/core/Scene.cs) does two things: it registers systems in `SetupECS` and
-creates entities in `SetupScene`. Both are plain hooks: override only the ones you need and never call
-`base`. Between them the engine sorts your systems by their dependencies and initializes them, so everything you
-registered is ready when `SetupScene` runs.
-
-This scene lights a purple triangle with cyan and orange emitters. **Exposure = 2f** doubles the linear-light output before presentation.
-
-```csharp
-using System.Numerics;
-using com.radiant.engine.bundle;
-using com.radiant.engine.core;
-using com.radiant.engine.math;
-using com.radiant.engine.runtime;
-
-public class TriangleScene : Scene
-{
-    public override void SetupECS()
-    {
-        ECS.AddSystem<Inspector>();
-        ECS.AddSystem<Geometry>();
-        var light = ECS.AddSystem<HRCGI>();
-        var color = ECS.AddSystem(new ToneMapping
-        {
-            Input = light.GetOutput, Exposure = 2f,
-            Mapper = ToneMapper.None, After = [light]
-        });
-        ECS.AddSystem(new RenderPresentation { Input = color.GetOutput, After = [color] });
-    }
-
-    public override void SetupScene()
-    {
-        var center = Renderer.VirtualSize / 2;
-        Renderer.FitWorld(center, Renderer.VirtualSize);
-        int triangle = ECS.CreateEntity();
-        ECS.AddComponent<Transform2D>(triangle) = new()
-        {
-            Position = center - new Vector2(180), Scale = Vector2.One
-        };
-        ECS.AddComponent<Triangle2D>(triangle) = new() { Size = new Vector2(360), Bordered = true };
-        ECS.AddComponent<Material>(triangle) = new()
-        {
-            Albedo = Color.Black, Emissive = new Color(220, 80, 255)
-        };
-        LightFactory.CreateLight(ECS, center + new Vector2(-400, 100), 50, new Color(0, 220, 255), new Color(0, 220, 255));
-        LightFactory.CreateLight(ECS, center + new Vector2(400, 100), 50, Color.Orange, Color.Orange);
-    }
-}
+```bash
+dotnet run --project tests/Radiant.Scenes -- radiance
 ```
 
-Register systems in any order; each one declares what it depends on. Vectors are standard
-`System.Numerics` types and colors come from `com.radiant.engine.math` (see [math](Math.md)).
+The default example has twelve colored lights orbiting close to a nonemissive central triangle and 150 dots distributed across five staggered outer rings.
+Left-drag places opaque dots and right-drag erases dots. The twelve orbiting lights are the only emitters.
+Press **Space** to pause motion, **R** to reset, **F1** to hide or show the Inspector, or **F11** to cycle reconstruction.
+Painting stops over Inspector panels and outside the game viewport. The brush supports up to 4,096 dots.
+
+## Reuse the scene in your project
+
+The complete example has one source of truth:
+[`RadianceScene.cs`](../src/com.radiant.engine/tests/2D/RadianceScene.cs).
+It uses [`DemoRendering.cs`](../src/com.radiant.engine/tests/2D/DemoRendering.cs) for tone mapping,
+anti-aliasing, reconstruction and presentation. Add both sources and the engine's source aliases to the
+project above (adjust the repository path as needed):
+
+```xml
+<ItemGroup>
+  <Compile Include="../radiant-game-engine/eng/Radiant.Numerics.cs" Link="Radiant.Numerics.cs" />
+  <Compile Include="../radiant-game-engine/src/com.radiant.engine/tests/2D/RadianceScene.cs" Link="RadianceScene.cs" />
+  <Compile Include="../radiant-game-engine/src/com.radiant.engine/tests/2D/DemoRendering.cs" Link="DemoRendering.cs" />
+</ItemGroup>
+```
+
+A [`Scene`](../src/com.radiant.engine/core/Scene.cs) registers systems in `SetupECS` and creates entities in
+`SetupScene`. The engine sorts and initializes the systems between those callbacks. `Update` animates the lights. A brush system runs after Inspector input to handle painting; `Renderer.ScreenToWorld` keeps the brush aligned when the window or docked
+viewport changes size. The scene uses **2.7× exposure** and sRGB output.
 
 ## Open the window
 
-The following example shows a complete `Program.cs`:
+Create this `Program.cs`:
 
 ```csharp
+using com.radiant.engine.core;
 using com.radiant.engine.runtime;
 
-new GameClient().Run(new TriangleScene(), new WindowOptions { Title = "My game", Width = 1280, Height = 720 });
+new GameClient().Run(new RadianceScene(), new WindowOptions { Title = "Radiance", Width = 1280, Height = 720 });
 ```
 
-`Run` returns when the player closes the window, after cleaning up the scene. Press **F1** while the game runs
-to open the inspector. Choose **View → Workspace Mode → Panels** to keep Entity Inspector beside Game
-and Debugger underneath it. Use **…** beside a panel title to move it, drag the divider grips to resize it,
+`Run` returns when the player closes the window, after cleaning up the scene. The example registers `ECS.AddSystemCollection(SystemCollections.Debugging)`, so all tools open in Panels
+mode by default, with Entity Inspector beside Game and Debugger underneath it. Press **F1** to hide or restore the Inspector. Use **…** beside a panel title to move it, drag the divider grips to resize it,
 and use Debugger's search and severity dropdown to find messages.
 
 See the [Inspector guide](Inspector.md) for screenshots and a control-by-control walkthrough.

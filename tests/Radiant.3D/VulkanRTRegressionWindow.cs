@@ -32,19 +32,19 @@ internal sealed class VulkanRTGeometry : ITraceGeometry
 internal sealed class VulkanRTScene : Scene
 {
     public readonly VulkanRTGeometry Geometry = new();
-    public PathTracer Software, Candidate;
+    public PTGI Software, Candidate;
 
     /// <inheritdoc/>
     public override void SetupECS()
     {
         Geometry.SetPlane();
-        Software = ECS.AddSystem(new PathTracer { Backend = PathTracingBackend.Software, Geometry = Geometry,
+        Software = ECS.AddSystem(new PTGI { Backend = PTGIBackend.Software, Geometry = Geometry,
             Channels = TraceChannels.All, MaxBounces = 2, ResolutionScale = 1, SeparateLighting = true, Environment = new(0.4f, 0.6f, 0.8f) });
-        Candidate = ECS.AddSystem(new PathTracer { Backend = PathTracingBackend.Auto, Geometry = Geometry,
+        Candidate = ECS.AddSystem(new PTGI { Backend = PTGIBackend.Auto, Geometry = Geometry,
             Channels = TraceChannels.All, MaxBounces = 2, ResolutionScale = 1, SeparateLighting = true, Environment = Software.Environment, After = [Software] });
 
-        var tone = ECS.AddSystem(new ToneMapping { Input = Candidate.GetOutput, After = [Candidate] });
-        ECS.AddSystem(new RenderPresentation { Input = tone.GetOutput, After = [tone] });
+        var tone = ECS.AddSystem(new ToneMapper { Input = Candidate.GetOutput, After = [Candidate] });
+        ECS.AddSystem(new RenderPresenter { Input = tone.GetOutput, After = [tone] });
     }
 }
 
@@ -89,9 +89,9 @@ internal sealed class VulkanRTRegressionWindow : Window
                 GraphicsDeviceManager.PreferredBackBufferHeight = 240;
                 GraphicsDeviceManager.ApplyChanges();
                 break;
-            case 13: Scene.Candidate.Backend = PathTracingBackend.Software;
+            case 13: Scene.Candidate.Backend = PTGIBackend.Software;
             break;
-            case 15: Scene.Candidate.Backend = ExpectSoftware ? PathTracingBackend.Auto : PathTracingBackend.Vulkan;
+            case 15: Scene.Candidate.Backend = ExpectSoftware ? PTGIBackend.Auto : PTGIBackend.Vulkan;
             break;
             case 17: Scene.Geometry.Triangles = [];
             Scene.Geometry.Revision++;
@@ -129,7 +129,7 @@ internal sealed class VulkanRTRegressionWindow : Window
         Frame++;
 
         var candidate = Scene.Candidate;
-        var expectedBackend = ExpectSoftware || Frame is 14 or 15 ? PathTracingBackend.Software : PathTracingBackend.Vulkan;
+        var expectedBackend = ExpectSoftware || Frame is 14 or 15 ? PTGIBackend.Software : PTGIBackend.Vulkan;
 
         if (candidate.ActiveBackend != expectedBackend)
             throw new Exception($"Expected {expectedBackend}, got {candidate.ActiveBackend}: {candidate.BackendStatus}");
@@ -150,7 +150,7 @@ internal sealed class VulkanRTRegressionWindow : Window
             // hardware triangle traversal is watertight. Both still face the analytic check.
             int width = candidate.GetOutput().Width, height = candidate.GetOutput().Height;
             bool sharedEdge = Math.Abs((index % width + 0.5f) / width + (index / width + 0.5f) / height - 1) < 0.000001f;
-            if (!sharedEdge || candidate.ActiveBackend == PathTracingBackend.Vulkan)
+            if (!sharedEdge || candidate.ActiveBackend == PTGIBackend.Vulkan)
                 maxError = Math.Max(maxError, Vector3.Distance(new(actual[index].X, actual[index].Y, actual[index].Z), expected));
 
             if (!sharedEdge && Vector4.Distance(actual[index], software[index]) > 0.002f) throw new Exception($"Hardware/software mismatch at frame {Frame}, pixel {index}: {actual[index]} / {software[index]}");
@@ -189,7 +189,7 @@ internal sealed class VulkanRTRegressionWindow : Window
             var previousOutput = candidate.GetOutput();
             var previousSample = candidate.SampleTexture;
             int previousSamples = candidate.SampleCount;
-            candidate.Backend = PathTracingBackend.Vulkan;
+            candidate.Backend = PTGIBackend.Vulkan;
 
             try { candidate.Render(); } catch (NotSupportedException) { rejected = true; }
 

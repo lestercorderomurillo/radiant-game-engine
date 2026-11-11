@@ -11,8 +11,8 @@ using Microsoft.Xna.Framework.Graphics.PackedVector;
 /// <summary>Displays reference color values through selectable output-transfer settings.</summary>
 internal sealed class ColorPipelineScene : Scene
 {
-    internal ColorManagement Legacy;
-    internal ToneMapping Processor;
+    internal HRCToneMapper Legacy;
+    internal ToneMapper Processor;
     internal UDR4 Upscaler;
 
     /// <inheritdoc/>
@@ -22,8 +22,8 @@ internal sealed class ColorPipelineScene : Scene
         ECS.AddSystem<Geometry>();
 
         var lighting = ECS.AddSystem<HRCGI>();
-        Legacy = ECS.AddSystem(new ColorManagement { Input = lighting.GetOutput });
-        Processor = ECS.AddSystem(new ToneMapping { Input = lighting.GetOutput, After = [Legacy] });
+        Legacy = ECS.AddSystem(new HRCToneMapper { Input = lighting.GetOutput });
+        Processor = ECS.AddSystem(new ToneMapper { Input = lighting.GetOutput, After = [Legacy] });
         Upscaler = ECS.AddSystem<UDR4>();
         Upscaler.SetInputSource(Legacy.GetOutput);
     }
@@ -40,7 +40,7 @@ internal sealed class ColorPipelineRegressionWindow : Window
 {
     private readonly ColorPipelineScene Scene = new();
     private int Frame;
-    private readonly ToneMapper[] Cases = Enum.GetValues<ToneMapper>();
+    private readonly ToneMapOperator[] Cases = Enum.GetValues<ToneMapOperator>();
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public ColorPipelineRegressionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Shared HRC color pipeline regression", Width = 320, Height = 180 }) { UDRQuality.Set(1); GameLoop.AddScene(Scene); GameLoop.ThrottleUnfocused = false; }
@@ -50,7 +50,7 @@ internal sealed class ColorPipelineRegressionWindow : Window
     {
         if (Scene.Legacy != null && Frame % 4 == 0 && Frame / 4 < Cases.Length)
         {
-            Scene.Legacy.Mapper = Scene.Processor.Mapper = Cases[Frame / 4];
+            Scene.Legacy.Operator = Scene.Processor.Operator = Cases[Frame / 4];
             Scene.Legacy.Transfer = Scene.Processor.Transfer = ColorTransfer.Gamma22;
             Scene.Legacy.Exposure = Scene.Processor.Exposure = 2;
             Scene.Upscaler.ResetHistory();
@@ -88,7 +88,7 @@ internal sealed class ColorPipelineRegressionWindow : Window
 
         if (Scene.Upscaler.HistoryFrames < 2) throw new Exception("UDR4 history did not accumulate after color processing.");
 
-        Console.WriteLine($"PASS: HRC → shared {Scene.Processor.Mapper} / Gamma22 / exposure 2 → UDR4; Update and Render color match.");
+        Console.WriteLine($"PASS: HRC → shared {Scene.Processor.Operator} / Gamma22 / exposure 2 → UDR4; Update and Render color match.");
         if (Frame == Cases.Length * 4) Exit();
     }
 }

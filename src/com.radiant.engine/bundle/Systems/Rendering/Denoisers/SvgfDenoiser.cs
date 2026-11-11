@@ -5,7 +5,7 @@ using com.radiant.engine.core;
 namespace com.radiant.engine.bundle;
 
 /// <summary>Diffuse SVGF adaptation: reprojected history, luminance moments, variance and first-level wavelet feedback.</summary>
-public sealed class SvgfDenoiser : IDenoisingBackend
+public sealed class SvgfDenoiser : IDenoiserBackend
 {
     public string Name => "SVGF (temporal diffuse)";
     public bool Available => true;
@@ -40,7 +40,7 @@ public sealed class SvgfDenoiser : IDenoisingBackend
     }
 
     /// <summary>Reprojects temporal radiance and runs guided spatial filtering.</summary>
-    public void Render(in DenoisingFrame frame)
+    public void Render(in DenoiserFrame frame)
     {
         if (frame.SingleSample == null) throw new InvalidOperationException("SVGF requires unaccumulated SingleSample radiance. Request TraceChannels.Sample on the tracer.");
 
@@ -96,7 +96,7 @@ public sealed class SvgfDenoiser : IDenoisingBackend
     }
 
     /// <summary>Runs an edge-aware filtering pass over the denoising intermediates.</summary>
-    private static void Filter(in DenoisingFrame frame, Texture2D source, RenderTarget2D target, int step, bool final)
+    private static void Filter(in DenoiserFrame frame, Texture2D source, RenderTarget2D target, int step, bool final)
     {
         frame.Renderer.Reset().SetShader("Denoising/SVGF").SetTechnique("Wavelet").Configure(SamplerState.PointClamp, 0).SetTarget(target).SetParameter("History", source).SetParameter("Source", frame.SingleSample).SetParameter("Progressive", frame.Input).SetParameter("Albedo", frame.Albedo).SetParameter("Normals", frame.Normals).SetParameter("Depth", frame.Depth).SetParameter("Emission", frame.Emission ?? frame.Albedo).SetParameter("HasEmission", frame.Emission != null).SetParameter("TexelSize", new Vector2(1f / frame.Input.Width, 1f / frame.Input.Height)).SetParameter("StepWidth", step).SetParameter("FinalPass", final).SetParameter("Strength", frame.Strength).SetParameter("DepthSigma", frame.DepthSigma).SetParameter("NormalPower", frame.NormalPower).SetParameter("AlbedoSigma", frame.AlbedoSigma).Draw().Commit().SetTarget(null);
     }

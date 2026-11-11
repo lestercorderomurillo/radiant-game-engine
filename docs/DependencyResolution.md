@@ -18,15 +18,15 @@ with a topological sort, so cycles are reported as an error at startup rather th
 
 ## Order instances of one type
 
-When a scene contains several instances of the same system type, for example two `ToneMapping` stages, order
+When a scene contains several instances of the same system type, for example two `ToneMapper` stages, order
 them by instance with the `After` field instead of attributes.
 
 The following example shows an image chain where each stage waits for the previous one:
 
 ```csharp
-var denoiser = ECS.AddSystem(new Denoising { Input = tracer.GetOutput, After = [tracer] });
-var color = ECS.AddSystem(new ToneMapping { Input = denoiser.GetOutput, After = [denoiser] });
-var aa = ECS.AddSystem(new AntiAliasing { Input = color.GetOutput, After = [color] });
+var denoiser = ECS.AddSystem(new Denoiser { Input = tracer.GetOutput, After = [tracer] });
+var color = ECS.AddSystem(new ToneMapper { Input = denoiser.GetOutput, After = [denoiser] });
+var aa = ECS.AddSystem(new AntiAliaser { Input = color.GetOutput, After = [color] });
 ```
 
 ## Separate render order from draw order

@@ -129,6 +129,10 @@ public partial class Inspector
 
             switch (widget.Type)
             {
+                case WidgetType.Metric: DrawMetric(widget);
+                break;
+                case WidgetType.FrameHistory: DrawFrameHistory(widget);
+                break;
                 case WidgetType.Label: DrawLabel(widget);
                 break;
                 case WidgetType.Button: DrawButton(widget, Mouse, HoverBlocked);
@@ -186,22 +190,22 @@ public partial class Inspector
         if (Widget.Section)
         {
             var solid = Renderer.GetSolidTexture(Color.White);
-            var textPos = new Vector2(Widget.Bounds.X + 4, Widget.Bounds.Y + (Widget.Bounds.Height - LineHeight) / 2);
+            var textPos = new Vector2(Widget.Bounds.X, Widget.Bounds.Y + (Widget.Bounds.Height - LineHeight) / 2);
             DrawTextBold(Widget.Text, textPos, labelColor);
 
             int textRight = (int)(textPos.X + MeasureText(Widget.Text).X) + 8;
             int lineY = Widget.Bounds.Y + Widget.Bounds.Height / 2;
             var lineRect = new Rectangle(textRight, lineY, Widget.Bounds.Right - textRight, 1);
-            Renderer.DrawSprite(solid, lineRect, TextColor, 0.20f);
+            if (lineRect.Width > 0) Renderer.DrawSprite(solid, lineRect, TextColor, 0.20f);
 
             return;
         }
 
-        int maxWidth = Widget.Bounds.Width - 8;
+        int maxWidth = Widget.Bounds.Width;
 
         if (MeasureText(Widget.Text).X <= maxWidth)
         {
-            var textPos = new Vector2(Widget.Bounds.X + 4, Widget.Bounds.Y + (Widget.Bounds.Height - LineHeight) / 2);
+            var textPos = new Vector2(Widget.Bounds.X, Widget.Bounds.Y + (Widget.Bounds.Height - LineHeight) / 2);
             DrawText(Widget.Text, textPos, labelColor);
             return;
         }
@@ -216,7 +220,7 @@ public partial class Inspector
 
             if (MeasureText(testLine).X > maxWidth && currentLine.Length > 0)
             {
-                DrawText(currentLine, new Vector2(Widget.Bounds.X + 4, currentY), labelColor);
+                DrawText(currentLine, new Vector2(Widget.Bounds.X, currentY), labelColor);
                 currentY += LineHeight;
                 currentLine = words[i];
             }
@@ -226,14 +230,14 @@ public partial class Inspector
             }
         }
 
-        if (currentLine.Length > 0) DrawText(currentLine, new Vector2(Widget.Bounds.X + 4, currentY), labelColor);
+        if (currentLine.Length > 0) DrawText(currentLine, new Vector2(Widget.Bounds.X, currentY), labelColor);
     }
 
     /// <summary> Draws a button widget with centered text/icon and hover highlight. </summary>
     private void DrawButton(Widget Widget, Vector2 Mouse, bool HoverBlocked)
     {
         bool hovered = !Widget.Disabled && !HoverBlocked && Widget.Bounds.Contains((int)Mouse.X, (int)Mouse.Y);
-        Renderer.DrawRoundedRect(Widget.Bounds, hovered ? ButtonHover : ButtonColor, CornerRadius);
+        Renderer.DrawRoundedRect(Widget.Bounds, Widget.Disabled ? Dim(ButtonColor) : hovered ? ButtonHover : ButtonColor, CornerRadius);
 
         if (string.IsNullOrEmpty(Widget.Text) || Widget.Text == "trash")
         {
@@ -252,11 +256,12 @@ public partial class Inspector
             return;
         }
 
-        var textSize = MeasureText(Widget.Text);
+        string label = TruncateText(Widget.Text, Widget.Bounds.Width - Padding * 2);
+        var textSize = MeasureText(label);
         var textPos = new Vector2(
             Widget.Bounds.X + (Widget.Bounds.Width - textSize.X) / 2,
             Widget.Bounds.Y + (Widget.Bounds.Height - textSize.Y) / 2);
-        DrawText(Widget.Text, textPos, TextColor);
+        DrawText(label, textPos, Widget.Disabled ? LabelDim : TextColor);
     }
 
     /// <summary> Draws a toggle checkbox widget with a filled inner square when active. </summary>
@@ -282,12 +287,12 @@ public partial class Inspector
     private void DrawSlider(Widget Widget)
     {
         string valueText = $"{Widget.Text}: {Widget.SliderValue:F2}";
-        var textPos = new Vector2(Widget.Bounds.X + 4, Widget.Bounds.Y + 2);
+        var textPos = new Vector2(Widget.Bounds.X, Widget.Bounds.Y + 2);
         DrawText(valueText, textPos, TextColor);
 
-        int trackY = (int)(Widget.Bounds.Y + LineHeight + 24);
-        int trackLeft = Widget.Bounds.X + 4;
-        int trackWidth = Widget.Bounds.Width - 8;
+        int trackY = (int)(Widget.Bounds.Y + LineHeight + 16);
+        int trackLeft = Widget.Bounds.X;
+        int trackWidth = Widget.Bounds.Width;
         var trackRect = new Rectangle(trackLeft, trackY, trackWidth, SliderTrackHeight);
         Renderer.DrawRoundedRect(trackRect, SliderTrack, CornerRadius);
 
@@ -324,7 +329,7 @@ public partial class Inspector
         Color bgColor = hovered || focused ? ButtonHover : ButtonColor;
         Renderer.DrawRoundedRect(Widget.Bounds, bgColor, CornerRadius);
 
-        int iconSize = Widget.Bounds.Height - 36;
+        int iconSize = Math.Min(24, Widget.Bounds.Height - 16);
         int iconPad = 12;
         var searchTex = Renderer.GetSearchTexture(iconSize * 4);
         var searchRect = new Rectangle(Widget.Bounds.X + iconPad, Widget.Bounds.Y + (Widget.Bounds.Height - iconSize) / 2, iconSize, iconSize);
@@ -420,7 +425,7 @@ public partial class Inspector
             byte lineAlpha = 60;
             float lineFactor = lineAlpha / 255f;
             var lineColor = new Color((byte)(TextColor.R * lineFactor), (byte)(TextColor.G * lineFactor), (byte)(TextColor.B * lineFactor), lineAlpha);
-            Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), new Rectangle(Widget.Bounds.X + 4, lineY, Widget.Bounds.Width - 8, 1), lineColor);
+            Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), new Rectangle(Widget.Bounds.X, lineY, Widget.Bounds.Width - 8, 1), lineColor);
             headerOffset = itemHeight + 2;
         }
 
@@ -479,7 +484,7 @@ public partial class Inspector
 
             if (isSelected)
             {
-                var highlightRect = new Rectangle(Widget.Bounds.X + 4, itemY, Widget.Bounds.Width - 8, itemHeight);
+                var highlightRect = new Rectangle(Widget.Bounds.X, itemY, Widget.Bounds.Width - 8, itemHeight);
                 Renderer.DrawRoundedRect(highlightRect, SliderFill, 4);
             }
 
@@ -611,7 +616,7 @@ public partial class Inspector
         Color textColor = Widget.Disabled ? Dim(LabelDim) : TextColor;
         var textSize = MeasureText(displayText);
         var textPos = new Vector2(
-            Widget.Bounds.X + (Widget.Bounds.Width - textSize.X - triSize - 4) / 2,
+            Widget.Bounds.X + Padding,
             Widget.Bounds.Y + (Widget.Bounds.Height - textSize.Y) / 2);
         DrawText(displayText, textPos, textColor);
 

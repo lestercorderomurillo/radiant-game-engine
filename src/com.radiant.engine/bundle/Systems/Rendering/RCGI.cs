@@ -3,26 +3,27 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Experimental deterministic diffuse global illumination for 3D trace geometry using world-space Radiance Cascades.</summary>
+/// <summary>Radiance Cascades Global Illumination (RCGI): experimental diffuse 3D lighting with dense world-space probes.</summary>
 /// <remarks>
+/// This dense-grid implementation is not Split Radiance Cascades Global Illumination (SRCGI).
 /// Probes fill a cube around the scene; each cascade doubles probe spacing, quadruples directions and quadruples ray length,
 /// so near occluders are resolved spatially and distant light directionally. Intervals are traced on the shader BVH when lighting needs updating
 /// and merged top-down; shading interpolates a per-probe irradiance map, which also feeds the next frame's bounce.
 /// Provide <see cref="ITraceGeometry"/> through <see cref="Geometry"/> and send the output to tone mapping.
-/// The material model is diffuse with per-triangle emission, as in <see cref="PathTracer"/>.
+/// The material model is diffuse with per-triangle emission, as in <see cref="PTGI"/>.
 /// </remarks>
 /// <example>
 /// The following example shows how to light meshes with radiance cascades:
 /// <code>
 /// var meshes = ECS.AddSystem&lt;MeshGeometry3D&gt;();
-/// var cascades = ECS.AddSystem(new RadianceCascades { Geometry = meshes, After = [meshes] });
-/// var color = ECS.AddSystem(new ToneMapping { Input = cascades.GetOutput, After = [cascades] });
+/// var cascades = ECS.AddSystem(new RCGI { Geometry = meshes, After = [meshes] });
+/// var color = ECS.AddSystem(new ToneMapper { Input = cascades.GetOutput, After = [cascades] });
 /// </code>
 /// </example>
 /// <seealso cref="HRCGI"/>
-/// <seealso cref="PathTracer"/>
+/// <seealso cref="PTGI"/>
 [SystemTag("Rendering", "Radiance cascades")]
-public class RadianceCascades : ImageSystem
+public class RCGI : ImageSystem
 {
     /// <summary>Largest atlas edge used for cascade and irradiance textures.</summary>
     public const int MaxAtlasSize = 4096;
@@ -89,7 +90,7 @@ public class RadianceCascades : ImageSystem
     private static readonly Point IrradianceTile = new(10, 5);
 
     /// <summary>Registers cascade, irradiance and depth buffers for inspection.</summary>
-    public RadianceCascades()
+    public RCGI()
     {
         for (int cascade = 0; cascade < MaxCascadeLimit; cascade++) { int index = cascade; BufferProviders[$"Cascade {index}"] = () => Cascades[index]; }
 
@@ -101,7 +102,7 @@ public class RadianceCascades : ImageSystem
     /// <inheritdoc/>
     public override void Initialize()
     {
-        if (Geometry == null) throw new InvalidOperationException("RadianceCascades requires an ITraceGeometry source.");
+        if (Geometry == null) throw new InvalidOperationException("RCGI requires an ITraceGeometry source.");
     }
 
     /// <summary>Returns the stage's current output image, or its input when processing is bypassed.</summary>
@@ -118,7 +119,7 @@ public class RadianceCascades : ImageSystem
     /// <inheritdoc/>
     public override void Render()
     {
-        if (Geometry == null) throw new InvalidOperationException("RadianceCascades requires geometry.");
+        if (Geometry == null) throw new InvalidOperationException("RCGI requires geometry.");
         if (GridSize < 8 || GridSize > 64 || (GridSize & (GridSize - 1)) != 0) throw new ArgumentOutOfRangeException(nameof(GridSize), "Use 8, 16, 32 or 64 probes per axis.");
         if (BaseDirectionRows < 2 || BaseDirectionRows > 8 || (BaseDirectionRows & (BaseDirectionRows - 1)) != 0) throw new ArgumentOutOfRangeException(nameof(BaseDirectionRows), "Use 2, 4 or 8 direction rows.");
         if ((long)GridSize * GridSize * GridSize * 2 * BaseDirectionRows * BaseDirectionRows > (long)MaxAtlasSize * MaxAtlasSize) throw new ArgumentOutOfRangeException(nameof(BaseDirectionRows), "A 64³ grid supports at most 4 direction rows.");

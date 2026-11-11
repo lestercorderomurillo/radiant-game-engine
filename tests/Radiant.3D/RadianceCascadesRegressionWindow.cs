@@ -53,13 +53,13 @@ internal sealed class FurnaceGeometry : ITraceGeometry
 /// <summary>Connects the furnace fixture to a radiance cascade stage.</summary>
 internal sealed class FurnaceScene : Scene
 {
-    public RadianceCascades Cascades;
+    public RCGI Cascades;
 
     /// <inheritdoc/>
     public override void SetupECS()
     {
-        Cascades = ECS.AddSystem(new RadianceCascades { Geometry = new FurnaceGeometry(), GridSize = 16, BaseDirectionRows = 2, Environment = Vector3.One });
-        ECS.AddSystem(new RenderPresentation { Input = Cascades.GetOutput, After = [Cascades] });
+        Cascades = ECS.AddSystem(new RCGI { Geometry = new FurnaceGeometry(), GridSize = 16, BaseDirectionRows = 2, Environment = Vector3.One });
+        ECS.AddSystem(new RenderPresenter { Input = Cascades.GetOutput, After = [Cascades] });
     }
 }
 
@@ -83,7 +83,7 @@ internal sealed class RadianceCascadesRegressionWindow : Window
     private double FullHdUpdatingMilliseconds;
     private readonly float[] FencePixel = new float[1];
     private CornellBoxScene Cornell => (CornellBoxScene)Scene;
-    private RadianceCascades Cascades => Scene is FurnaceScene furnace ? furnace.Cascades : Cornell.Cascades;
+    private RCGI Cascades => Scene is FurnaceScene furnace ? furnace.Cascades : Cornell.Cascades;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public RadianceCascadesRegressionWindow(bool furnace, bool native = false, bool dense = false) : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant radiance cascades regression", Width = 640, Height = 360 })
@@ -103,8 +103,8 @@ internal sealed class RadianceCascadesRegressionWindow : Window
         if (!Furnace && Frame == 2)
         {
             Cornell.SelectRenderer(3);
-            if (Cornell.Upscaler.Mode != UpscalingMode.UDR4 || UDRQuality.Index != 1) throw new Exception("Radiance cascades did not default to UDR4 Balanced.");
-            if (Native) Cornell.Upscaler.Select(UpscalingMode.None);
+            if (Cornell.Upscaler.Mode != UpscalerMode.UDR4 || UDRQuality.Index != 1) throw new Exception("Radiance cascades did not default to UDR4 Balanced.");
+            if (Native) Cornell.Upscaler.Select(UpscalerMode.None);
             Cascades.GridSize = InitialGrid;
         }
         base.Update(time);
@@ -156,8 +156,8 @@ internal sealed class RadianceCascadesRegressionWindow : Window
         if (Frame == 102) Cascades.ResetBounces();
         if (Frame == 104) Cascades.MaxBounceUpdates = 1;
         if (Frame == 106) Cascades.MaxBounceUpdates = 0;
-        if (Frame == 108) Cornell.Upscaler.Select(UpscalingMode.None);
-        if (Frame == 110) { Cornell.Upscaler.Select(UpscalingMode.UDR4); UDRQuality.Set(1); }
+        if (Frame == 108) Cornell.Upscaler.Select(UpscalerMode.None);
+        if (Frame == 110) { Cornell.Upscaler.Select(UpscalerMode.UDR4); UDRQuality.Set(1); }
         if (Frame == 112) UDRQuality.Set(2);
         if (Frame == 114) UDRQuality.Set(1);
         if (Frame == 116)

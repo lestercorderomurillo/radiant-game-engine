@@ -7,11 +7,11 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Optional per-view path tracing controls, shared by perspective and orthographic adapters.</summary>
 [SystemTag("Rendering", "Tools")]
-public class PathTracingSettings : core.System
+public class PTGISettings : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.UI;
-    public PathTracer Source;
-    public Denoising Denoiser;
+    public PTGI Source;
+    public Denoiser Denoiser;
     public string Id = "pathTracing";
     public string Title = "Path tracing";
     public Action Changed;
@@ -31,13 +31,13 @@ public class PathTracingSettings : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        if (Source == null) throw new InvalidOperationException("PathTracingSettings requires a PathTracer source.");
+        if (Source == null) throw new InvalidOperationException("PTGISettings requires a PTGI source.");
 
         Inspector.CreateWindow(Id, Title, LayoutOrder: 200, Visible: false);
         Inspector.AddLabel(Id, "samples", "Path samples: 0");
         Inspector.AddDropdown(Id, "traceBackend", "Tracing backend", ["Auto", "GPU shader BVH", "Vulkan hardware RT"], (int)Source.Backend, index =>
         {
-            if (index == (int)PathTracingBackend.Vulkan && !Renderer.SupportsVulkanPathTracing(out var reason))
+            if (index == (int)PTGIBackend.Vulkan && !Renderer.SupportsVulkanPathTracing(out var reason))
             {
                 TraceSelectionError = reason;
                 Inspector.SetDropdownValue(Id, "traceBackend", (int)Source.Backend);
@@ -45,7 +45,7 @@ public class PathTracingSettings : core.System
             }
 
             TraceSelectionError = null;
-            Source.Backend = (PathTracingBackend)index;
+            Source.Backend = (PTGIBackend)index;
             Source.ResetAccumulation();
             Changed?.Invoke();
         });

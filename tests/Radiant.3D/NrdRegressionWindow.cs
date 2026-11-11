@@ -10,23 +10,23 @@ using Microsoft.Xna.Framework.Graphics;
 internal sealed class NrdRegressionScene : Scene
 {
     public readonly VulkanRTGeometry Geometry = new();
-    public PathTracer Tracer;
-    public Denoising Denoiser;
+    public PTGI Tracer;
+    public Denoiser Denoiser;
 
     /// <inheritdoc/>
     public override void SetupECS()
     {
         Geometry.SetPlane();
-        Tracer = ECS.AddSystem(new PathTracer { Geometry = Geometry, Channels = TraceChannels.All,
+        Tracer = ECS.AddSystem(new PTGI { Geometry = Geometry, Channels = TraceChannels.All,
             ResolutionScale = 1, MaxBounces = 2, SeparateLighting = true, Environment = new(0.4f, 0.6f, 0.8f) });
-        Denoiser = ECS.AddSystem(new Denoising { TraceSource = Tracer, Input = Tracer.GetOutput,
+        Denoiser = ECS.AddSystem(new Denoiser { TraceSource = Tracer, Input = Tracer.GetOutput,
             Albedo = () => Tracer.AlbedoTexture, Normals = () => Tracer.NormalTexture,
             Depth = () => Tracer.DepthTexture, Emission = () => Tracer.EmissionTexture,
             SingleSample = () => Tracer.SampleTexture, Camera = () => Geometry.HasCamera ? Geometry.Camera : null,
             Revision = () => Tracer.RadianceRevision, After = [Tracer] });
 
-        var tone = ECS.AddSystem(new ToneMapping { Input = Denoiser.GetOutput, After = [Denoiser] });
-        ECS.AddSystem(new RenderPresentation { Input = tone.GetOutput, After = [tone] });
+        var tone = ECS.AddSystem(new ToneMapper { Input = Denoiser.GetOutput, After = [Denoiser] });
+        ECS.AddSystem(new RenderPresenter { Input = tone.GetOutput, After = [tone] });
     }
 }
 
@@ -69,8 +69,8 @@ internal sealed class NrdRegressionWindow : Window
         if (Frame == 16) Scene.Geometry.Size = new(81, 55);
         if (Frame == 20) Scene.Geometry.HasCamera = false;
         if (Frame == 22) Scene.Geometry.HasCamera = true;
-        if (Frame == 24) Scene.Tracer.Backend = PathTracingBackend.Software;
-        if (Frame == 26) Scene.Tracer.Backend = PathTracingBackend.Auto;
+        if (Frame == 24) Scene.Tracer.Backend = PTGIBackend.Software;
+        if (Frame == 26) Scene.Tracer.Backend = PTGIBackend.Auto;
         if (Frame == 30) Scene.Tracer.Channels = TraceChannels.None;
         if (Frame == 32) Scene.Tracer.Channels = TraceChannels.All;
         if (Frame == 28) Scene.Denoiser.Mode = DenoiserMode.None;

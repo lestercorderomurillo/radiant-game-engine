@@ -1,6 +1,6 @@
 # Neural denoising
 
-Path tracing is noisy at low sample counts. `Denoising` cleans the image before tone mapping, without touching the
+Path tracing is noisy at low sample counts. `Denoiser` cleans the image before tone mapping, without touching the
 tracer's own accumulation, so lighting stays smooth while the camera moves.
 
 ## Pick a mode
@@ -22,7 +22,7 @@ The following example shows à-trous denoising with the guide buffers it needs:
 ```csharp
 tracer.Channels = TraceChannels.All;
 
-var denoiser = ECS.AddSystem(new Denoising
+var denoiser = ECS.AddSystem(new Denoiser
 {
     Input = tracer.GetOutput,
     Mode = DenoiserMode.Atrous,
@@ -32,8 +32,8 @@ var denoiser = ECS.AddSystem(new Denoising
     Emission = () => tracer.EmissionTexture,
     After = [tracer]
 });
-var color = ECS.AddSystem(new ToneMapping { Input = denoiser.GetOutput, After = [denoiser] });
-ECS.AddSystem(new PathTracingSettings { Id = "mainPath", Source = tracer, Denoiser = denoiser });
+var color = ECS.AddSystem(new ToneMapper { Input = denoiser.GetOutput, After = [denoiser] });
+ECS.AddSystem(new PTGISettings { Id = "mainPath", Source = tracer, Denoiser = denoiser });
 ```
 
 The following example shows the extra connections for temporal SVGF:

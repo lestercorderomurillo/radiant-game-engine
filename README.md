@@ -1,18 +1,18 @@
 <h1 align="center">Radiant</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.8.0"><img src="https://img.shields.io/badge/release-v0.8.0-E73C00?style=flat-square" alt="Release v0.8.0"></a>
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.9.0"><img src="https://img.shields.io/badge/release-v0.9.0-E73C00?style=flat-square" alt="Release v0.9.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
 </p>
 
-[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.8.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.8.0)
+[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.9.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.9.0)
 
 A C# engine for 2D and 3D games, with an entity-component system, composable rendering pipelines,
 global illumination and live inspection tools.
 
-Build a scene in code, run it, and press **F1** to inspect entities, tune rendering or read diagnostics.
-The tools can float over the game or dock beside it.
+Build a scene in code and register the debugging collection to inspect entities, tune rendering and read diagnostics.
+Tools open as docked panels with Show All enabled; **F1** hides or restores them.
 
 ## Features
 
@@ -37,7 +37,7 @@ The tools can float over the game or dock beside it.
 
 ## Get Radiant
 
-**[Download v0.8.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.8.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.8.0)
+**[Download v0.9.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.9.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.9.0)
 
 You need the .NET 8 SDK or newer and a Vulkan-capable GPU. On Linux, also install the Vulkan loader and SDL2.
 
@@ -55,62 +55,46 @@ Add Radiant to your game project:
 </Project>
 ```
 
-Run the triangle demo from this repository:
+Run the interactive radiance demo from this repository (also the default scene):
 
 ```bash
-dotnet run --project tests/Radiant.Scenes -- triangles
+dotnet run --project tests/Radiant.Scenes -- radiance
 ```
 
-The demo combines an emissive triangle, orbiting lights and occluders. Its exposure is set to **2×**.
-For a smaller scene in your own project:
+Twelve colored lights orbit close to a nonemissive central triangle, with 150 dots distributed across five staggered rings farther out. Paint or erase dots while
+Holographic Radiance Cascades updates their lighting and shadows. Exposure is **2.7×**, with sRGB output.
+
+![Radiance demo with twelve central colored lights, a dark triangle and five outer rings of dots](docs/images/radiance.png)
+
+| Control | Action |
+| --- | --- |
+| Left click / drag | Place dark dots that block light. |
+| Right click / drag | Erase dots, including the initial field. |
+| Space | Pause or resume moving lights. |
+| R | Restore the initial field and lights. |
+| F1 | Hide or show the Inspector. |
+| F11 | Cycle reconstruction modes. |
+
+Painting respects the game viewport and Inspector panels. The brush supports up to 4,096 dots.
+The scene lives in [RadianceScene.cs](src/com.radiant.engine/tests/2D/RadianceScene.cs), with shared image stages
+in [DemoRendering.cs](src/com.radiant.engine/tests/2D/DemoRendering.cs).
+
+Other examples: `rendering2d` compares 2D rendering techniques, `tiles` shows procedural terrain,
+and `dotnet run --project tests/Radiant.3D` opens the Cornell Box.
+See the [quickstart](docs/GettingStarted.md) to reuse the radiance scene in your own project.
+
+Register the same debugging tools in any scene:
 
 ```csharp
-using System.Numerics;
-using com.radiant.engine.bundle;
-using com.radiant.engine.core;
-using com.radiant.engine.math;
-using com.radiant.engine.runtime;
-
-new GameClient().Run(new TriangleScene(), new WindowOptions { Title = "Triangles" });
-
-public class TriangleScene : Scene
-{
-    public override void SetupECS()
-    {
-        ECS.AddSystem<Inspector>();
-        ECS.AddSystem<Geometry>();
-        var light = ECS.AddSystem<HRCGI>();
-        var color = ECS.AddSystem(new ToneMapping
-        {
-            Input = light.GetOutput, Exposure = 2f,
-            Mapper = ToneMapper.None, After = [light]
-        });
-        ECS.AddSystem(new RenderPresentation { Input = color.GetOutput, After = [color] });
-    }
-
-    public override void SetupScene()
-    {
-        var center = Renderer.VirtualSize / 2;
-        Renderer.FitWorld(center, Renderer.VirtualSize);
-        int triangle = ECS.CreateEntity();
-        ECS.AddComponent<Transform2D>(triangle) = new()
-        {
-            Position = center - new Vector2(180), Scale = Vector2.One
-        };
-        ECS.AddComponent<Triangle2D>(triangle) = new() { Size = new Vector2(360), Bordered = true };
-        ECS.AddComponent<Material>(triangle) = new()
-        {
-            Albedo = Color.Black, Emissive = new Color(220, 80, 255)
-        };
-        LightFactory.CreateLight(ECS, center + new Vector2(-400, 100), 50, new Color(0, 220, 255), new Color(0, 220, 255));
-        LightFactory.CreateLight(ECS, center + new Vector2(400, 100), 50, Color.Orange, Color.Orange);
-    }
-}
+ECS.AddSystemCollection(SystemCollections.Debugging);
 ```
+
+This adds Inspector, Profiling and Gizmos, with entity/component/system editors, logs and shared camera controls.
+Camera Controls discovers 2D/3D entity cameras, fitted 2D views and the tile viewport. All four examples use this collection.
 
 ## Work with the Inspector
 
-Press **F1**, then choose **View → Workspace Mode → Panels**. Entity Inspector opens on the left,
+Panels with **Show All** is the default for every Inspector. Entity Inspector opens on the left,
 the game stays in the center, and Debugger shows diagnostics below it. Side panels stack vertically
 so you can use them together. When space runs out, only the panels that need it share tabs.
 
@@ -123,7 +107,7 @@ so you can use them together. When space runs out, only the panels that need it 
 | Tab title | Select a panel. Hold and drag it to move it; the highlighted area marks the destination. |
 | Divider grip | Resize the adjacent panels. |
 | **Clear** | Remove every retained log message, including messages hidden by a filter. |
-| **Follow latest** | Keep the newest matching messages in view. Turn it off to read older entries. |
+| **Follow latest** | Scroll when new messages arrive; idle frames preserve your position. Turn it off to keep reading older entries as messages arrive. |
 | **Search logs…** | Find text in messages, sources or the displayed timestamp. |
 | **All levels** | Show all messages, or only Info, Warnings or Errors. Works together with search. |
 

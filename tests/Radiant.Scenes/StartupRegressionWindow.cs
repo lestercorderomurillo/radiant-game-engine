@@ -199,7 +199,7 @@ internal sealed class StartupRegressionWindow : Window
         }
     }
 
-    private sealed class ProbeScene : SimpleLightScene
+    private sealed class ProbeScene : RadianceScene
     {
         public int Setups, Updates;
         public override void SetupScene() { base.SetupScene(); Setups++; }

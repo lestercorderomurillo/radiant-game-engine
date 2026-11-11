@@ -10,7 +10,7 @@ namespace com.radiant.engine.core;
 /// The following example shows how to offer two upscalers and cycle them with a key:
 /// <code>
 /// var upscaling = new SystemGroup("Upscaling",
-///     ("Bilinear", ECS.AddSystem&lt;Bilinear&gt;()),
+///     ("Bilinear", ECS.AddSystem&lt;BilinearUpscaler&gt;()),
 ///     ("UDR3", ECS.AddSystem&lt;UDR3&gt;(enabled: false)));
 /// ECS.RegisterSystemGroup(upscaling);
 ///

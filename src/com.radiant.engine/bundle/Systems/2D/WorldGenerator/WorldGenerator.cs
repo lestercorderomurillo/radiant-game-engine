@@ -4,7 +4,7 @@ using com.radiant.engine.core;
 namespace com.radiant.engine.bundle;
 
 /// <summary>Populates the ECS with terrain and cave tiles derived from noise.</summary>
-public class WorldGen : core.System
+public class WorldGenerator : core.System
 {
     private PerlinNoise2D PerlinNoise;
 

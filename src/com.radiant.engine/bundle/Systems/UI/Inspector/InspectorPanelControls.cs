@@ -11,10 +11,10 @@ public partial class Inspector
     private string PanelMenuWindowId;
     private Rectangle PanelMenuBounds;
     private int PanelMenuSelection;
-    private static readonly string[] PanelActions = ["Move left", "Move right", "Move below Game", "Reset panel sizes", "Close panel"];
+    private static readonly string[] PanelActions = ["Move left", "Move right", "Move below preview", "Reset panel sizes", "Close panel"];
     // About uses a 28 screen-pixel square. Convert to Inspector coordinates, bounded by the header.
-    private int ChromeButtonExtent => Math.Clamp((int)MathF.Round(CloseButtonSize * Renderer.VirtualWidth / (Renderer.ScreenWidth * UIScale)), 12, TitleBarHeight - 12);
-    private int DockHeaderHeight => Math.Max(MenuItemHeight, ChromeButtonExtent + 12);
+    private int ChromeButtonExtent => Math.Clamp((int)MathF.Round(CloseButtonSize * Renderer.VirtualWidth / (Renderer.ScreenWidth * UIScale)), 12, TitleBarHeight - InlineGap);
+    private int DockHeaderHeight => TitleBarHeight;
 
     private Rectangle DockTabCloseBounds(Rectangle tab) => new(
         tab.Right - ChromeButtonExtent - 6, tab.Y + (tab.Height - ChromeButtonExtent) / 2,
@@ -129,7 +129,7 @@ public partial class Inspector
 
     private void ApplyWindowScroll(WindowData window, int bottomLimit)
     {
-        int bottom = window.Widgets.Where(w => w.Visible).Select(w => w.Bounds.Bottom).DefaultIfEmpty((int)window.Position.Y).Max() + (window.Id == "debugger" ? 8 : Padding);
+        int bottom = window.Widgets.Where(w => w.Visible).Select(w => w.Bounds.Bottom).DefaultIfEmpty((int)window.Position.Y).Max() + (Padding);
         int scroll = Math.Clamp(DockScroll.GetValueOrDefault(window.Id), 0, Math.Max(0, bottom - bottomLimit));
         DockScroll[window.Id] = scroll;
         if (scroll == 0) return;

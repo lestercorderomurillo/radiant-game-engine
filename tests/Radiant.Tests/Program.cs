@@ -18,13 +18,18 @@ RenderViewRegression.Run();
 ResourceCacheRegression.Run();
 ShapeCollectionRegression.Run();
 FontServiceRegression.Run();
-PortableRendererRegression.Run(DebuggerLayoutRegression.Run);
+PortableRendererRegression.Run(renderer =>
+{
+    DebuggerLayoutRegression.Run(renderer);
+    ProfilingRegression.Run(renderer);
+    SystemCollectionRegression.Run(renderer);
+});
 
 var Scene = new Scene();
 Scene.Initialize();
 Scene.ECS.AddSystem<PerlinNoise2D>();
 
-var World = Scene.ECS.AddSystem<WorldGen>();
+var World = Scene.ECS.AddSystem<WorldGenerator>();
 Scene.ECS.Initialize();
 World.GenerateWorld(8, 128);
 

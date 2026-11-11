@@ -19,10 +19,10 @@ internal sealed class MixedDimensionScene : Scene
         MeshView = ECS.AddSystem(new Geometry3D { Source = source, After = [source] });
         ShapeView = ECS.AddSystem(new ShapeGeometry2D { Resolution = new Point(320, 360) });
 
-        var aa3D = ECS.AddSystem(new AntiAliasing { Input = MeshView.GetOutput, After = [MeshView] });
-        var aa2D = ECS.AddSystem(new AntiAliasing { Input = ShapeView.GetOutput, After = [ShapeView] });
-        var left = ECS.AddSystem(new RenderPresentation { Input = aa3D.GetOutput, Destination = new Rectangle(0, 0, 320, 360), ClearColor = Color.Black, After = [aa3D] });
-        ECS.AddSystem(new RenderPresentation { Input = aa2D.GetOutput, Destination = new Rectangle(320, 0, 320, 360), After = [left, aa2D] });
+        var aa3D = ECS.AddSystem(new AntiAliaser { Input = MeshView.GetOutput, After = [MeshView] });
+        var aa2D = ECS.AddSystem(new AntiAliaser { Input = ShapeView.GetOutput, After = [ShapeView] });
+        var left = ECS.AddSystem(new RenderPresenter { Input = aa3D.GetOutput, Destination = new Rectangle(0, 0, 320, 360), ClearColor = Color.Black, After = [aa3D] });
+        ECS.AddSystem(new RenderPresenter { Input = aa2D.GetOutput, Destination = new Rectangle(320, 0, 320, 360), After = [left, aa2D] });
     }
 
     /// <inheritdoc/>

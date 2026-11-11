@@ -51,7 +51,7 @@ The following example shows how to offer two upscalers and cycle them with F11:
 
 ```csharp
 var upscaling = new SystemGroup("Upscaling",
-    ("Bilinear", ECS.AddSystem<Bilinear>()),
+    ("Bilinear", ECS.AddSystem<BilinearUpscaler>()),
     ("UDR3", ECS.AddSystem<UDR3>(enabled: false)));
 ECS.RegisterSystemGroup(upscaling);
 

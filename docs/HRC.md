@@ -7,9 +7,9 @@ Choose how light interacts with your scene, then connect the result to the same 
 | Technique | Scene | Use it for |
 | --- | --- | --- |
 | **Holographic Radiance Cascades** (`HRCGI`) | 2D shapes | Emissive lights, soft shadows and colored transmission |
-| **3D Radiance Cascades** (`RadianceCascades`, experimental) | 3D trace geometry | Deterministic diffuse lighting with world-space probes and optional bounce feedback |
+| **3D Radiance Cascades** (`RCGI`, experimental) | 3D trace geometry | Deterministic diffuse lighting with world-space probes and optional bounce feedback |
 | **Raster lighting** (`RasterRenderer`) | 2D or 3D raster geometry | Directional diffuse shading with an ambient term |
-| **Path tracing** (`PathTracer`) | 2D or 3D trace geometry | Progressive diffuse global illumination |
+| **Path tracing** (`PTGI`) | 2D or 3D trace geometry | Progressive diffuse global illumination |
 | **Unlit rendering** (`FlatRenderer`) | 2D or 3D images | Preserve authored colors without a lighting pass |
 
 Lighting technique and execution backend are separate choices. Vulkan ray queries accelerate path tracing; they do not define the lighting model. Toon lighting is not a built-in technique yet. Custom shader passes can provide other looks without changing the rest of the pipeline.
@@ -60,11 +60,11 @@ Open **F1 → View → Holographic Radiance Cascades**. Performance, Balanced, U
 
 These are **lighting quality** settings. They are separate from the resolution presets used by [UDR](UDR4.md).
 
-`HRCGI.GetOutput()` supplies linear light. Connect it to `ColorManagement` before display, then add reconstruction when rendering below display resolution:
+`HRCGI.GetOutput()` supplies linear light. Connect it to `HRCToneMapper` before display, then add reconstruction when rendering below display resolution:
 
 ```csharp
 var lighting = ECS.AddSystem<HRCGI>();
-var color = ECS.AddSystem<ColorManagement>();
+var color = ECS.AddSystem<HRCToneMapper>();
 var upscaler = ECS.AddSystem<UDR4>();
 
 // Connecting providers is fine inside SetupECS; the engine initializes systems afterwards.
@@ -74,7 +74,7 @@ upscaler.SetInputSource(color.GetOutput);
 
 ## 3D Radiance Cascades
 
-`RadianceCascades` lights diffuse meshes through a cube of world-space probes. It
+`RCGI` lights diffuse meshes through a cube of world-space probes. It
 uses the same `ITraceGeometry` and `SurfaceEmission` inputs as path tracing.
 Primary surfaces are shaded at the requested view size; probe density controls
 lighting detail independently. No stochastic sampling or denoiser is required,
@@ -85,7 +85,7 @@ adapter, tone mapping and presentation:
 
 ```csharp
 var meshes = ECS.AddSystem<MeshGeometry3D>();
-var lighting = ECS.AddSystem(new RadianceCascades
+var lighting = ECS.AddSystem(new RCGI
 {
     Geometry = meshes,
     After = [meshes],
@@ -93,12 +93,12 @@ var lighting = ECS.AddSystem(new RadianceCascades
     BaseDirectionRows = 4,
     MultiBounce = true
 });
-var color = ECS.AddSystem(new ToneMapping
+var color = ECS.AddSystem(new ToneMapper
 {
     Input = lighting.GetOutput,
     After = [lighting]
 });
-ECS.AddSystem(new RenderPresentation
+ECS.AddSystem(new RenderPresenter
 {
     Input = color.GetOutput,
     After = [color]
@@ -112,7 +112,7 @@ and **UDR4 → Balanced**, rendering at 50% of each display dimension and
 reconstructing to the full window size. Change reconstruction under
 **F1 → View → Image quality**; later renderer switches preserve that choice.
 UDR4 uses spatial reconstruction for this 3D input. Other scenes can register
-`RadianceCascadesSettings` with `Source = lighting` alongside their `Inspector`.
+`RCGISettings` with `Source = lighting` alongside their `Inspector`.
 
 - `GridSize` accepts 8, 16, 32 or 64 probes per axis; the standalone stage defaults to 32,
   while Cornell selects 16 for interactive use. Doubling it increases base probe count eightfold.
@@ -157,27 +157,27 @@ Here `geometry` is your existing raster geometry system. `LightDirection`, `Ligh
 
 ## Path tracing
 
-Use `PathTracer` with an `ITraceGeometry` adapter to accumulate diffuse light transport in 2D or 3D. For a 3D scene, `MeshGeometry3D` supplies the triangles:
+Use `PTGI` with an `ITraceGeometry` adapter to accumulate diffuse light transport in 2D or 3D. For a 3D scene, `MeshGeometry3D` supplies the triangles:
 
 ```csharp
 var meshes = ECS.AddSystem<MeshGeometry3D>();
-var lighting = ECS.AddSystem(new PathTracer
+var lighting = ECS.AddSystem(new PTGI
 {
     Geometry = meshes,
     After = [meshes],
     MaxBounces = 4,
     ResolutionScale = 0.5f
 });
-var color = ECS.AddSystem(new ToneMapping
+var color = ECS.AddSystem(new ToneMapper
 {
     Input = lighting.GetOutput,
     After = [lighting]
 });
 ```
 
-The image converges over successive samples. Use `SurfaceEmission` for emissive 3D surfaces, and insert `Denoising` before tone mapping when low sample counts are too noisy. The current material model is diffuse; glossy and transparent surfaces are not traced.
+The image converges over successive samples. Use `SurfaceEmission` for emissive 3D surfaces, and insert `Denoiser` before tone mapping when low sample counts are too noisy. The current material model is diffuse; glossy and transparent surfaces are not traced.
 
-`PathTracingBackend.Auto` selects Vulkan ray queries when available and otherwise uses shader BVH traversal. `Software` still runs on the GPU; it does not mean CPU rendering. See [Rendering pipelines](Rendering.md#hardware-ray-tracing) for the optional Vulkan runtime setup.
+`PTGIBackend.Auto` selects Vulkan ray queries when available and otherwise uses shader BVH traversal. `Software` still runs on the GPU; it does not mean CPU rendering. See [Rendering pipelines](Rendering.md#hardware-ray-tracing) for the optional Vulkan runtime setup.
 
 ## Build the final image
 

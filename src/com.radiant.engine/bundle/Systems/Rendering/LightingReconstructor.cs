@@ -5,9 +5,9 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Reconstructs reduced-resolution diffuse lighting on full-resolution primary surfaces, after denoising.</summary>
 [SystemTag("Rendering", "Path lighting")]
-public class PathLighting : ImageSystem
+public class LightingReconstructor : ImageSystem
 {
-    public PathTracer Source;
+    public PTGI Source;
     public RenderTarget2D DepthTexture => Surfaces[2];
 
     private readonly RenderTarget2D[] Surfaces = new RenderTarget2D[4];
@@ -17,7 +17,7 @@ public class PathLighting : ImageSystem
     private bool HadCamera;
 
     /// <summary>Registers the full-resolution surface guides used for lighting reconstruction.</summary>
-    public PathLighting()
+    public LightingReconstructor()
     {
         BufferProviders["Albedo"] = () => Surfaces[0];
         BufferProviders["Normals"] = () => Surfaces[1];
@@ -31,13 +31,13 @@ public class PathLighting : ImageSystem
     /// <inheritdoc/>
     public override void Render()
     {
-        if (Source == null) throw new InvalidOperationException("PathLighting requires a PathTracer source.");
+        if (Source == null) throw new InvalidOperationException("LightingReconstructor requires a PTGI source.");
 
         var input = Input?.Invoke();
 
         if (!Source.Enabled || !Source.SeparateLighting || input == null) { Dispose(); return; }
         if (Source.AlbedoTexture == null || Source.NormalTexture == null || Source.DepthTexture == null || Source.EmissionTexture == null)
-            throw new InvalidOperationException("PathLighting requires albedo, normal, depth and emission trace channels.");
+            throw new InvalidOperationException("LightingReconstructor requires albedo, normal, depth and emission trace channels.");
 
         var size = Source.ViewSize?.Invoke() ?? Source.Geometry.Size;
         bool dirty = Output?.Width != size.X || Output.Height != size.Y;

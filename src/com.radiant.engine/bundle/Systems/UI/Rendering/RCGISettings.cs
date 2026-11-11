@@ -3,12 +3,12 @@ using com.radiant.engine.core;
 
 namespace com.radiant.engine.bundle;
 
-/// <summary>Optional per-view controls for a <see cref="RadianceCascades"/> stage: probe density, directions, ray length and bounces.</summary>
+/// <summary>Optional per-view controls for a <see cref="RCGI"/> stage: probe density, directions, ray length and bounces.</summary>
 [SystemTag("Rendering", "Tools")]
-public class RadianceCascadesSettings : core.System
+public class RCGISettings : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.UI;
-    public RadianceCascades Source;
+    public RCGI Source;
     public string Id = "radianceCascades";
     public string Title = "Radiance cascades";
     public Action Changed;
@@ -19,7 +19,7 @@ public class RadianceCascadesSettings : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        if (Source == null) throw new InvalidOperationException("RadianceCascadesSettings requires a RadianceCascades source.");
+        if (Source == null) throw new InvalidOperationException("RCGISettings requires a RCGI source.");
 
         Inspector.CreateWindow(Id, Title, LayoutOrder: 200, Visible: false);
         Inspector.AddLabel(Id, "status", "Radiance cascades inactive");

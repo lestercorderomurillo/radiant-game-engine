@@ -2,7 +2,7 @@
 
 ## Optional Vulkan ray-query path tracer
 
-`PathTracer.Backend` accepts `Auto`, `Software`, or `Vulkan`. Auto uses the optional native backend when the active device enables Vulkan KHR ray queries; otherwise it reports the reason and uses the existing GPU shader BVH. Explicit Vulkan selection fails if unavailable. The Path tracing inspector exposes the selection and the last completed ray-query GPU time, excluding geometry guides, denoising and other image stages.
+`PTGI.Backend` accepts `Auto`, `Software`, or `Vulkan`. Auto uses the optional native backend when the active device enables Vulkan KHR ray queries; otherwise it reports the reason and uses the existing GPU shader BVH. Explicit Vulkan selection fails if unavailable. The Path tracing inspector exposes the selection and the last completed ray-query GPU time, excluding geometry guides, denoising and other image stages.
 
 Build and run the optional runtime on the target platform:
 
@@ -52,15 +52,15 @@ Scale defaults to one. `ECS.AddComponent<T>` initializes new component values us
 | `ShapeGeometry2D` | Collect opaque rectangles, circles and triangles, including 2D scale/rotation/layer; expose flat color and an orthographic triangle adapter |
 | `FlatRenderer` | Forward geometry color with no copy or extra target |
 | `RasterRenderer` | Light submitted geometry before sample resolve; alternatively light an image with an optional normal buffer |
-| `PathTracer` | Progressive diffuse GPU path tracing from an `ITraceGeometry` adapter |
-| `Denoising` | Optional spatial, temporal diffuse and neural HDR denoising |
-| `PathTracingSettings` | Optional per-view path tracing and denoiser selector window |
-| `ToneMapping` | Shared exposure, tone operators and optional output transfer |
-| `ColorSettings` | Optional per-view color window, bound to a `ToneMapping` instance |
-| `AntiAliasingSettings` | Optional per-view AA window, bound to `AntiAliasing` and optionally `RasterSampling` |
-| `RasterSampling` | Per-view MSAA / SSAA configuration and projection jitter |
-| `AntiAliasing` | FXAA, SMAA 1x, TAA and area supersample resolve |
-| `RenderPresentation` | Draw a chosen result to a target and optional destination rectangle |
+| `PTGI` | Progressive diffuse GPU path tracing from an `ITraceGeometry` adapter |
+| `Denoiser` | Optional spatial, temporal diffuse and neural HDR denoising |
+| `PTGISettings` | Optional per-view path tracing and denoiser selector window |
+| `ToneMapper` | Shared exposure, tone operators and optional output transfer |
+| `ToneMapperSettings` | Optional per-view color window, bound to a `ToneMapper` instance |
+| `AntiAliaserSettings` | Optional per-view AA window, bound to `AntiAliaser` and optionally `RasterSampler` |
+| `RasterSampler` | Per-view MSAA / SSAA configuration and projection jitter |
+| `AntiAliaser` | FXAA, SMAA 1x, TAA and area supersample resolve |
+| `RenderPresenter` | Draw a chosen result to a target and optional destination rectangle |
 | `RenderInspector` | Expose a view's named buffers through the existing F1 inspector |
 
 The geometry systems produce buffers; they do not present to the screen. Inspecting a normal buffer never changes what another stage gets from a geometry source. `IRenderSource.GetOutput()` is the stable primary output; `Buffers` provides named live getters that survive resize.
@@ -85,24 +85,24 @@ A minimal 3D flat pipeline:
 var meshes = ECS.AddSystem<MeshGeometry3D>();
 var geometry = ECS.AddSystem(new Geometry3D { Source = meshes, After = [meshes] });
 var flat = ECS.AddSystem(new FlatRenderer { Input = geometry.GetOutput, After = [geometry] });
-ECS.AddSystem(new RenderPresentation { Input = flat.GetOutput, After = [flat] });
+ECS.AddSystem(new RenderPresenter { Input = flat.GetOutput, After = [flat] });
 ```
 
 A minimal 2D flat pipeline:
 
 ```csharp
 var geometry = ECS.AddSystem<ShapeGeometry2D>();
-ECS.AddSystem(new RenderPresentation { Input = geometry.GetOutput, After = [geometry] });
+ECS.AddSystem(new RenderPresenter { Input = geometry.GetOutput, After = [geometry] });
 ```
 
 Optional AA works with either source:
 
 ```csharp
-var aa = ECS.AddSystem(new AntiAliasing { Input = geometry.GetOutput, After = [geometry] }, enabled: false);
-ECS.AddSystem(new RenderPresentation { Input = aa.GetOutput, After = [aa] });
+var aa = ECS.AddSystem(new AntiAliaser { Input = geometry.GetOutput, After = [geometry] }, enabled: false);
+ECS.AddSystem(new RenderPresenter { Input = aa.GetOutput, After = [aa] });
 ```
 
-A disabled image system forwards its input. `ToneMapper.None` skips the tone curve but still applies exposure. At exposure 1 with Linear output transfer it forwards its input and releases any cached color target. Exposure-only processing preserves HDR values in HalfVector4; it does not clamp highlights. No image target is allocated until an enabled pass actually needs it. Changing a stage's enabled flag retains its cached target for reuse; call `Dispose()` to release it. The demo selectors release inactive renderer targets explicitly.
+A disabled image system forwards its input. `ToneMapOperator.None` skips the tone curve but still applies exposure. At exposure 1 with Linear output transfer it forwards its input and releases any cached color target. Exposure-only processing preserves HDR values in HalfVector4; it does not clamp highlights. No image target is allocated until an enabled pass actually needs it. Changing a stage's enabled flag retains its cached target for reuse; call `Dispose()` to release it. The demo selectors release inactive renderer targets explicitly.
 
 `System.After` names system instances, so two views can contain the same system types without sharing their dependencies. Dependencies are sorted once at ECS initialization; missing dependencies and cycles fail explicitly. Existing type-based ordering attributes are also supported and apply to all matching instances. `GetSystem<T>()` returns the last registered instance, so retain the references returned by `AddSystem` when composing multiple views.
 
@@ -110,22 +110,22 @@ Each presentation has its own input, target, destination and optional clear. Pre
 
 ## Shared color and settings windows
 
-ACES, AgX and the other tone operators process image radiance, independently of the renderer or scene dimension. `ToneMapping` supports None, Reinhard, ACES (Narkowicz fit), ACES Fitted (Hill RRT/ODT fit), AgX, Filmic, Uchimura and PBR Neutral. The previous HRC label "ACES 2.0" referred to the Hill fit; it is now named ACES Fitted rather than claiming to implement the ACES 2.0 standard.
+ACES, AgX and the other tone operators process image radiance, independently of the renderer or scene dimension. `ToneMapper` supports None, Reinhard, ACES (Narkowicz fit), ACES Fitted (Hill RRT/ODT fit), AgX, Filmic, Uchimura and PBR Neutral. The previous HRC label "ACES 2.0" referred to the Hill fit; it is now named ACES Fitted rather than claiming to implement the ACES 2.0 standard.
 
 `Exposure` is a linear multiplier. `Transfer` selects Linear (default), sRGB or Gamma22 separately from the tone curve. Processing unpremultiplies coverage, applies exposure and the curve, applies the selected transfer once, and restores alpha. `None` with Linear transfer preserves HDR highlights; choosing None does not disable exposure. Raw buffer inspection continues to bypass display processing.
 
 The processing systems have no mandatory UI. Add the same optional window systems for a 2D or 3D view:
 
 ```csharp
-var color = ECS.AddSystem(new ToneMapping { Input = renderer.GetOutput, Mapper = ToneMapper.AgX, After = [renderer] });
-var aa = ECS.AddSystem(new AntiAliasing { Input = color.GetOutput, After = [color] });
-ECS.AddSystem(new ColorSettings { Id = "mainColor", Source = color });
-ECS.AddSystem(new AntiAliasingSettings { Id = "mainAA", Source = aa, Sampling = sampling });
+var color = ECS.AddSystem(new ToneMapper { Input = renderer.GetOutput, Operator = ToneMapOperator.AgX, After = [renderer] });
+var aa = ECS.AddSystem(new AntiAliaser { Input = color.GetOutput, After = [color] });
+ECS.AddSystem(new ToneMapperSettings { Id = "mainColor", Source = color });
+ECS.AddSystem(new AntiAliaserSettings { Id = "mainAA", Source = aa, Sampling = sampling });
 ```
 
 Both windows appear under F1 → View and start hidden. They edit the bound instances and synchronize changes made through code. Use distinct IDs (and optional Titles) for multiple views; each view can choose a different curve, exposure or AA mode. Omit `Sampling` for a post-AA-only window, or omit the window systems entirely without changing rendering. The Cornell Box and compact 2D demo use these shared windows; their scene panels retain renderer selection and buffer inspection.
 
-The existing `ColorManagement` class is now a thin HRC/UDR compatibility adapter over `ToneMapping`: it processes during Update so UDR1–4 can consume this frame's result. `SetInputSource` and its Color Management window remain available. Defaults retain PBR Neutral + Gamma22. Set `SettingsId` to customize its window ID, or null for no compatibility UI. It uses the same operators, exposure, alpha handling and shader as render-phase `ToneMapping`; do not chain both processors unintentionally. New render-phase pipelines compose `ToneMapping` and `ColorSettings` explicitly.
+The existing `HRCToneMapper` class is now a thin HRC/UDR compatibility adapter over `ToneMapper`: it processes during Update so UDR1–4 can consume this frame's result. `SetInputSource` and its Color Management window remain available. Defaults retain PBR Neutral + Gamma22. Set `SettingsId` to customize its window ID, or null for no compatibility UI. It uses the same operators, exposure, alpha handling and shader as render-phase `ToneMapper`; do not chain both processors unintentionally. New render-phase pipelines compose `ToneMapper` and `ToneMapperSettings` explicitly.
 
 ```sh
 dotnet run --project tests/Radiant.3D -c Release -- --rendering-settings
@@ -133,7 +133,7 @@ dotnet run --project tests/Radiant.3D -c Release -- --rendering-settings --2d
 dotnet run --project tests/Radiant.Scenes -c Release -- --color-pipeline
 ```
 
-These regressions exercise every operator/transfer combination through the shared windows in both demo scenes, check premultiplied HDR/alpha and exposure/transfer ordering, compare legacy Update processing with Render processing, and validate identity/disabled bypass, null input cleanup and UI synchronization. The HRC color regression additionally feeds every operator through the real HRC → ColorManagement → UDR4 chain, compares its color output against render-phase processing and checks UDR4 history accumulation.
+These regressions exercise every operator/transfer combination through the shared windows in both demo scenes, check premultiplied HDR/alpha and exposure/transfer ordering, compare legacy Update processing with Render processing, and validate identity/disabled bypass, null input cleanup and UI synchronization. The HRC color regression additionally feeds every operator through the real HRC → HRCToneMapper → UDR4 chain, compares its color output against render-phase processing and checks UDR4 history accumulation.
 
 ## Optional geometry buffers
 
@@ -149,15 +149,15 @@ The generic input is `ITraceGeometry`: enabled world triangles, a revision, and 
 
 The tracer builds a median-split BVH only when geometry changes, uploads its nodes/triangles to a float texture, and traverses escape links on the GPU. Traversal is bounded and monotonic. Camera motion does not rebuild geometry. Camera, environment, bounce-count, geometry and resolution changes reset progressive history. No camera clears output and resets history. Changing the geometry adapter invalidates the cached BVH as well.
 
-Diffuse paths use cosine-weighted hemisphere sampling, emissive surfaces, an environment and Russian roulette. Primary rays use the camera clip range. `SurfaceEmission` is an optional component for HDR mesh emission. The Cornell Box includes a ceiling emitter. Geometry remains opaque; this is a baseline diffuse tracer, without hardware RT acceleration, transmission, glossy BSDFs or direct-light importance sampling. Denoising is a separate optional stage. Expect visible noise at low sample counts. It is not a replacement for a production path tracer.
+Diffuse paths use cosine-weighted hemisphere sampling, emissive surfaces, an environment and Russian roulette. Primary rays use the camera clip range. `SurfaceEmission` is an optional component for HDR mesh emission. The Cornell Box includes a ceiling emitter. Geometry remains opaque; this is a baseline diffuse tracer, without hardware RT acceleration, transmission, glossy BSDFs or direct-light importance sampling. Denoiser is a separate optional stage. Expect visible noise at low sample counts. It is not a replacement for a production path tracer.
 
 `ResolutionScale` controls tracer resolution independently of rasterization. HDR history uses Vector4 (float32) ping-pong targets: half precision loses small corrections after many frames and biases brightness and color. The two history targets cost 32 bytes per tracing pixel and are allocated only when tracing renders. The running-average window is bounded at 4096 samples to avoid unbounded history weights; random sample sequences continue beyond that point. Scene extraction checks component values each frame; dynamic geometry rebuilds the BVH, rather than performing a refit. Mesh GPU buffers remain cached for the renderer's lifetime.
 
-`PathTracer.Channels` defaults to `TraceChannels.None`. Request Albedo, Normals, Depth, Emission, Sample or All for ray-derived surface buffers in either dimension. These use deterministic pixel-center primary rays and the existing BVH, independently of stochastic radiance history. Only requested targets are allocated; static surfaces are cached until camera, geometry or resolution changes. Depth is linear view depth divided by the camera far plane, with zero for misses. Normals are encoded world-space normals facing the primary ray. Emission retains HDR values. The demo inspectors request all channels and route tracer depth to TAA while raster geometry is inactive. `TraceChannels.Sample` adds a separate RGBA32F unaccumulated sample (16 bytes per tracing pixel), written alongside the progressive mean without tracing twice. It is optional; temporal denoisers need it, spatial and neural filters do not. `All` now includes Sample. Camera motion resets progressive averaging but advances the random sequence; geometry/environment/bounce/resolution changes and explicit resets also advance `RadianceRevision`, allowing temporal consumers to distinguish camera reprojection from invalid scene history.
+`PTGI.Channels` defaults to `TraceChannels.None`. Request Albedo, Normals, Depth, Emission, Sample or All for ray-derived surface buffers in either dimension. These use deterministic pixel-center primary rays and the existing BVH, independently of stochastic radiance history. Only requested targets are allocated; static surfaces are cached until camera, geometry or resolution changes. Depth is linear view depth divided by the camera far plane, with zero for misses. Normals are encoded world-space normals facing the primary ray. Emission retains HDR values. The demo inspectors request all channels and route tracer depth to TAA while raster geometry is inactive. `TraceChannels.Sample` adds a separate RGBA32F unaccumulated sample (16 bytes per tracing pixel), written alongside the progressive mean without tracing twice. It is optional; temporal denoisers need it, spatial and neural filters do not. `All` now includes Sample. Camera motion resets progressive averaging but advances the random sequence; geometry/environment/bounce/resolution changes and explicit resets also advance `RadianceRevision`, allowing temporal consumers to distinguish camera reprojection from invalid scene history.
 
 The optional `ViewSize` provider supplies the base tracing resolution before `ResolutionScale`. Both demos use their view size here, so selecting raster MSAA/SSAA does not silently change path resolution or consume raster targets. Path tracing provides stochastic ray sampling; its image can additionally use FXAA, SMAA or TAA.
 
-Both demos separate surface detail from lighting with `PathLighting`, placed after denoising and before tone mapping. The **Lighting resolution** slider reduces the path-traced lighting buffer while model silhouettes, albedo and emission retain the full view resolution. `PathTracer.SeparateLighting` holds primary rays at pixel centers so low-resolution samples and their surface guides agree; bounce directions remain stochastic. The reconstruction stage divides diffuse radiance by its source albedo, gathers lighting using normal/depth weights, then applies full-resolution albedo and emission. It keeps the existing radiance/guide contracts and denoiser resolutions intact. At native resolution it copies radiance without extra filtering. Full-resolution surface buffers are cached until the camera, geometry or view changes, exposed under **Path lighting** in the pipeline inspector, and used for AA depth. Disabling tracing releases these targets. Small lighting features still depend on trace resolution; surfaces missed by every nearby lighting sample fall back to environment illumination. Cached surface tracing and reconstruction add GPU work, so this is a quality/performance tradeoff rather than a guaranteed frame-rate gain.
+Both demos separate surface detail from lighting with `LightingReconstructor`, placed after denoising and before tone mapping. The **Lighting resolution** slider reduces the path-traced lighting buffer while model silhouettes, albedo and emission retain the full view resolution. `PTGI.SeparateLighting` holds primary rays at pixel centers so low-resolution samples and their surface guides agree; bounce directions remain stochastic. The reconstruction stage divides diffuse radiance by its source albedo, gathers lighting using normal/depth weights, then applies full-resolution albedo and emission. It keeps the existing radiance/guide contracts and denoiser resolutions intact. At native resolution it copies radiance without extra filtering. Full-resolution surface buffers are cached until the camera, geometry or view changes, exposed under **Path lighting** in the pipeline inspector, and used for AA depth. Disabling tracing releases these targets. Small lighting features still depend on trace resolution; surfaces missed by every nearby lighting sample fall back to environment illumination. Cached surface tracing and reconstruction add GPU work, so this is a quality/performance tradeoff rather than a guaranteed frame-rate gain.
 
 Shape tracing tessellates circles using `CircleSegments`. New shape rendering is opaque and untextured; the existing 2D pipeline retains its texture/transparency features. Shape color, raster lighting and trace albedo are interpreted as linear numeric RGB; tone mapping is independent of output transfer/gamma conversion. HRC/UDR and the opaque 2D/3D pipelines share the same color shader and operators.
 
@@ -167,19 +167,19 @@ Algorithm references: [PBRT's simple path tracer](https://pbr-book.org/4ed/Light
 
 The shared **Path tracing** window under F1 → View offers **None**, **Joint bilateral**, **À-trous**, **SVGF (temporal diffuse)** and optional **OIDN neural** in both demo dimensions. SDKs without working native integrations are listed as unavailable and cannot be selected; selecting them reports why and retains the current filter. The standalone Cornell Box launch starts with À-trous enabled; generic systems and regression fixtures default to None. Strength adjusts edge weighting; à-trous and SVGF expose 1–5 wavelet iterations. **Neural denoising settings** opens per-view OIDN quality, device, update interval and status controls. **Reset denoising history** invalidates reconstruction without resetting the raw tracer. Changing the filter preserves accumulated path samples and resets the demo's downstream AA history.
 
-`Denoising` is an independent image system, not part of the tracer or a mandatory post-processing chain. It filters the tracer's linear HDR output before `ToneMapping`; `PathTracer.GetOutput()` and its accumulation/history buffers remain raw. `RenderInspector` exposes the Denoising input, output and optional intermediate target independently from the path tracing buffers. No filtered result is fed back into progressive accumulation.
+`Denoiser` is an independent image system, not part of the tracer or a mandatory post-processing chain. It filters the tracer's linear HDR output before `ToneMapper`; `PTGI.GetOutput()` and its accumulation/history buffers remain raw. `RenderInspector` exposes the Denoiser input, output and optional intermediate target independently from the path tracing buffers. No filtered result is fed back into progressive accumulation.
 
 The algorithms are engine adaptations of [Tomasi and Manduchi, Bilateral Filtering for Gray and Color Images (1998)](https://www.cs.jhu.edu/~misha/ReadingSeminar/Papers/Tomasi98.pdf) and [Dammertz et al., Edge-Avoiding À-Trous Wavelet Transform for Fast Global Illumination Filtering (2010)](https://jo.dreggn.org/home/2010_atrous.pdf). Joint bilateral uses one 5×5 Gaussian pass. À-trous uses a separable B3 kernel evaluated as 25 taps per pass, doubling tap spacing at each level and narrowing the radiance range. Both combine normal, linear-depth and albedo weights. Diffuse albedo is demodulated before filtering and restored afterward; an optional emission guide excludes directly emissive surfaces. Alpha is preserved and samples with different coverage are rejected. A conservative one-sided depth slope accepts slanted surfaces while protecting depth discontinuities.
 
 Bind matching, pixel-aligned surface buffers explicitly. Request `TraceChannels.Albedo | TraceChannels.Normals | TraceChannels.Depth` on the tracer, plus Emission when needed. The demos already request All for inspection. Consumers do not silently change a producer's requested channels.
 
 ```csharp
-var denoiser = ECS.AddSystem(new Denoising { Input = tracer.GetOutput, Mode = DenoiserMode.Atrous, Albedo = () => tracer.AlbedoTexture, Normals = () => tracer.NormalTexture, Depth = () => tracer.DepthTexture, Emission = () => tracer.EmissionTexture, After = [tracer] });
-var color = ECS.AddSystem(new ToneMapping { Input = denoiser.GetOutput, After = [denoiser] });
-ECS.AddSystem(new PathTracingSettings { Id = "mainPath", Source = tracer, Denoiser = denoiser });
+var denoiser = ECS.AddSystem(new Denoiser { Input = tracer.GetOutput, Mode = DenoiserMode.Atrous, Albedo = () => tracer.AlbedoTexture, Normals = () => tracer.NormalTexture, Depth = () => tracer.DepthTexture, Emission = () => tracer.EmissionTexture, After = [tracer] });
+var color = ECS.AddSystem(new ToneMapper { Input = denoiser.GetOutput, After = [denoiser] });
+ECS.AddSystem(new PTGISettings { Id = "mainPath", Source = tracer, Denoiser = denoiser });
 ```
 
-The same API accepts perspective/orthographic path outputs or another HDR producer with compatible guides. `PathTracingSettings.Denoiser` is optional. Give independent views distinct window IDs and retain their system references. Raw tracing output remains `tracer.GetOutput()`; omit Denoising entirely if unwanted.
+The same API accepts perspective/orthographic path outputs or another HDR producer with compatible guides. `PTGISettings.Denoiser` is optional. Give independent views distinct window IDs and retain their system references. Raw tracing output remains `tracer.GetOutput()`; omit Denoiser entirely if unwanted.
 
 None forwards input with no filter allocation and releases cached filter targets. A null input also releases targets, so the demos free denoising resources when switching away from tracing. Bilateral allocates one RGBA32F target (16 bytes per tracing pixel); multi-pass à-trous uses two (32 bytes per pixel). These costs exclude producer-owned guides. Spatial modes allocate no temporal history or neural model. SVGF and OIDN allocate their own resources only when selected, and dispose them when switching modes. Disabled systems follow the standard image-stage bypass/cache behavior; `Dispose()` releases their cached targets.
 
@@ -222,7 +222,7 @@ This integration uses **host readback/upload**, including when OIDN chooses a GP
 
 There is no universal “best denoiser”: reconstruction quality depends on signals, motion, supported hardware, sampling and frame budget. [DLSS 4.5 Ray Reconstruction](https://www.nvidia.com/en-us/geforce/news/dlss-4-5-ray-reconstruction-1000-rtx-games-apps-out-now/), [FSR Ray Regeneration](https://gpuopen.com/amd-fsr-sdk/), [NRD REBLUR/RELAX](https://github.com/NVIDIA-RTX/NRD) and OptiX are distinct vendor/native integrations. SIGMA in NRD handles shadows, rather than arbitrary beauty-image denoising. These are not extra names for the portable filters above.
 
-**NRD REBLUR and RELAX are integrated for diffuse path tracing through the optional Vulkan runtime.** Build with `python3 eng/build-vulkan-rt.py --nrd`, then build/run with `-p:RadiantVulkanRT=true`. This pins official NRD 4.18.0 and compiles its SPIR-V shaders; CMake 3.30+ is required and the first build downloads the SDK’s shader compiler dependencies. Assign `Denoising.TraceSource = tracer` (already wired in both path tracing demos), use Auto or Vulkan tracing, and select `nrd.reblur` / `nrd.relax` with `TrySelectBackend`. The selector checks the loaded runtime and device. Standard builds keep both entries unavailable. Cornell also accepts `--denoiser=nrd.reblur` or `--denoiser=nrd.relax`, including with `--capture`.
+**NRD REBLUR and RELAX are integrated for diffuse path tracing through the optional Vulkan runtime.** Build with `python3 eng/build-vulkan-rt.py --nrd`, then build/run with `-p:RadiantVulkanRT=true`. This pins official NRD 4.18.0 and compiles its SPIR-V shaders; CMake 3.30+ is required and the first build downloads the SDK’s shader compiler dependencies. Assign `Denoiser.TraceSource = tracer` (already wired in both path tracing demos), use Auto or Vulkan tracing, and select `nrd.reblur` / `nrd.relax` with `TrySelectBackend`. The selector checks the loaded runtime and device. Standard builds keep both entries unavailable. Cornell also accepts `--denoiser=nrd.reblur` or `--denoiser=nrd.relax`, including with `--capture`.
 
 NRD consumes a current, stable-primary diffuse sample with primary albedo/emission removed, second-segment hit distance, packed normals/roughness, world-unit view depth, and zero world motion. Camera reprojection uses current/previous matrices; geometry revisions reset history rather than attempting object-motion tracking. REBLUR receives normalized hit distance and YCoCg encoding; RELAX receives linear radiance and world-unit hit distance. Reconstruction reapplies exact primary albedo/emission and forwards misses from the current raw sample. All tracing, NRD passes and composition remain in MonoGame’s GPU command stream, with per-view pools and per-flight-frame constants/descriptors. Selecting software tracing forwards raw radiance with a status message. Resize, scene/radiance revisions, explicit reset, and trace-session replacement invalidate history. Native signals are allocated at trace resolution only while a native denoiser is selected; ordinary tracing uses minimal dummy bindings. This is a diffuse-only integrator: specular/glass denoising and per-object motion are not implemented.
 
@@ -230,7 +230,7 @@ NRD consumes a current, stable-primary diffuse sample with primary albedo/emissi
 
 DLSS Ray Reconstruction and OptiX remain unimplemented native backends requiring NVIDIA hardware/runtime support. [FSR Ray Regeneration 1.2.1 requirements](https://gpuopen.com/manuals/fsr_sdk/techniques/denoising/#6-requirements) specify Windows 11, DirectX 12 and RX 9000-series or later; the broader FSR SDK’s Vulkan upscaling support does not provide a Vulkan Ray Regeneration backend. These three entries stay unavailable. Enabling them requires separate SDK integrations and supported validation hardware/platforms; they are not aliases for NRD or the portable filters.
 
-`IDenoisingBackend` provides per-view Render/Update, output/buffers, status/capability, reset and disposal. Register an independently owned, lazy backend factory; a small disposable probe supplies metadata. Distinct IDs are required, including when overriding an unavailable catalog entry:
+`IDenoiserBackend` provides per-view Render/Update, output/buffers, status/capability, reset and disposal. Register an independently owned, lazy backend factory; a small disposable probe supplies metadata. Distinct IDs are required, including when overriding an unavailable catalog entry:
 
 ```csharp
 denoiser.RegisterBackend("studio.neural", () => new StudioDenoiser());
@@ -277,7 +277,7 @@ dotnet run --project tests/Radiant.3D -c Release --no-build -- --pipeline-regres
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --pipeline-regression --2d
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --regression
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --mixed-regression
-dotnet run --project tests/Radiant.Scenes -c Release --no-build -- triangles --smoke
+dotnet run --project tests/Radiant.Scenes -c Release --no-build -- radiance --smoke
 ```
 
 The mixed-dimension GPU regression renders one entity into two independent 2D/3D views, each with its own AA instance and resolution. The pipeline GPU regressions exercise real triangle hits, renderer switching, optional FXAA, tone mapping, camera/geometry/environment invalidation, missing-camera clearing, BVH reuse, lazy resources and resize in both dimensions. Captures are saved to `artifacts/pipeline/`. Headless tests check component sizes/defaults, independent transforms, movement, BVH packing and per-instance dependencies.
@@ -292,28 +292,28 @@ The former shared `Transform` is removed. Change 2D components/queries to `Trans
 
 Geometry sampling and post-processing are independent per-view systems:
 
-| Geometry AA (`RasterSampling.Mode`) | Actual operation |
+| Geometry AA (`RasterSampler.Mode`) | Actual operation |
 | --- | --- |
 | None | Native-resolution rasterization |
 | MSAA2x / MSAA4x / MSAA8x | Multisampled render targets, hardware resolve, and adapter capability fallback |
 | SSAA2x / SSAA3x | Two/three times each view dimension (4/9 spatial samples per final pixel), then area-weighted resolve |
 
-| Post AA (`AntiAliasing.Mode`) | Actual operation |
+| Post AA (`AntiAliaser.Mode`) | Actual operation |
 | --- | --- |
 | None | Bypass; resolve/upscale only when input and view resolutions differ |
 | FXAA | Contrast-based directional spatial filtering |
 | SMAA | Reference SMAA 1x: edge detection, area/search lookup blending weights, neighborhood blending |
 | TAA | Eight-position Halton projection jitter, depth-based camera reprojection, depth rejection, neighborhood clamping and history accumulation |
 
-MSAA can be combined with a post filter such as SMAA. SSAA can be combined with TAA. `RasterSampling.ActualSamples` and the inspector report the real target sample count: on the tested RADV GPU, requesting 8x selects 4x. MSAA requires geometry integration; selecting it does not apply a renamed image blur. The native Vulkan backend's MSAA resolve supports one color attachment per render pass, so multisampled 3D color/normals/depth use separate geometry passes. Non-MSAA rendering retains the MRT path.
+MSAA can be combined with a post filter such as SMAA. SSAA can be combined with TAA. `RasterSampler.ActualSamples` and the inspector report the real target sample count: on the tested RADV GPU, requesting 8x selects 4x. MSAA requires geometry integration; selecting it does not apply a renamed image blur. The native Vulkan backend's MSAA resolve supports one color attachment per render pass, so multisampled 3D color/normals/depth use separate geometry passes. Non-MSAA rendering retains the MRT path.
 
 Minimal sampling configuration:
 
 ```csharp
-var sampling = ECS.AddSystem(new RasterSampling { Mode = RasterAAMode.MSAA4x });
+var sampling = ECS.AddSystem(new RasterSampler { Mode = RasterAAMode.MSAA4x });
 var meshes = ECS.AddSystem(new MeshGeometry3D { Sampling = sampling });
 var geometry = ECS.AddSystem(new Geometry3D { Source = meshes, Channels = GeometryChannels.All, After = [meshes] });
-var aa = ECS.AddSystem(new AntiAliasing { Input = geometry.GetOutput, Mode = PostAAMode.TAA, Camera = () => meshes.Camera, Depth = () => geometry.DepthTexture, GeometryRevision = () => meshes.Revision, OutputSize = () => meshes.ViewSize, After = [geometry] });
+var aa = ECS.AddSystem(new AntiAliaser { Input = geometry.GetOutput, Mode = PostAAMode.TAA, Camera = () => meshes.Camera, Depth = () => geometry.DepthTexture, GeometryRevision = () => meshes.Revision, OutputSize = () => meshes.ViewSize, After = [geometry] });
 aa.SetSampling(sampling);
 ```
 

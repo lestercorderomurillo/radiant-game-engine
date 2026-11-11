@@ -20,8 +20,8 @@ internal sealed class AdvancedDenoisingRegressionWindow : Window
     private int Frame, NeuralStage, Jobs, CameraEntity;
     private Vector4[] Raw16, Temporal16;
     private bool NeuralReady;
-    private PathTracer Tracer => Scene is CornellBoxScene c ? c.Tracer : ((Rendering2DScene)Scene).Tracer;
-    private AntiAliasing AA => Scene is CornellBoxScene c ? c.AA : ((Rendering2DScene)Scene).AA;
+    private PTGI Tracer => Scene is CornellBoxScene c ? c.Tracer : ((Rendering2DScene)Scene).Tracer;
+    private AntiAliaser AA => Scene is CornellBoxScene c ? c.AA : ((Rendering2DScene)Scene).AA;
     private string SettingsId => TwoD ? "rendering2dPath" : "pathTracing";
 
     /// <summary>Finds a named inspector widget required by the regression case.</summary>
@@ -32,7 +32,7 @@ internal sealed class AdvancedDenoisingRegressionWindow : Window
         return window.Widgets[window.WidgetIndex[id]];
     }
 
-    private Denoising Filter => Scene is CornellBoxScene c ? c.Denoiser : ((Rendering2DScene)Scene).Denoiser;
+    private Denoiser Filter => Scene is CornellBoxScene c ? c.Denoiser : ((Rendering2DScene)Scene).Denoiser;
 
     /// <summary>Applies a renderer or denoiser selection through the test's inspector controls.</summary>
     private void Select(int method) { if (Scene is CornellBoxScene c) c.SelectRenderer(method); else ((Rendering2DScene)Scene).SelectRenderer(method); }
@@ -318,7 +318,7 @@ internal sealed class AdvancedDenoisingRegressionWindow : Window
     }
 
     /// <summary>Minimal registered denoiser used to verify backend selection and lifecycle.</summary>
-    private sealed class TestBackend : IDenoisingBackend
+    private sealed class TestBackend : IDenoiserBackend
     {
         public static int Created, Disposed;
         public string Name => "Test passthrough";
@@ -336,7 +336,7 @@ internal sealed class AdvancedDenoisingRegressionWindow : Window
         public Texture2D GetOutput() => Input;
 
         /// <summary>Records the supplied frame and exposes the test backend's output.</summary>
-        public void Render(in DenoisingFrame frame) => Input = frame.Input;
+        public void Render(in DenoiserFrame frame) => Input = frame.Input;
 
         /// <summary>Discards accumulated image history so the next frame starts fresh.</summary>
         public void ResetHistory() { }

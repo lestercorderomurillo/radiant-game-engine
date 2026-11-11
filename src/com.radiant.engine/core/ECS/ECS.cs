@@ -57,6 +57,7 @@ public class ECS : IGameObject
 
     // Systems
     private readonly List<System> Systems;
+    private readonly HashSet<SystemCollection> Collections = new();
     private List<System> RenderSystems;
     private readonly Dictionary<Type, System> SystemCache;
     private readonly List<SystemGroup> SystemGroups = new();
@@ -275,6 +276,17 @@ public class ECS : IGameObject
         SystemCache[typeof(T)] = system;
 
         return system;
+    }
+
+    /// <summary>Applies a reusable system recipe once, during scene setup.</summary>
+    /// <example><code>ECS.AddSystemCollection(SystemCollections.Debugging);</code></example>
+    public void AddSystemCollection(SystemCollection collection)
+    {
+        ArgumentNullException.ThrowIfNull(collection);
+        if (IsInitialized) throw new InvalidOperationException("Register system collections in SetupECS, before initialization.");
+        if (Collections.Contains(collection)) return;
+        collection.Register(this);
+        Collections.Add(collection);
     }
 
     /// <summary>Returns the registered system of a type, or null if the scene doesn't have one.</summary>

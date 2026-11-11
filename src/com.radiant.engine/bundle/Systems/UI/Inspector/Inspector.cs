@@ -39,7 +39,24 @@ public partial class Inspector : core.System
     private string SliderWindowId;
     private string SliderWidgetId;
     private bool MouseOverUI;
-    private bool GlobalVisible = false;
+    private bool GlobalVisible = true;
+    private bool StartupWindowsPending = true;
+
+    /// <summary>Workspace used at initialization. Panels is the default for every scene.</summary>
+    public WorkspaceMode StartupWorkspaceMode { get; set; } = WorkspaceMode.Panels;
+    /// <summary>Open all registered tools at startup, including windows registered by other systems.</summary>
+    public bool ShowAllOnStartup { get; set; } = true;
+    /// <summary>Show the tools, or give the entire window to the game. F1 toggles this setting.</summary>
+    public bool Visible
+    {
+        get => GlobalVisible;
+        set
+        {
+            GlobalVisible = value;
+            if (!value) { MouseOverUI = false; ClearTextInputFocus(); }
+            if (Renderer != null) UpdatePresentationViewport();
+        }
+    }
     private bool Resizing;
     private string ResizeWindowId;
     private Vector2 ResizeStartMouse;
@@ -64,22 +81,22 @@ public partial class Inspector : core.System
     private string FocusedTextInputWidgetId;
     private float CursorBlinkTimer;
     private const float CursorBlinkRate = 0.53f;
-    private const int InlineGap = 10;
+    private const int InlineGap = 12;
 
     /// <summary>Raised when the user picks View → Reorder Windows, after windows return to their default places.</summary>
     public static event Action WindowsRestored;
 
     private const int DefaultWindowWidth = 600;
-    private const int TitleBarHeight = 64;
-    private const int WidgetHeight = 60;
-    private const int WidgetSpacing = 18;
+    private const int TitleBarHeight = 48;
+    private const int WidgetHeight = 48;
+    private const int WidgetSpacing = 12;
     private const int LabelSpacing = 6;
     private const int Padding = 20;
     private const int CloseButtonSize = 28;
     private const int AutoLayoutGap = 32;
     private const int SliderTrackHeight = 8;
     private const int SliderHandleSize = 22;
-    private const int ToggleBoxSize = 34;
+    private const int ToggleBoxSize = 28;
     private const int CornerRadius = 10;
     private const int MaxVisibleDropdownItems = 4;
     private const int ResizeHandleSize = 32;
@@ -614,6 +631,8 @@ public partial class Inspector : core.System
         AddDropdown("inspector", "theme", "Theme", GetThemeNames(), defaultThemeIndex, ApplyTheme);
 
         InitializeMenuBar();
+        SetWorkspaceMode(StartupWorkspaceMode);
+        if (ShowAllOnStartup) ShowAllWindows();
     }
 
     /// <summary>Inserts typed characters into the currently focused text field.</summary>
@@ -681,6 +700,12 @@ public partial class Inspector : core.System
     /// <summary> Processes F1 toggle, mouse input, window dragging, slider dragging, and dropdown interaction. </summary>
     public override void Update()
     {
+        if (StartupWindowsPending)
+        {
+            StartupWindowsPending = false;
+            if (ShowAllOnStartup) ShowAllWindows();
+        }
+
         if (CurrentWorkspaceMode == WorkspaceMode.Windows && !LayoutDone && !Dragging && !Resizing)
         {
             AutoPositionAll();
@@ -1035,13 +1060,13 @@ public partial class Inspector : core.System
             switch (widget.Type)
             {
                 case WidgetType.Slider:
-                    int trackLeft = widget.Bounds.X + 4;
-                    int trackWidth = widget.Bounds.Width - 8;
+                    int trackLeft = widget.Bounds.X;
+                    int trackWidth = widget.Bounds.Width;
                     float range = widget.SliderMax - widget.SliderMin;
                     float normalizedValue = range > 0 ? (widget.SliderValue - widget.SliderMin) / range : 0;
                     int fillWidth = (int)(trackWidth * normalizedValue);
                     int handleCX = trackLeft + fillWidth;
-                    int handleCY = (int)(widget.Bounds.Y + LineHeight + 10) + SliderTrackHeight / 2;
+                    int handleCY = (int)(widget.Bounds.Y + LineHeight + 16) + SliderTrackHeight / 2;
                     float dx = Mouse.X - handleCX;
                     float dy = Mouse.Y - handleCY;
 
@@ -1069,7 +1094,7 @@ public partial class Inspector : core.System
 
                     if (textValue.Length > 0)
                     {
-                        int clearIconSize = widget.Bounds.Height - 36;
+                        int clearIconSize = Math.Min(24, widget.Bounds.Height - 16);
                         int clearIconPad = 12;
                         int clearX = widget.Bounds.Right - clearIconPad - clearIconSize;
 
@@ -1234,8 +1259,8 @@ public partial class Inspector : core.System
         if (!window.WidgetIndex.TryGetValue(SliderWidgetId, out int index)) return;
 
         var widget = window.Widgets[index];
-        int trackLeft = widget.Bounds.X + 4;
-        int trackRight = widget.Bounds.Right - 4;
+        int trackLeft = widget.Bounds.X;
+        int trackRight = widget.Bounds.Right;
         int trackWidth = trackRight - trackLeft;
 
         if (trackWidth <= 0) return;

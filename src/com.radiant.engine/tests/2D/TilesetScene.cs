@@ -11,11 +11,9 @@ public class TilesetScene : Scene
     /// <inheritdoc/>
     public override void SetupECS()
     {
-        ECS.AddSystem<Inspector>();
+        ECS.AddSystemCollection(SystemCollections.Debugging);
         ECS.AddSystem<PerlinNoise2D>();
-        ECS.AddSystem<GizmosRenderer>();
-        ECS.AddSystem<PerformanceMonitor>();
-        ECS.AddSystem<WorldGen>();
+        ECS.AddSystem<WorldGenerator>();
 
         var tiles = ECS.AddSystem(new Tileset { Present = false });
         DemoRendering.AddImage(ECS, tiles, tiles.GetOutput);
@@ -26,7 +24,7 @@ public class TilesetScene : Scene
     {
 
         // Scene is the bridge: generate world first
-        var worldGen = ECS.GetSystem<WorldGen>();
+        var worldGen = ECS.GetSystem<WorldGenerator>();
         worldGen.GenerateWorld(WorldWidth, WorldHeight);
 
         // Then tell Tileset to load from the generated world

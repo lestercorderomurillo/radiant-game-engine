@@ -21,9 +21,9 @@ internal sealed class DenoisingRegressionWindow : Window
     private Texture2D TestInput, TestAlbedo, TestNormals, TestDepth, TestEmission, Snapshot;
     private readonly List<(string Edge, DenoiserMode Mode, int Passes)> Synthetic = new();
     private int PathFrame => Frame - Synthetic.Count;
-    private PathTracer Tracer => Scene is CornellBoxScene c ? c.Tracer : ((Rendering2DScene)Scene).Tracer;
-    private AntiAliasing AA => Scene is CornellBoxScene c ? c.AA : ((Rendering2DScene)Scene).AA;
-    private Denoising Denoiser => Scene is CornellBoxScene c ? c.Denoiser : ((Rendering2DScene)Scene).Denoiser;
+    private PTGI Tracer => Scene is CornellBoxScene c ? c.Tracer : ((Rendering2DScene)Scene).Tracer;
+    private AntiAliaser AA => Scene is CornellBoxScene c ? c.AA : ((Rendering2DScene)Scene).AA;
+    private Denoiser Denoiser => Scene is CornellBoxScene c ? c.Denoiser : ((Rendering2DScene)Scene).Denoiser;
 
     /// <summary>Applies a renderer or denoiser selection through the test's inspector controls.</summary>
     private void Select(int method) { if (Scene is CornellBoxScene c) c.SelectRenderer(method); else ((Rendering2DScene)Scene).SelectRenderer(method); }

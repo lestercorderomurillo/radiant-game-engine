@@ -11,7 +11,7 @@ public enum WorkspaceMode { Windows, Panels }
 
 public partial class Inspector
 {
-    /// <summary>The selected workspace style. Windows is the default.</summary>
+    /// <summary>The selected workspace style. Initialization selects Panels by default.</summary>
     public WorkspaceMode CurrentWorkspaceMode { get; private set; }
     private readonly Dictionary<string, (Vector2 Position, Vector2 Size, float Height, bool Resizable)> FloatingLayout = new();
     private readonly Dictionary<string, int> DockScroll = new();
@@ -103,7 +103,7 @@ public partial class Inspector
         int bottomHeight = groups.ContainsKey(2) ? ComputeBottomDockHeight(availableHeight) : 0;
         GamePane = new Rectangle(left, MenuBarHeight, Math.Max(1, width - left - right), availableHeight - bottomHeight);
         BottomPane = new Rectangle(left, GamePane.Bottom, GamePane.Width, bottomHeight);
-        var content = new Rectangle(GamePane.X + 2, GamePane.Y + DockHeaderHeight, Math.Max(1, GamePane.Width - 4), Math.Max(1, GamePane.Height - DockHeaderHeight - 2));
+        var content = new Rectangle(GamePane.X + 2, GamePane.Y + 2, Math.Max(1, GamePane.Width - 4), Math.Max(1, GamePane.Height - 4));
         GameViewport = FitPreview(content, Renderer.ScreenWidth, Renderer.ScreenHeight);
         DockTabs.Clear();
         DisplayedDockWindows.Clear();
@@ -283,8 +283,6 @@ public partial class Inspector
         var solid = Renderer.GetSolidTexture(Color.White);
         Renderer.BeginDraw(transform: scale);
         Renderer.DrawSprite(solid, GamePane, Color.Black);
-        Renderer.DrawSprite(solid, new Rectangle(GamePane.X, GamePane.Y, GamePane.Width, DockHeaderHeight), OpaqueWorkspaceColor(TitleBarColor));
-        DrawTextBold("Game", new Vector2(GamePane.X + Padding, GamePane.Y + (DockHeaderHeight - MeasureText("Game").Y) / 2), TextColor);
         Renderer.DrawSprite(WorkspaceSnapshot, GameViewport, Color.White);
         Renderer.EndDraw();
         foreach (var window in RenderOrder)
@@ -298,9 +296,9 @@ public partial class Inspector
             Renderer.DrawSprite(solid, tab.Bounds, OpaqueWorkspaceColor(IsWindowDisplayed(tab.Window) ? ButtonHover : TitleBarColor));
             var close = DockTabCloseBounds(tab.Bounds);
             var menu = DockTabMenuBounds(tab.Bounds);
-            var (label, size) = FitMenuItemText(tab.Window.Title, menu.X - tab.Bounds.X - 18);
+            var (label, size) = FitMenuItemText(tab.Window.Title, menu.X - tab.Bounds.X - Padding - InlineGap);
             var labelSize = Renderer.MeasureString("Inter", size, label);
-            Renderer.DrawString("Inter", size, label, new Vector2(tab.Bounds.X + 10, tab.Bounds.Y + (tab.Bounds.Height - labelSize.Y) / 2), IsWindowDisplayed(tab.Window) ? TextColor : LabelDim);
+            Renderer.DrawString("Inter", size, label, SnapTextPosition(new Vector2(tab.Bounds.X + Padding, tab.Bounds.Y + (tab.Bounds.Height - labelSize.Y) / 2)), IsWindowDisplayed(tab.Window) ? TextColor : LabelDim);
             bool canHover = OpenMenuId == null && OpenDropdownWindowId == null && PanelMenuWindowId == null && DragTabId == null;
             DrawChromeButton(close, canHover && close.Contains(mouse), true);
             DrawChromeButton(menu, canHover && menu.Contains(mouse), false);

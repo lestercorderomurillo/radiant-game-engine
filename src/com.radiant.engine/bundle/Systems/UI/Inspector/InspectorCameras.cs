@@ -10,7 +10,17 @@ public partial class Inspector
 {
     private bool NavigatingCamera;
     private float NavigationSpeed = 5;
+    private float ViewportNavigationSpeed = 500;
+    private bool PixelNavigation;
     private MouseState NavigationMouse;
+    private IViewportCamera2D[] ViewportCameras = [];
+    private IViewportCamera2D ControlledViewport => ControlledCamera <= -3 && -ControlledCamera - 3 < ViewportCameras.Length
+        ? ViewportCameras[-ControlledCamera - 3] : null;
+
+    /// <summary>True while the camera tools own right-button navigation. Suppress gameplay painting in this state.</summary>
+    public static bool IsCameraInputActive => Instance?.GlobalVisible == true && Instance.NavigatingCamera
+        && IsWindowVisible("camera_controls") && Instance.Controls.IsDown(MouseButton.Right);
+
     private ICameraView[] CameraViews = Array.Empty<ICameraView>();
     private int CameraViewIndex;
     private int ControlledCamera = -1;
@@ -18,6 +28,7 @@ public partial class Inspector
     private int[] CameraEntities = [];
     private string[] CameraLabels = [];
     private readonly System.Collections.Generic.List<int> CameraCandidates = new();
+    private long CameraCandidateRevision = -1;
 
     /// <summary>Opens the Camera Controls window to pan, zoom and switch cameras, optionally preselecting a camera entity.</summary>
     public static void OpenCameraControls(int Entity = -1)
@@ -75,7 +86,7 @@ public partial class Inspector
         });
         AddToggle("camera_controls", "navigateCamera", "Navigate camera", false, enabled => NavigatingCamera = enabled);
         AddLabel("camera_controls", "speedLabel", "Movement speed (units / second)");
-        AddTextInput("camera_controls", "speed", "Movement speed", text => { if (float.TryParse(text, CultureInfo.InvariantCulture, out float speed) && float.IsFinite(speed) && speed > 0) NavigationSpeed = speed; });
+        AddTextInput("camera_controls", "speed", "Movement speed", text => { if (float.TryParse(text, CultureInfo.InvariantCulture, out float speed) && float.IsFinite(speed) && speed > 0) { if (PixelNavigation) ViewportNavigationSpeed = speed; else NavigationSpeed = speed; } });
         MarkNumericInput("camera_controls", "speed");
         SetTextInputValue("camera_controls", "speed", NavigationSpeed.ToString(CultureInfo.InvariantCulture));
         AddButton("camera_controls", "zoomIn", "Zoom in", () => ZoomWorldCamera(0.8f));
@@ -86,11 +97,16 @@ public partial class Inspector
     /// <summary>Refreshes searchable cameras and preserves a valid selection.</summary>
     private void RefreshCameraControls()
     {
-        Scene.ECS.GetAllEntityIds(CameraCandidates);
-
-        var candidates = CameraCandidates.Where(entity => Scene.ECS.HasComponent<Camera2D>(entity) || Scene.ECS.HasComponent<Camera3D>(entity))
-            .ToList();
+        if (CameraCandidateRevision != Scene.ECS.EntityRevision)
+        {
+            Scene.ECS.GetAllEntityIds(CameraCandidates);
+            CameraCandidates.RemoveAll(entity => !Scene.ECS.HasComponent<Camera2D>(entity) && !Scene.ECS.HasComponent<Camera3D>(entity));
+            CameraCandidateRevision = Scene.ECS.EntityRevision;
+        }
+        var candidates = CameraCandidates.ToList();
         if (Renderer.TryGetWorldFit(out _, out _)) candidates.Insert(0, -2);
+        ViewportCameras = Scene.ECS.GetAllSystems().OfType<IViewportCamera2D>().ToArray();
+        for (int i = 0; i < ViewportCameras.Length; i++) candidates.Insert(i, -3 - i);
 
         var entities = candidates.Where(entity => CameraLabel(entity).Contains(CameraSearch, StringComparison.OrdinalIgnoreCase)).ToArray();
         var labels = entities.Select(CameraLabel).ToArray();
@@ -129,7 +145,7 @@ public partial class Inspector
 
     /// <summary>Formats the entity ID and camera type for the camera list.</summary>
     private string CameraLabel(int Entity)
-        => Entity == -2 ? "World view (fitted 2D)" : $"Entity {Entity} — {(Scene.ECS.HasComponent<Camera2D>(Entity) ? "Camera2D" : "")}{(Scene.ECS.HasComponent<Camera3D>(Entity) ? " Camera3D" : "")}{(Scene.ECS.IsDisabled(Entity) ? " (disabled)" : "")}";
+        => Entity <= -3 ? ViewportCameras[-Entity - 3].CameraName : Entity == -2 ? "World view (fitted 2D)" : $"Entity {Entity} — {(Scene.ECS.HasComponent<Camera2D>(Entity) ? "Camera2D" : "")}{(Scene.ECS.HasComponent<Camera3D>(Entity) ? " Camera3D" : "")}{(Scene.ECS.IsDisabled(Entity) ? " (disabled)" : "")}";
 
     private Type ControlledCameraType => CameraViews.ElementAtOrDefault(CameraViewIndex)?.CameraType
         ?? (ControlledCamera >= 0 && Scene.ECS.HasComponent<Camera3D>(ControlledCamera) ? typeof(Camera3D) : typeof(Camera2D));
@@ -138,10 +154,16 @@ public partial class Inspector
     private void RefreshCameraPose()
     {
         bool worldView = ControlledCamera == -2 && Renderer.TryGetWorldFit(out _, out _);
-        bool available = worldView || ControlledCamera >= 0 && Scene.ECS.IsAlive(ControlledCamera) && !Scene.ECS.IsDisabled(ControlledCamera);
+        bool pixelNavigation = worldView || ControlledViewport != null;
+        if (PixelNavigation != pixelNavigation)
+        {
+            PixelNavigation = pixelNavigation;
+            SetTextInputValue("camera_controls", "speed", (PixelNavigation ? ViewportNavigationSpeed : NavigationSpeed).ToString(CultureInfo.InvariantCulture));
+        }
+        bool available = worldView || ControlledViewport != null || ControlledCamera >= 0 && Scene.ECS.IsAlive(ControlledCamera) && !Scene.ECS.IsDisabled(ControlledCamera);
         var type = ControlledCameraType;
         string pose = ControlledCamera >= 0 && type == typeof(Camera3D) && Scene.ECS.HasComponent<Transform3D>(ControlledCamera) ? "Transform3D" : ControlledCamera >= 0 && type == typeof(Camera2D) && Scene.ECS.HasComponent<Transform2D>(ControlledCamera) ? "Transform2D" : type.Name;
-        SetLabel("camera_controls", "pose", worldView ? "Fitted world view. WASD pans; use buttons to zoom." : ControlledCamera < 0 ? "No matching camera instances in this scene." : !available ? "Selected camera is disabled." : $"Edit position / rotation in {pose}.");
+        SetLabel("camera_controls", "pose", ControlledViewport != null ? $"{ControlledViewport.CameraName}: {ControlledViewport.CameraPosition}. WASD pans." : worldView ? "Fitted world view. WASD pans; use buttons to zoom." : ControlledCamera < 0 ? "No matching camera instances in this scene." : !available ? "Selected camera is disabled." : $"Edit position / rotation in {pose}.");
         SetWidgetEnabled("camera_controls", "zoomIn", worldView);
         SetWidgetEnabled("camera_controls", "zoomOut", worldView);
         SetWidgetEnabled("camera_controls", "cameraView", available && CameraViews.Length > 0);
@@ -170,19 +192,21 @@ public partial class Inspector
         var previous = NavigationMouse;
         NavigationMouse = mouse;
 
-        if (!GlobalVisible || !IsWindowVisible("camera_controls") || !NavigatingCamera || !Renderer.IsActive || IsEditingText || (ControlledCamera != -2 && (!Scene.ECS.IsAlive(ControlledCamera) || Scene.ECS.IsDisabled(ControlledCamera))) || mouse.RightButton != ButtonState.Pressed) return;
+        if (!GlobalVisible || !IsWindowVisible("camera_controls") || !NavigatingCamera || !Renderer.IsActive || IsEditingText || (ControlledCamera != -2 && ControlledViewport == null && (!Scene.ECS.IsAlive(ControlledCamera) || Scene.ECS.IsDisabled(ControlledCamera))) || mouse.RightButton != ButtonState.Pressed) return;
 
         var cursor = ScreenToVirtual(new Vector2(mouse.X, mouse.Y));
 
         if ((CurrentWorkspaceMode == WorkspaceMode.Panels && !GameViewport.Contains(cursor)) || cursor.Y < MenuBarHeight || Windows.Values.Any(window => IsWindowDisplayed(window) && window.WindowBounds.Contains(cursor)) || OpenDropdownWindowId != null || OpenMenuId != null) return;
 
         var keyboard = Controls.Keyboard;
-        float distance = NavigationSpeed * Math.Min(Scene.DeltaTime, 0.1f) * (keyboard.IsKeyDown(Key.LeftShift) || keyboard.IsKeyDown(Key.RightShift) ? 4 : 1);
+        float distance = (PixelNavigation ? ViewportNavigationSpeed : NavigationSpeed) * Math.Min(Scene.DeltaTime, 0.1f) * (keyboard.IsKeyDown(Key.LeftShift) || keyboard.IsKeyDown(Key.RightShift) ? 4 : 1);
         var look = previous.RightButton == ButtonState.Pressed ? new Vector2(mouse.X - previous.X, mouse.Y - previous.Y) * 0.003f : Vector2.Zero;
         var movement = new Vector3((keyboard.IsKeyDown(Key.D) ? 1 : 0) - (keyboard.IsKeyDown(Key.A) ? 1 : 0), (keyboard.IsKeyDown(Key.E) ? 1 : 0) - (keyboard.IsKeyDown(Key.Q) ? 1 : 0), (keyboard.IsKeyDown(Key.S) ? 1 : 0) - (keyboard.IsKeyDown(Key.W) ? 1 : 0));
         if (movement.LengthSquared() > 1) movement = Vector3.Normalize(movement);
 
-        if (ControlledCamera == -2)
+        if (ControlledViewport != null)
+            ControlledViewport.CameraPosition += new Vector2(movement.X, movement.Z) * distance;
+        else if (ControlledCamera == -2)
         {
             if (Renderer.TryGetWorldFit(out var center, out var size)) Renderer.FitWorld(center + new Vector2(movement.X, movement.Z) * distance, size);
         }

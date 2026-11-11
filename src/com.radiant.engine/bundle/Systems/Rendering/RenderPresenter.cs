@@ -5,7 +5,7 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Optional presentation. Independent instances may composite multiple views or target textures.</summary>
 [SystemTag("Rendering")]
-public class RenderPresentation : core.System
+public class RenderPresenter : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
     public Func<Texture2D> Input;

@@ -8,7 +8,7 @@ public enum RasterAAMode { None, MSAA2x, MSAA4x, MSAA8x, SSAA2x, SSAA3x }
 
 /// <summary>Per-view geometry sampling, independent of post AA. Share with the view's geometry adapters.</summary>
 [SystemTag("Rendering", "AA")]
-public class RasterSampling : core.System
+public class RasterSampler : core.System
 {
     public RasterAAMode Mode;
     public Vector2 Jitter;

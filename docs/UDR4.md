@@ -1,6 +1,6 @@
 # Universal Detail Reconstruction
 
-Render fewer pixels and reconstruct an image at display resolution. Radiant provides four UDR algorithms behind the `Upscaling` system, with a separate quality setting that controls the input resolution.
+Render fewer pixels and reconstruct an image at display resolution. Radiant provides four UDR algorithms behind the `Upscaler` system, with a separate quality setting that controls the input resolution.
 
 All four accept a color image from any 2D or 3D pipeline: unlit rendering, raster lighting, a producer using prebaked GI, HRC, 3D radiance cascades, path tracing or your own renderer. Lighting and reconstruction are independent choices. Optional geometry and motion guidance describe the image's view; they do not determine which lighting technique you must use.
 
@@ -13,7 +13,7 @@ All four accept a color image from any 2D or 3D pipeline: unlit rendering, raste
 | **UDR3** | Lanczos reconstruction and sharpening, with guided edge refinement and temporal accumulation when available | Color image from a 2D or 3D pipeline |
 | **UDR4** | Spatial reconstruction, with geometry- and motion-guided temporal reconstruction when available | Color image from a 2D or 3D pipeline |
 
-Use `UpscalingMode.None` to disable reconstruction. The four algorithms are not quality presets: choose the algorithm first, then choose its render resolution.
+Use `UpscalerMode.None` to disable reconstruction. The four algorithms are not quality presets: choose the algorithm first, then choose its render resolution.
 
 With only an image connected, every mode uses its spatial path and preserves image alpha. Matching guidance enables additional edge refinement and, in UDR2–4, temporal history. Compare the algorithms on your scene, especially moving silhouettes, transparent overlaps and lighting changes.
 
@@ -35,23 +35,23 @@ The following example shows how to select the Balanced resolution preset:
 UDRQuality.Set(1); // Balanced; 0 = Performance, 2 = Native
 ```
 
-Changing this setting affects every active UDR system. These presets are independent of HRC's lighting probe quality and the 3D radiance cascade grid. A newly created `Upscaling` stage still needs an algorithm selected; the Balanced preset alone does not enable reconstruction.
+Changing this setting affects every active UDR system. These presets are independent of HRC's lighting probe quality and the 3D radiance cascade grid. A newly created `Upscaler` stage still needs an algorithm selected; the Balanced preset alone does not enable reconstruction.
 
 ## Connect an image pipeline
 
-Place `Upscaling` after your color and antialiasing stages. It produces an output image; add `RenderPresentation` to display it.
+Place `Upscaler` after your color and antialiasing stages. It produces an output image; add `RenderPresenter` to display it.
 
 The following example shows how to connect reconstruction and presentation:
 
 ```csharp
-var upscaler = ECS.AddSystem(new Upscaling
+var upscaler = ECS.AddSystem(new Upscaler
 {
     Input = aa.GetOutput,
     After = [aa]
 });
-upscaler.Select(UpscalingMode.UDR4);
+upscaler.Select(UpscalerMode.UDR4);
 
-ECS.AddSystem(new RenderPresentation
+ECS.AddSystem(new RenderPresenter
 {
     Input = upscaler.GetOutput,
     After = [upscaler]
@@ -66,7 +66,7 @@ The following example shows how to resolve the producer's view size each frame:
 geometry.Resolution = upscaler.ResolveViewSize(geometry.Resolution);
 ```
 
-`ResolveViewSize` remembers an explicit view resolution and restores it when scaling is bypassed. Pass this stage to `AntiAliasingSettings.Upscaler` to expose algorithm and quality controls in **F1 → View → Image quality**.
+`ResolveViewSize` remembers an explicit view resolution and restores it when scaling is bypassed. Pass this stage to `AntiAliaserSettings.Upscaler` to expose algorithm and quality controls in **F1 → View → Image quality**.
 
 ## Connect 3D radiance cascades
 
@@ -77,7 +77,7 @@ full display size. For example, a 1920×1080 window receives a 960×540 input.
 Later renderer switches preserve your reconstruction choice.
 
 In your own scene, use the image pipeline above, following
-`RadianceCascades → ToneMapping → AntiAliasing → Upscaling → RenderPresentation`.
+`RCGI → ToneMapper → AntiAliaser → Upscaler → RenderPresenter`.
 All four UDR algorithms accept this output. Without a compatible guidance adapter,
 they use spatial reconstruction; the current 2D guidance adapter does not consume
 the 3D cascade depth or motion buffers.
@@ -87,7 +87,7 @@ The following example shows how to bind the lighting output size during setup:
 
 ```csharp
 cascades.ViewSize = () => meshes.ViewSize;
-upscaler.Select(UpscalingMode.UDR4);
+upscaler.Select(UpscalerMode.UDR4);
 UDRQuality.Set(1);
 ```
 
@@ -110,13 +110,13 @@ Set `UseGeometryGuidance = true` before selecting an algorithm or initializing t
 The following example shows how to connect a color image with matching 2D guidance:
 
 ```csharp
-var upscaler = ECS.AddSystem(new Upscaling
+var upscaler = ECS.AddSystem(new Upscaler
 {
     UseGeometryGuidance = true,
     Input = color.GetOutput,
     After = [color]
 });
-upscaler.Select(UpscalingMode.UDR3);
+upscaler.Select(UpscalerMode.UDR3);
 ```
 
 Leave guidance disabled when only a color image is available, including a custom producer using prebaked GI. A depth texture or motion texture from another renderer is not automatically compatible with the current 2D adapter. Image-only reconstruction remains available in all four modes.
@@ -128,16 +128,16 @@ Leave guidance disabled when only a color image is available, including a custom
 The following example shows how to enable that adapter for an HRC image:
 
 ```csharp
-var upscaler = ECS.AddSystem(new Upscaling
+var upscaler = ECS.AddSystem(new Upscaler
 {
     HrcInput = true,
     Input = color.GetOutput,
     After = [color]
 });
-upscaler.Select(UpscalingMode.UDR4);
+upscaler.Select(UpscalerMode.UDR4);
 ```
 
-Set this flag before selecting a mode or initializing the stage, when `color` processes the scene's HRC output. For an existing scene using standalone `UDR4`, keep using `SetInputSource(color.GetOutput)`. Do not add a standalone UDR system alongside an `Upscaling` stage that already owns one.
+Set this flag before selecting a mode or initializing the stage, when `color` processes the scene's HRC output. For an existing scene using standalone `UDR4`, keep using `SetInputSource(color.GetOutput)`. Do not add a standalone UDR system alongside an `Upscaler` stage that already owns one.
 
 ## Handle motion and scene cuts
 
@@ -149,7 +149,7 @@ The following example shows how to discard reconstruction history:
 upscaler.ResetHistory();
 ```
 
-When using standalone systems, UDR2 exposes `ResetAccumulation()` and UDR4 exposes `ResetHistory()`. The shared `Upscaling` stage handles reset behavior for whichever algorithm is selected.
+When using standalone systems, UDR2 exposes `ResetAccumulation()` and UDR4 exposes `ResetHistory()`. The shared `Upscaler` stage handles reset behavior for whichever algorithm is selected.
 
 ### UDR4 motion guidance
 

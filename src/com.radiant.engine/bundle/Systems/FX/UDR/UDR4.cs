@@ -5,8 +5,8 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Reconstructs a color image with optional geometry and temporal guidance.</summary>
 /// <remarks>Geometry guidance is independent of the lighting technique. For standalone image-only sources, set UseHrcGeometry and UseGeometryGuidance to false before initialization. Call ResetHistory after scene cuts. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
-/// <seealso cref="Upscaling"/>
-[RunAfter(typeof(Geometry), typeof(HRCGI), typeof(ColorManagement))]
+/// <seealso cref="Upscaler"/>
+[RunAfter(typeof(Geometry), typeof(HRCGI), typeof(HRCToneMapper))]
 public class UDR4 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;

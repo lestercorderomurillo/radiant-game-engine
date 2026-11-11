@@ -6,9 +6,9 @@ namespace com.radiant.engine.bundle;
 /// <summary>Post-processing anti-aliasing techniques available to image stages.</summary>
 public enum PostAAMode { None, FXAA, SMAA, TAA }
 
-/// <summary>Per-view post AA plus supersample resolve. Geometry MSAA/SSAA belongs to RasterSampling.</summary>
+/// <summary>Per-view post AA plus supersample resolve. Geometry MSAA/SSAA belongs to RasterSampler.</summary>
 [SystemTag("Rendering", "AA")]
-public class AntiAliasing : ImageSystem
+public class AntiAliaser : ImageSystem
 {
     public PostAAMode Mode = PostAAMode.FXAA;
     public float EdgeThreshold = 0.125f;
@@ -21,7 +21,7 @@ public class AntiAliasing : ImageSystem
     public float HistoryWeight = 0.9f;
     public bool JitterEnabled = true;
 
-    private RasterSampling Sampling;
+    private RasterSampler Sampling;
     private RenderTarget2D Resolved, Edges, Weights, History, HistoryDepth, DepthWrite;
     private TraceCamera PreviousCamera;
     private long PreviousRevision = -1;
@@ -32,7 +32,7 @@ public class AntiAliasing : ImageSystem
     public int HistoryFrames { get; private set; }
 
     /// <summary>Registers the anti-aliasing outputs exposed to buffer inspection.</summary>
-    public AntiAliasing()
+    public AntiAliaser()
     {
         BufferProviders["Resolved"] = () => Resolved;
         BufferProviders["SMAA edges"] = () => Edges;
@@ -42,7 +42,7 @@ public class AntiAliasing : ImageSystem
     }
 
     /// <summary>Connects geometry sampling so post-processing can coordinate jitter and resolve behavior.</summary>
-    public void SetSampling(RasterSampling sampling)
+    public void SetSampling(RasterSampler sampling)
     {
         if (Sampling != null) Sampling.TemporalJitter = null;
         Sampling = sampling;

@@ -5,7 +5,7 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Reconstructs a color image and smooths it through temporal accumulation.</summary>
 /// <remarks>Combines a spatial pass with previous-frame history. Uses spatial reconstruction when matching geometry guidance is unavailable. Call ResetAccumulation after discontinuous scene changes. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
-/// <seealso cref="Upscaling"/>
+/// <seealso cref="Upscaler"/>
 public class UDR2 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;

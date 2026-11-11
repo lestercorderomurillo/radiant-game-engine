@@ -11,11 +11,11 @@ public readonly record struct DenoiserOption(string Id, string Name, bool Availa
 
 /// <summary>Per-view HDR denoising with spatial, temporal and optional neural backends. Raw tracer accumulation stays independent.</summary>
 [SystemTag("Rendering", "Denoising")]
-public class Denoising : ImageSystem
+public class Denoiser : ImageSystem
 {
     public DenoiserMode Mode;
     /// <summary>Optional native trace signal source for NRD diffuse reconstruction.</summary>
-    public PathTracer TraceSource;
+    public PTGI TraceSource;
     public int Iterations = 3;
     public float Strength = 2;
     public float DepthSigma = 0.01f;
@@ -33,10 +33,10 @@ public class Denoising : ImageSystem
     public int NeuralUpdateInterval = 8;
 
     private RenderTarget2D Intermediate;
-    private IDenoisingBackend Backend;
+    private IDenoiserBackend Backend;
     private string ActiveBackendId, ExternalId;
     private Func<int> NativeSignalProvider;
-    private Dictionary<string, (Func<IDenoisingBackend> Factory, DenoiserOption Info)> Extensions;
+    private Dictionary<string, (Func<IDenoiserBackend> Factory, DenoiserOption Info)> Extensions;
     private IReadOnlyList<DenoiserOption> Options;
 
     public int OptionsRevision { get; private set; }
@@ -58,7 +58,7 @@ public class Denoising : ImageSystem
         };
         if (Extensions != null) foreach (var item in Extensions) result.Add(item.Value.Info);
 
-        string nrdReason = "Assign Denoising.TraceSource to enable native tracing signals.";
+        string nrdReason = "Assign Denoiser.TraceSource to enable native tracing signals.";
         bool nrdAvailable = TraceSource != null && Renderer != null && Renderer.SupportsNrdDenoising(out nrdReason);
         if (!result.Exists(option => option.Id == "nrd.reblur")) result.Add(new("nrd.reblur", "NRD REBLUR", nrdAvailable, nrdReason));
         if (!result.Exists(option => option.Id == "nrd.relax")) result.Add(new("nrd.relax", "NRD RELAX", nrdAvailable, nrdReason));
@@ -73,7 +73,7 @@ public class Denoising : ImageSystem
     private static void AddUnavailable(List<DenoiserOption> options, string id, string name, string reason) { foreach (var option in options) if (option.Id == id) return; options.Add(new(id, name, false, reason)); }
 
     /// <summary>Register a fresh per-activation backend factory. No process-global renderer or backend state.</summary>
-    public void RegisterBackend(string id, Func<IDenoisingBackend> factory)
+    public void RegisterBackend(string id, Func<IDenoiserBackend> factory)
     {
         if (string.IsNullOrWhiteSpace(id) || id is "none" or "bilateral" or "atrous" or "svgf" or "oidn") throw new ArgumentException("Use a distinct backend ID.", nameof(id));
 
@@ -117,7 +117,7 @@ public class Denoising : ImageSystem
     private Texture2D BackendBuffer(string name) => Backend != null && Backend.Buffers.TryGetValue(name, out var get) ? get() : null;
 
     /// <summary>Creates the selected backend when its mode or registration changes.</summary>
-    private IDenoisingBackend EnsureBackend()
+    private IDenoiserBackend EnsureBackend()
     {
         string id = BackendId;
 
@@ -136,7 +136,7 @@ public class Denoising : ImageSystem
     }
 
     /// <summary>Collects current radiance, guides, and settings into a denoising frame.</summary>
-    private DenoisingFrame Frame(Texture2D input) => new(Renderer, input, SingleSample?.Invoke(), Albedo?.Invoke(), Normals?.Invoke(), Depth?.Invoke(), Emission?.Invoke(), Camera?.Invoke(), Revision?.Invoke() ?? 0, Iterations, Strength, DepthSigma, NormalPower, AlbedoSigma);
+    private DenoiserFrame Frame(Texture2D input) => new(Renderer, input, SingleSample?.Invoke(), Albedo?.Invoke(), Normals?.Invoke(), Depth?.Invoke(), Emission?.Invoke(), Camera?.Invoke(), Revision?.Invoke() ?? 0, Iterations, Strength, DepthSigma, NormalPower, AlbedoSigma);
 
     /// <summary>Requests the native tracing signals required by the selected denoiser.</summary>
     private void ConfigureNativeSignals()
@@ -159,7 +159,7 @@ public class Denoising : ImageSystem
     }
 
     /// <summary>Registers denoising inputs and intermediates for buffer inspection.</summary>
-    public Denoising()
+    public Denoiser()
     {
         BufferProviders["Intermediate"] = () => Intermediate;
 
@@ -196,7 +196,7 @@ public class Denoising : ImageSystem
         var emission = Emission?.Invoke();
         bool Matches(Texture2D texture) => texture is { IsDisposed: false } && texture.Width == input.Width && texture.Height == input.Height;
 
-        if (!Matches(albedo) || !Matches(normals) || !Matches(depth) || emission != null && !Matches(emission)) throw new InvalidOperationException("Denoising requires matching albedo, normal and linear-depth buffers; optional emission must match too.");
+        if (!Matches(albedo) || !Matches(normals) || !Matches(depth) || emission != null && !Matches(emission)) throw new InvalidOperationException("Denoiser requires matching albedo, normal and linear-depth buffers; optional emission must match too.");
         if (Mode is not DenoiserMode.Bilateral and not DenoiserMode.Atrous)
         {
             ReleaseTargets();

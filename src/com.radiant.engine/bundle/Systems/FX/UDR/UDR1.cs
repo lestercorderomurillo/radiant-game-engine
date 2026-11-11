@@ -5,7 +5,7 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Reconstructs a color image spatially, with geometry-guided edge refinement and sharpening.</summary>
 /// <remarks>Uses only the current image; it does not accumulate previous frames. Matching 2D geometry buffers optionally guide edge refinement. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
-/// <seealso cref="Upscaling"/>
+/// <seealso cref="Upscaler"/>
 public class UDR1 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;

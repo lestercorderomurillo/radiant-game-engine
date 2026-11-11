@@ -6,10 +6,15 @@ draggable windows. Press **F1** to show or hide them.
 Add the [`Inspector`](../src/com.radiant.engine/bundle/Systems/UI/Inspector/Inspector.cs) system to your scene.
 Use its static widget helpers to build panels, then keep diagnostic overlays in the Gizmos section below.
 
+Use `ECS.AddSystemCollection(SystemCollections.Debugging)` in `SetupECS` to include Inspector, Profiling,
+Gizmos and the shared 2D/3D camera tools in any scene. Existing systems are reused. All registered tool
+windows open at startup, including ones created by other systems. Closing a panel keeps it closed until
+you reopen it; Show All is applied only at startup or when selected from View.
+
 ## Open the workspace
 
-Press **F1** while the game is running, then choose **View → Workspace Mode → Panels**.
-Entity Inspector appears on the left, Game occupies the center, and Debugger opens below Game.
+The Inspector starts in **Panels** mode with **Show All** enabled. **F1** hides or restores the workspace.
+Entity Inspector appears on the left, the game preview occupies the center without a title bar, and Debugger opens below it.
 Tools stack vertically within each side dock, so their controls stay visible together. When there is not enough height, only the panels that need it share a tab group. Click a tab title to select a panel in that group.
 
 ![Entity Inspector, Game, rendering controls and Debugger in the Panels workspace](images/inspector-workspace.png)
@@ -28,7 +33,7 @@ Use the **…** button beside a panel's X when you want to move it without dragg
 | --- | --- |
 | **Move left** | Put the panel in the left dock and select its tab. |
 | **Move right** | Put the panel in the right dock and select its tab. |
-| **Move below Game** | Put the panel in the bottom dock, alongside Debugger. |
+| **Move below preview** | Put the panel in the bottom dock, alongside Debugger. |
 | **Reset panel sizes** | Restore the default left, right and bottom proportions. Panels keep their assigned docks. |
 | **Close panel** | Hide the panel. Its entry in **View** opens it again. |
 
@@ -56,10 +61,10 @@ diagnostics, appear here. Each line shows its time, severity, source and message
 | Control | How to use it |
 | --- | --- |
 | **Clear** | Empty the entire retained log. Search and severity settings stay selected. |
-| **Follow latest** | Keep the newest matching lines visible as messages arrive. Turn it off before scrolling back. |
+| **Follow latest** | Scroll to the latest lines when new messages arrive. Idle frames and filter changes preserve your scroll position. |
 | **Search logs…** | Match part of a message, source, severity or displayed time. Search ignores letter case. Use the small X in the field to clear the search. |
 | **All levels** | Include every severity. Select **Info**, **Warnings** or **Errors** to show only that level. |
-| List scrollbar | Browse older matching messages with Follow latest off. |
+| List scrollbar | Browse older matching messages. Turn Follow latest off to keep your place when new messages arrive. |
 
 For example, choose **Warnings** and type `Graphics` to read warnings from graphics initialization.
 Choose **All levels** and clear the search field to show the whole retained log again.
@@ -74,6 +79,15 @@ EngineLog.Write("Level loaded", source: "Scene");
 EngineLog.Write("No spawn point found", LogLevel.Warning, "World");
 EngineLog.Write("Save failed", LogLevel.Error, "Save");
 ```
+
+## Profile the scene
+
+Add `PerformanceMonitor` to expose **View → Profiling**. Performance and memory measurements sit beside geometry
+measurements when the panel is wide enough, and stack when it is narrow. Values align to the right with their units.
+The frame-time chart below them shows the latest 64 frames in milliseconds and a dashed target-frame-time line;
+uncapped rendering has no target line. Scroll the panel to reach the chart in a short dock.
+
+Entity Inspector's compact **Delete** button removes selected entities and is disabled when nothing is selected.
 
 ## Use floating windows
 
@@ -168,7 +182,7 @@ gizmos.AddGizmoText(position, "spawn", Color.White);
 gizmos.ToggleGizmos();
 ```
 
-`PerformanceMonitor` adds frame-time, CPU and GPU metrics windows; GPU counters are available on Windows only.
+`PerformanceMonitor` adds the Profiling panel with frame-time history, memory, CPU and GPU metrics; GPU counters are available on Windows only.
 
 ## Continue
 

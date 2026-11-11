@@ -8,7 +8,7 @@ namespace com.radiant.engine.core;
 /// The following example shows how to light the scene after its geometry is built:
 /// <code>
 /// [RunAfter(typeof(Geometry))]
-/// public class MyLighting : System { }
+/// public class CustomRenderer : System { }
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]

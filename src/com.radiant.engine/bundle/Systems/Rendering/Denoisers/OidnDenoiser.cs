@@ -12,7 +12,7 @@ public enum OidnQuality { Fast, Balanced, High }
 public enum OidnDevice { Auto, CPU, GPU }
 
 /// <summary>Optional OIDN 2 neural backend. GPU access stays on the render thread; native inference runs on a worker.</summary>
-public sealed class OidnDenoiser : IDenoisingBackend
+public sealed class OidnDenoiser : IDenoiserBackend
 {
     public string Name => "OIDN neural";
     public bool Available => OidnNative.TryGet(out _);
@@ -54,10 +54,10 @@ public sealed class OidnDenoiser : IDenoisingBackend
     public void ResetHistory() { Interlocked.Increment(ref Generation); ValidOutput = false; LastUpdate = -1000; Failure = null; Status = "OIDN waiting for current frame"; }
 
     /// <summary>Builds an identity for the current radiance, camera, and geometry revision.</summary>
-    private Key FrameKey(in DenoisingFrame frame) => new(frame.Input.Width, frame.Input.Height, frame.Camera, frame.Revision, Quality, Device);
+    private Key FrameKey(in DenoiserFrame frame) => new(frame.Input.Width, frame.Input.Height, frame.Camera, frame.Revision, Quality, Device);
 
     /// <summary>Detects changed input identity and invalidates stale denoising work.</summary>
-    private void Observe(in DenoisingFrame frame)
+    private void Observe(in DenoiserFrame frame)
     {
         CurrentInput = frame.Input;
 
@@ -67,7 +67,7 @@ public sealed class OidnDenoiser : IDenoisingBackend
     }
 
     /// <summary>Observes completed asynchronous filtering work before the next render pass.</summary>
-    public void Update(in DenoisingFrame frame)
+    public void Update(in DenoiserFrame frame)
     {
         if (Disposed) return;
 
@@ -141,7 +141,7 @@ public sealed class OidnDenoiser : IDenoisingBackend
     }
 
     /// <summary>Schedules denoising or publishes the latest result matching the current frame.</summary>
-    public void Render(in DenoisingFrame frame)
+    public void Render(in DenoiserFrame frame)
     {
         Observe(frame);
         LastRenderedKey = CurrentKey;
@@ -155,7 +155,7 @@ public sealed class OidnDenoiser : IDenoisingBackend
     }
 
     /// <summary>Uploads a completed result only when it still matches the current input.</summary>
-    private void Publish(in DenoisingFrame frame)
+    private void Publish(in DenoiserFrame frame)
     {
         var task = Pending;
         Pending = null;

@@ -5,7 +5,7 @@ picks the combination that fits its budget.
 
 ## Pick a method
 
-| Geometry (`RasterSampling.Mode`) | Post (`AntiAliasing.Mode`) |
+| Geometry (`RasterSampler.Mode`) | Post (`AntiAliaser.Mode`) |
 | --- | --- |
 | MSAA 2x / 4x / 8x: hardware multisampling | FXAA: fast edge smoothing |
 | SSAA 2x / 3x: render bigger, then average | SMAA: sharper, high-quality edges |
@@ -19,10 +19,10 @@ TAA needs a camera, depth and motion information so it can reproject the previou
 The following example shows MSAA 4x combined with TAA:
 
 ```csharp
-var sampling = ECS.AddSystem(new RasterSampling { Mode = RasterAAMode.MSAA4x });
+var sampling = ECS.AddSystem(new RasterSampler { Mode = RasterAAMode.MSAA4x });
 var meshes = ECS.AddSystem(new MeshGeometry3D { Sampling = sampling });
 var geometry = ECS.AddSystem(new Geometry3D { Source = meshes, Channels = GeometryChannels.All, After = [meshes] });
-var aa = ECS.AddSystem(new AntiAliasing
+var aa = ECS.AddSystem(new AntiAliaser
 {
     Input = geometry.GetOutput,
     Mode = PostAAMode.TAA,
@@ -33,11 +33,11 @@ var aa = ECS.AddSystem(new AntiAliasing
     After = [geometry]
 });
 aa.SetSampling(sampling);
-ECS.AddSystem(new AntiAliasingSettings { Id = "mainAA", Source = aa, Sampling = sampling });
+ECS.AddSystem(new AntiAliaserSettings { Id = "mainAA", Source = aa, Sampling = sampling });
 ```
 
-`AntiAliasingSettings` adds the **Image quality** window under F1 → View, so the method can be switched while
-the game runs. `RasterSampling.ActualSamples` reports what the GPU really used; some GPUs give 4x when you ask
+`AntiAliaserSettings` adds the **Image quality** window under F1 → View, so the method can be switched while
+the game runs. `RasterSampler.ActualSamples` reports what the GPU really used; some GPUs give 4x when you ask
 for 8x.
 
 ## Use TAA in 2D

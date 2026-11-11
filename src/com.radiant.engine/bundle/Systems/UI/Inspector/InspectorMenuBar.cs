@@ -7,9 +7,9 @@ namespace com.radiant.engine.bundle;
 
 public partial class Inspector
 {
-    private const int MenuBarHeight = 44;
-    private const int MenuBarPaddingX = 24;
-    private const int MenuItemPaddingX = 30;
+    private const int MenuBarHeight = TitleBarHeight;
+    private const int MenuBarPaddingX = 0;
+    private const int MenuItemPaddingX = Padding;
     private const int MenuItemHeight = 48;
     private const int MenuSeparatorHeight = 18;
 
@@ -17,7 +17,7 @@ public partial class Inspector
     private static int MenuRowHeight(MenuItem item) => item.Type == MenuItemType.Separator ? MenuSeparatorHeight : MenuItemHeight;
 
     private const int MenuDropdownWidth = 400;
-    private const float MenuBarFontSize = 28f;
+    private const float MenuBarFontSize = FontSize;
 
     private List<MenuData> Menus = new();
     private string OpenMenuId;
@@ -44,11 +44,11 @@ public partial class Inspector
         var view = new MenuData { Id = "view", Label = "View" };
 
         var ecs = new MenuData { Id = "ecs", Label = "ECS" };
-        ecs.Items.Add(new MenuItem { Id = "entity_inspector", Label = "Open Entity Inspector", Type = MenuItemType.Action, ActionCallback = OpenEntityInspector });
-        ecs.Items.Add(new MenuItem { Id = "component_inspector", Label = "Open Component Inspector", Type = MenuItemType.Action, ActionCallback = OpenComponentInspector });
-        ecs.Items.Add(new MenuItem { Id = "system_inspector", Label = "Open System Inspector", Type = MenuItemType.Action, ActionCallback = OpenSystemsInspector });
+        ecs.Items.Add(new MenuItem { Id = "entity_inspector", Label = "Entity Inspector", Type = MenuItemType.Action, ActionCallback = OpenEntityInspector });
+        ecs.Items.Add(new MenuItem { Id = "component_inspector", Label = "Component Inspector", Type = MenuItemType.Action, ActionCallback = OpenComponentInspector });
+        ecs.Items.Add(new MenuItem { Id = "system_inspector", Label = "System Inspector", Type = MenuItemType.Action, ActionCallback = OpenSystemsInspector });
 
-        ecs.Items.Add(new MenuItem { Id = "camera_controls", Label = "Open Camera Controls", Type = MenuItemType.Action, ActionCallback = () => OpenCameraControls() });
+        ecs.Items.Add(new MenuItem { Id = "camera_controls", Label = "Camera Controls", Type = MenuItemType.Action, ActionCallback = () => OpenCameraControls() });
 
         var file = new MenuData { Id = "file", Label = "File" };
         file.Items.Add(new MenuItem
@@ -75,6 +75,23 @@ public partial class Inspector
             window.ShowAbout(CloseColor, CloseHover, CloseText);
     }
 
+    /// <summary>Creates the built-in editors and reveals every registered tool.</summary>
+    public void ShowAllWindows()
+    {
+        OpenEntityInspector();
+        OpenComponentInspector();
+        OpenSystemsInspector();
+        CreateDebugger();
+        EnsureCameraControls();
+        RefreshComponentList();
+        foreach (var window in Windows.Values)
+            if (window.Id != "about_radiant") window.Visible = true;
+        if (Windows.TryGetValue("perf", out var profiling)) ActivateDock(profiling);
+        SyncViewToggleValues();
+        ComputeAllLayouts();
+        UpdatePresentationViewport();
+    }
+
     /// <summary>Rebuilds the View menu from the registered inspector windows.</summary>
     private void RebuildViewMenu()
     {
@@ -88,7 +105,7 @@ public partial class Inspector
         if (viewMenu == null) return;
 
         viewMenu.Items.Clear();
-        viewMenu.Items.Add(new MenuItem { Id = "workspace_mode", Label = "Workspace Mode  >", Type = MenuItemType.Action,
+        viewMenu.Items.Add(new MenuItem { Id = "workspace_mode", Label = "Workspace mode", Type = MenuItemType.Action,
             ActionCallback = () => WorkspaceSubmenuOpen = !WorkspaceSubmenuOpen });
         viewMenu.Items.Add(new MenuItem { Id = "workspace_separator", Type = MenuItemType.Separator });
 
@@ -109,17 +126,7 @@ public partial class Inspector
             Id = "show_all",
             Label = "Show All",
             Type = MenuItemType.Action,
-            ActionCallback = () =>
-            {
-                foreach (var win in Windows.Values)
-                {
-                    if (win.Id == "about_radiant") continue;
-
-                    win.Visible = true;
-                }
-
-                SyncViewToggleValues();
-            }
+            ActionCallback = ShowAllWindows
         });
 
         viewMenu.Items.Add(new MenuItem
@@ -332,7 +339,12 @@ public partial class Inspector
 
         foreach (var item in menu.Items) height += MenuRowHeight(item);
 
-        return new Rectangle(menu.HeaderBounds.X, MenuBarHeight, MenuDropdownWidth, height);
+        int width = MenuDropdownWidth;
+        foreach (var item in menu.Items)
+            if (item.Type != MenuItemType.Separator)
+                width = Math.Max(width, (int)MathF.Ceiling(MeasureText(item.Label).X) + Padding * 2 + ToggleBoxSize + InlineGap * 2 + 24);
+        width = Math.Min(width, MenuBarBounds.Width);
+        return new Rectangle(Math.Min(menu.HeaderBounds.X, MenuBarBounds.Right - width), MenuBarHeight, width, height);
     }
 
     /// <summary>Closes the active top-level menu popup.</summary>
@@ -495,13 +507,14 @@ public partial class Inspector
             }
             else
             {
-                float textStartX = itemRect.X + Padding;
+                float textStartX = itemRect.X + Padding + ToggleBoxSize + 8;
                 float maxTextWidth = itemRect.Right - textStartX - Padding;
                 var (fitText, fitSize) = FitMenuItemText(item.Label, maxTextWidth);
 
                 float fitLineHeight = Renderer.MeasureString("Inter", fitSize, fitText).Y;
                 var textPos = new Vector2(textStartX, itemRect.Y + (itemRect.Height - fitLineHeight) / 2);
-                Renderer.DrawString("Inter", fitSize, fitText, textPos, TextColor);
+                Renderer.DrawString("Inter", fitSize, fitText, SnapTextPosition(textPos), TextColor);
+                if (item.Id == "workspace_mode") DrawText(">", new Vector2(itemRect.Right - Padding - MeasureText(">").X, textPos.Y), LabelDim);
             }
         }
     }
@@ -516,7 +529,7 @@ public partial class Inspector
             var row = new Rectangle(WorkspaceSubmenuBounds.X, WorkspaceSubmenuBounds.Y + i * MenuItemHeight, MenuDropdownWidth, MenuItemHeight);
             if (row.Contains(mouse)) Renderer.DrawSprite(solid, row, ButtonHover);
             string label = ((int)CurrentWorkspaceMode == i ? "✓  " : "    ") + (i == 0 ? "Windows" : "Panels");
-            Renderer.DrawString("Inter", MenuBarFontSize, label, new Vector2(row.X + Padding, row.Y + 8), TextColor);
+            Renderer.DrawString("Inter", MenuBarFontSize, label, SnapTextPosition(new Vector2(row.X + Padding, row.Y + (row.Height - MeasureText(label).Y) / 2)), TextColor);
         }
     }
 
@@ -529,6 +542,8 @@ public partial class Inspector
     private void UpdateEntityInspector()
     {
         if (!IsWindowVisibleInternal("entity_inspector")) return;
+
+        SetWidgetEnabled("entity_inspector", "delete_btn", GetSelectedEntityIds() != null);
 
         if (Scene.ECS.EntityRevision != ListedEntityRevision || EntityListDirty)
         {
@@ -628,7 +643,12 @@ public partial class Inspector
             AddListBox("entity_inspector", "results_list", 500);
             SetListBoxHeader("entity_inspector", "results_list", "ID  |  Components");
             SetListBoxToggleCallback("entity_inspector", "results_list", ToggleEntityVisibility);
-            AddButton("entity_inspector", "delete_btn", "trash", () => DeleteSelectedEntities());
+            AddButton("entity_inspector", "delete_btn", "Delete", () => DeleteSelectedEntities());
+            var index = entityInspectorWindow.WidgetIndex["delete_btn"];
+            var button = entityInspectorWindow.Widgets[index];
+            button.Compact = true;
+            button.Disabled = true;
+            entityInspectorWindow.Widgets[index] = button;
             RefreshEntityList();
         }
 

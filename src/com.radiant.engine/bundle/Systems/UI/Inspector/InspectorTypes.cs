@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace com.radiant.engine.bundle;
 
 /// <summary> Available widget types for Inspector windows. </summary>
-public enum WidgetType { Label, Button, Toggle, Slider, Dropdown, TextInput, ListBox }
+public enum WidgetType { Label, Button, Toggle, Slider, Dropdown, TextInput, ListBox, Metric, FrameHistory }
 
 /// <summary> A single UI widget inside an Inspector window. Struct for value-type list storage. </summary>
 public struct Widget
@@ -26,6 +26,11 @@ public struct Widget
     public Action<float> SliderCallback;
 
     public Action ButtonCallback;
+    public bool Compact;
+
+    public float[] History;
+    public int HistoryIndex, HistoryCount;
+    public float HistoryTarget;
 
     public string[] DropdownOptions;
     public int DropdownSelected;

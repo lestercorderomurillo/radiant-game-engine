@@ -14,7 +14,7 @@ public class MeshGeometry3D : core.System, ITraceGeometry, ICameraView
     public int CameraEntity { get; set; } = -1;
     public global::System.Type CameraType => typeof(Camera3D);
     public Point? Resolution;
-    public RasterSampling Sampling;
+    public RasterSampler Sampling;
     public Point ViewSize => Resolution ?? new Point(Renderer.ScreenWidth, Renderer.ScreenHeight);
     public Point Size => Sampling?.RenderSize(ViewSize) ?? ViewSize;
     public bool HasCamera { get; private set; }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using com.radiant.engine.core;
-using com.radiant.engine.runtime;
 
 namespace com.radiant.engine.bundle;
 
@@ -86,28 +85,12 @@ public class GizmosRenderer : core.System
     /// <inheritdoc/>
     public override void LateRender()
     {
-        // Scale from virtual coordinates to actual screen pixels so gizmos
-        // resize proportionally with the window (resolution-independent).
-        var Scale = Matrix.CreateScale(
-            Renderer.ScreenWidth / Renderer.VirtualWidth,
-            Renderer.ScreenHeight / Renderer.VirtualHeight,
-            1f);
-
         if (Enabled)
         {
             Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: Renderer.WorldTransform);
             RenderGizmos();
             Renderer.EndDraw();
         }
-
-        // Always render build number in bottom-left corner
-        var BuildText = RuntimeInfo.BuildTag;
-        var TextSize = Renderer.MeasureString("Inter", FontSize, BuildText);
-        var BuildPos = new Vector2(15, Renderer.VirtualHeight - TextSize.Y - 15);
-
-        Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: Scale);
-        RenderTextWithBackground(new TextGizmo(BuildPos, BuildText, Color.Gray));
-        Renderer.EndDraw();
     }
 
     /// <summary>Draws the queued diagnostic primitives and labels.</summary>

@@ -4,8 +4,8 @@ using com.radiant.engine.core;
 namespace com.radiant.engine.bundle;
 
 /// <summary>Reconstructs a color image with Lanczos filtering, edge refinement and temporal accumulation.</summary>
-/// <remarks>Uses optional matching 2D geometry guidance, then sharpens the reconstructed result. Use Upscaling.ResetHistory when hosted by the shared stage. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
-/// <seealso cref="Upscaling"/>
+/// <remarks>Uses optional matching 2D geometry guidance, then sharpens the reconstructed result. Use Upscaler.ResetHistory when hosted by the shared stage. Use <see cref="UDRQuality"/> for resolution presets.</remarks>
+/// <seealso cref="Upscaler"/>
 public class UDR3 : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;

@@ -159,7 +159,9 @@ public partial class Inspector
     private int GetWidgetHeight(Widget Widget, int ContentWidth) => Widget.Type switch
     {
         WidgetType.Slider => WidgetHeight + 18,
-        WidgetType.Label => MeasureWrappedHeight(Widget.Text, ContentWidth),
+        WidgetType.Label => Widget.Section ? WidgetHeight : MeasureWrappedHeight(Widget.Text, ContentWidth),
+        WidgetType.Metric => (int)LineHeight + LabelSpacing,
+        WidgetType.FrameHistory => ProfilingChartHeight,
         WidgetType.ListBox => Widget.ListBoxHeight,
         _ => WidgetHeight
     };
@@ -177,11 +179,39 @@ public partial class Inspector
         return false;
     }
 
+    // Split the available width after subtracting all gaps; cumulative rounding closes the row exactly.
+    private int GetInlineWidgetWidth(WindowData window, int index, int contentWidth)
+    {
+        int start = index;
+        for (int i = index - 1; i >= 0; i--)
+        {
+            if (!window.Widgets[i].Visible) continue;
+            if (window.Widgets[i].InlineRatio <= 0) break;
+            start = i;
+        }
+        float total = 0, before = 0;
+        int count = 0;
+        for (int i = start; i < window.Widgets.Count; i++)
+        {
+            var widget = window.Widgets[i];
+            if (!widget.Visible) continue;
+            if (widget.InlineRatio <= 0) break;
+            total += widget.InlineRatio;
+            if (i < index) before += widget.InlineRatio;
+            count++;
+        }
+        int available = Math.Max(1, contentWidth - InlineGap * (count - 1));
+        return Math.Max(1, (int)MathF.Round(available * (before + window.Widgets[index].InlineRatio) / total)
+            - (int)MathF.Round(available * before / total));
+    }
+
     /// <summary> Calculates the total pixel height of a window based on its visible widgets. </summary>
     private int ComputeWindowHeight(WindowData Window)
     {
         if (Window.Resizable && Window.ResizedHeight > 0) return (int)Window.ResizedHeight;
         if (Window.Id == "debugger" && Window.WidgetIndex.ContainsKey("log")) return 440;
+
+        if (Window.Id == "perf") return LayoutProfiling(Window, false);
 
         int contentWidth = (int)Window.Size.X - Padding * 2;
         int height = WindowTitleHeight + WidgetSpacing;
@@ -194,7 +224,7 @@ public partial class Inspector
 
             if (!widget.Visible) continue;
 
-            int widgetH = GetWidgetHeight(widget, contentWidth);
+            int widgetH = GetWidgetHeight(widget, widget.InlineRatio > 0 ? GetInlineWidgetWidth(Window, i, contentWidth) : contentWidth);
 
             if (widget.InlineRatio > 0)
             {
@@ -259,7 +289,7 @@ public partial class Inspector
                 continue;
             }
 
-            int widgetH = GetWidgetHeight(widget, contentWidth);
+            int widgetH = GetWidgetHeight(widget, widget.InlineRatio > 0 ? GetInlineWidgetWidth(Window, i, contentWidth) : contentWidth);
 
             if (widget.InlineRatio > 0)
             {
@@ -322,6 +352,7 @@ public partial class Inspector
     private void ComputeLayout(WindowData Window)
     {
         if (Window.Id == "debugger" && Window.WidgetIndex.ContainsKey("log")) { ComputeDebuggerLayout(Window); return; }
+        if (Window.Id == "perf") { LayoutProfiling(Window, true); return; }
         int posX = (int)Window.Position.X;
         int posY = (int)Window.Position.Y;
         int windowWidth = (int)Window.Size.X;
@@ -345,13 +376,13 @@ public partial class Inspector
             if (!widget.Visible) continue;
 
             int widgetH = (widget.Type == WidgetType.ListBox && dynamicListBoxHeight > 0)
-                ? dynamicListBoxHeight : GetWidgetHeight(widget, contentWidth);
+                ? dynamicListBoxHeight : GetWidgetHeight(widget, widget.InlineRatio > 0 ? GetInlineWidgetWidth(Window, i, contentWidth) : contentWidth);
 
             if (widget.InlineRatio > 0)
             {
                 if (!inRow) { inlineX = posX + Padding; inlineMaxH = 0; inRow = true; }
 
-                int widgetWidth = (int)(contentWidth * widget.InlineRatio) - InlineGap / 2;
+                int widgetWidth = GetInlineWidgetWidth(Window, i, contentWidth);
                 widget.Bounds = new Rectangle(inlineX, widgetY, widgetWidth, widgetH);
                 Window.Widgets[i] = widget;
                 inlineX += widgetWidth + InlineGap;
@@ -372,7 +403,8 @@ public partial class Inspector
                 inRow = false;
             }
 
-            widget.Bounds = new Rectangle(posX + Padding, widgetY, contentWidth, widgetH);
+            int standaloneWidth = widget.Compact ? Math.Min(contentWidth, (int)MathF.Ceiling(MeasureText(widget.Text).X) + Padding * 2) : contentWidth;
+            widget.Bounds = new Rectangle(posX + Padding, widgetY, standaloneWidth, widgetH);
             Window.Widgets[i] = widget;
 
             bool tightLabel = widget.Type == WidgetType.Label && !widget.Section;
@@ -399,7 +431,7 @@ public partial class Inspector
     /// <summary> Measures the pixel height of text that word-wraps within the given width. </summary>
     private int MeasureWrappedHeight(string Text, int AvailableWidth)
     {
-        int maxWidth = AvailableWidth - 8;
+        int maxWidth = AvailableWidth;
 
         if (MeasureText(Text).X <= maxWidth) return (int)MeasureText(Text).Y;
 
@@ -435,6 +467,6 @@ public partial class Inspector
             ScreenPos.Y * (Renderer.VirtualHeight / Renderer.ScreenHeight) / UIScale);
     }
 
-    /// <summary>Keeps body text at 20 screen pixels instead of changing size in half-step jumps.</summary>
-    private float ComputeAutoScale() => Math.Clamp(20f / FontSize * Renderer.VirtualHeight / Renderer.ScreenHeight, 0.5f, 3f);
+    /// <summary>Keeps body text at 18 screen pixels instead of changing size in half-step jumps.</summary>
+    private float ComputeAutoScale() => Math.Clamp(18f / FontSize * Renderer.VirtualHeight / Renderer.ScreenHeight, 0.5f, 3f);
 }

@@ -5,10 +5,10 @@ namespace com.radiant.engine.bundle;
 
 /// <summary>Optional color controls for any view. Bind by instance; assign distinct IDs for multiple views.</summary>
 [SystemTag("Rendering", "Tools")]
-public class ColorSettings : core.System
+public class ToneMapperSettings : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.UI;
-    public ToneMapping Source;
+    public ToneMapper Source;
     public string Id = "colorProfile";
     public string Title = "Color Management";
 
@@ -18,30 +18,30 @@ public class ColorSettings : core.System
     /// <inheritdoc/>
     public override void Initialize()
     {
-        if (Source == null) throw new InvalidOperationException("ColorSettings requires a ToneMapping source.");
+        if (Source == null) throw new InvalidOperationException("ToneMapperSettings requires a ToneMapper source.");
 
         CreateWindow(Id, Title, Source);
     }
 
     /// <summary>Creates the inspector controls owned by this settings system.</summary>
-    internal static void CreateWindow(string id, string title, ToneMapping source)
+    internal static void CreateWindow(string id, string title, ToneMapper source)
     {
         if (id == null) return;
 
         Inspector.CreateWindow(id, title, Visible: false);
         Inspector.AddToggle(id, "enabled", "Enabled", source.Enabled, enabled => source.Enabled = enabled);
-        Inspector.AddDropdown(id, "tonemap", "Tonemapper", MapperNames, (int)source.Mapper, index => source.Mapper = (ToneMapper)index);
+        Inspector.AddDropdown(id, "tonemap", "Tonemapper", MapperNames, (int)source.Operator, index => source.Operator = (ToneMapOperator)index);
         Inspector.AddSlider(id, "exposure", "Exposure multiplier", 0.1f, 8, source.Exposure, value => source.Exposure = value);
         Inspector.AddDropdown(id, "transfer", "Output transfer", TransferNames, (int)source.Transfer, index => source.Transfer = (ColorTransfer)index);
     }
 
     /// <summary>Synchronizes inspector controls with the current rendering settings.</summary>
-    internal static void SyncWindow(string id, ToneMapping source)
+    internal static void SyncWindow(string id, ToneMapper source)
     {
         if (id == null) return;
 
         Inspector.SetToggleValue(id, "enabled", source.Enabled);
-        Inspector.SetDropdownValue(id, "tonemap", (int)source.Mapper);
+        Inspector.SetDropdownValue(id, "tonemap", (int)source.Operator);
         Inspector.SetSliderValue(id, "exposure", source.Exposure);
         Inspector.SetDropdownValue(id, "transfer", (int)source.Transfer);
         Inspector.SetWidgetEnabled(id, "tonemap", source.Enabled);

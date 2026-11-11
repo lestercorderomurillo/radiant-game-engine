@@ -4,16 +4,16 @@ The interactive test scenes use the same final-stage contract:
 
 `producer → tone mapping → post AA → reconstruction → buffer inspector → presentation`
 
-Geometry AA belongs to the producer's `RasterSampling`. Reconstruction belongs to `Upscaling`; presentation belongs to `RenderPresentation`. A scene chooses its content and producer; it does not need its own UDR switching implementation. UI and gizmos remain outside reconstruction.
+Geometry AA belongs to the producer's `RasterSampler`. Reconstruction belongs to `Upscaler`; presentation belongs to `RenderPresenter`. A scene chooses its content and producer; it does not need its own UDR switching implementation. UI and gizmos remain outside reconstruction.
 
 | Demo | Default | Reconstruction choices | Guidance |
 | --- | --- | --- | --- |
-| SimpleLight / MegaLights | UDR4 Balanced | None, UDR1–4 | HRC geometry and temporal buffers |
+| Radiance | UDR4 Balanced | None, UDR1–4 | HRC geometry and temporal buffers |
 | Rendering2D / CornellBox flat, raster, path tracing | None on startup | None, UDR1–4 | Spatial reconstruction |
 | CornellBox radiance cascades | UDR4 Balanced on first activation | None, UDR1–4 | Spatial reconstruction; 16³ lighting probes |
 | Tileset | None | None, UDR1–4 | Spatial reconstruction of cropped viewport |
 
-Open **Image quality** in the framework inspector for reconstruction, quality, post AA, geometry AA where supported, and history reset. The UDR backend windows retain algorithm-specific advanced controls. Sources without a camera omit TAA. MegaLights also supports F11 to cycle None / UDR1–4.
+Open **Image quality** in the framework inspector for reconstruction, quality, post AA, geometry AA where supported, and history reset. The UDR backend windows retain algorithm-specific advanced controls. Sources without a camera omit TAA. Radiance also supports F11 to cycle None / UDR1–4.
 
 `None` means native producer resolution with reconstruction disabled. `Native` retains the algorithm selection but bypasses reconstruction and returns the source texture directly. Performance and Balanced request 25% and 50% per dimension. Modern demos reduce the producer's view resolution, including its path tracer. Bypassing reconstruction restores an explicitly configured resolution. Tiles still rasterizes its padded world grid at tile resolution and reduces the final viewport; this does not reduce terrain iteration or CPU lighting work.
 
@@ -26,7 +26,7 @@ updates is separate from reconstruction history. See
 
 ## Integration
 
-Add `Upscaling` after post AA with `Input = aa.GetOutput` and `After = [aa]`. Feed `upscaler.GetOutput` into the buffer inspector or presentation. Add it as an inspector source to expose its input/output. Pass it to `AntiAliasingSettings.Upscaler` for the shared controls. Select with `upscaler.Select(UpscalingMode.UDR4)` and disable reconstruction with `Select(UpscalingMode.None)`.
+Add `Upscaler` after post AA with `Input = aa.GetOutput` and `After = [aa]`. Feed `upscaler.GetOutput` into the buffer inspector or presentation. Add it as an inspector source to expose its input/output. Pass it to `AntiAliaserSettings.Upscaler` for the shared controls. Select with `upscaler.Select(UpscalerMode.UDR4)` and disable reconstruction with `Select(UpscalerMode.None)`.
 
 For a Render-phase geometry producer, apply `geometry.Resolution = upscaler.ResolveViewSize(geometry.Resolution)` before rendering. The existing demo helpers illustrate HRC and tile integration. `UseGeometryGuidance = true` connects matching 2D Geometry buffers independently of lighting. `HrcInput = true` additionally enables HRC jitter in UDR4 and must only be used for that producer. Neither flag restricts algorithm selection. Without guidance, UDR1–4 all reconstruct the image spatially and preserve alpha; UDR2 skips history passes and UDR3 skips guided edge/history passes. The UI exposes all four algorithms for every producer.
 
@@ -43,8 +43,7 @@ Temporal reconstruction outside the existing 2D Geometry adapter needs a defined
 ```sh
 dotnet build radiant.sln -c Release -m:1
 dotnet run --project tests/Radiant.Tests -c Release --no-build
-dotnet run --project tests/Radiant.Scenes -c Release --no-build -- lights --upscaling-regression
-dotnet run --project tests/Radiant.Scenes -c Release --no-build -- triangles --upscaling-regression
+dotnet run --project tests/Radiant.Scenes -c Release --no-build -- radiance --upscaling-regression
 dotnet run --project tests/Radiant.Scenes -c Release --no-build -- tiles --upscaling-regression
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --upscaling-regression --2d
 dotnet run --project tests/Radiant.3D -c Release --no-build -- --upscaling-regression

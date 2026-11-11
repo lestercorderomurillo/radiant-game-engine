@@ -60,6 +60,7 @@ public class MonoGameWindow : Game, IRuntimeHost, IWindow, IAboutWindow
         // Adapter enumeration initializes Vulkan before PreparingDeviceSettings is raised.
         using (NativeDiagnosticCapture.Begin()) _ = GraphicsAdapter.Adapters;
         GraphicsDeviceManager.PreparingDeviceSettings += (_, _) => GraphicsDiagnostics ??= NativeDiagnosticCapture.Begin();
+        GraphicsDeviceManager.DeviceResetting += PrepareSurfaceForReset;
         GraphicsDeviceManager.DeviceCreated += (_, _) => FinishGraphicsDiagnostics();
         GraphicsDeviceManager.DeviceReset += (_, _) => FinishGraphicsDiagnostics();
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -156,6 +157,18 @@ public class MonoGameWindow : Game, IRuntimeHost, IWindow, IAboutWindow
         if (MaximizeOnShow) { NativeWindow.Maximize(Window.Handle); MaximizeOnShow = false; }
     }
 
+    private void PrepareSurfaceForReset(object sender, EventArgs args)
+    {
+        var presentation = GraphicsDevice.PresentationParameters;
+        // DesktopVK resets the swapchain before its PresentationChanged event sizes the
+        // SDL window. Vulkan can clamp that swapchain to the old loader/client extent;
+        // the subsequent same-size window event then skips the resize that would fix it.
+        // DeviceResetting sees the final parameters, including overrides supplied by
+        // clients. Size the surface first for both ApplyChanges and direct device resets.
+        if (Window.Handle != IntPtr.Zero && !presentation.IsFullScreen)
+            NativeWindow.SetSize(Window.Handle, presentation.BackBufferWidth, presentation.BackBufferHeight);
+    }
+
     /// <summary>Marks a window resize for deferred renderer updates.</summary>
     private void OnClientSizeChanged(object Sender, EventArgs Event)
     {
@@ -171,13 +184,16 @@ public class MonoGameWindow : Game, IRuntimeHost, IWindow, IAboutWindow
     /// <summary>Returns the center of the current client area in pixels.</summary>
     public Vector2 GetScreenCenter()
     {
-        return new Vector2(GraphicsDeviceManager.PreferredBackBufferWidth / 2, GraphicsDeviceManager.PreferredBackBufferHeight / 2);
+        return GetScreenSize() / 2;
     }
 
     /// <summary>Returns the current client-area dimensions in pixels.</summary>
     public Vector2 GetScreenSize()
     {
-        return new Vector2(GraphicsDeviceManager.PreferredBackBufferWidth, GraphicsDeviceManager.PreferredBackBufferHeight);
+        var presentation = GraphicsDeviceManager.GraphicsDevice?.PresentationParameters;
+        return presentation == null
+            ? new Vector2(GraphicsDeviceManager.PreferredBackBufferWidth, GraphicsDeviceManager.PreferredBackBufferHeight)
+            : new Vector2(presentation.BackBufferWidth, presentation.BackBufferHeight);
     }
 
     /// <inheritdoc/>

@@ -17,7 +17,7 @@ public sealed class UpscalingRegressionWindow : Window
     private readonly Scene Scene;
     private int Frame;
     private int Case;
-    private UpscalingMode[] Modes;
+    private UpscalerMode[] Modes;
     private Func<Texture2D> OriginalInput;
     private bool OriginalHrcInput;
     private bool OriginalGuidance;
@@ -41,8 +41,8 @@ public sealed class UpscalingRegressionWindow : Window
     {
         if (Frame > 0 && Frame % 5 == 0)
         {
-            var upscaler = Scene.ECS.GetSystem<Upscaling>();
-            Modes ??= Enum.GetValues<UpscalingMode>();
+            var upscaler = Scene.ECS.GetSystem<Upscaler>();
+            Modes ??= Enum.GetValues<UpscalerMode>();
             if (OriginalInput == null)
             {
                 OriginalInput = upscaler.Input;
@@ -55,14 +55,14 @@ public sealed class UpscalingRegressionWindow : Window
             {
                 upscaler.Select(Modes[Case / 3]);
                 UDRQuality.Set(Case % 3);
-                Scene.ECS.GetSystem<AntiAliasing>().Mode = Case % 2 == 0 ? PostAAMode.FXAA : PostAAMode.SMAA;
+                Scene.ECS.GetSystem<AntiAliaser>().Mode = Case % 2 == 0 ? PostAAMode.FXAA : PostAAMode.SMAA;
                 Case++;
             }
             else if (Case < Modes.Length * 3 + 4 * ImageColors.Length)
             {
                 // Arbitrary RGBA images must work even when unrelated HRC geometry exists in the scene.
                 int imageCase = Case - Modes.Length * 3;
-                upscaler.Select(UpscalingMode.None);
+                upscaler.Select(UpscalerMode.None);
                 upscaler.HrcInput = false;
                 upscaler.UseGeometryGuidance = false;
                 ExpectedColor = ImageColors[imageCase % ImageColors.Length];
@@ -75,7 +75,7 @@ public sealed class UpscalingRegressionWindow : Window
             else if (Case < Modes.Length * 3 + 4 * ImageColors.Length + 4)
             {
                 // Guidance is independent of HRC; absent guidance still permits every algorithm.
-                upscaler.Select(UpscalingMode.None);
+                upscaler.Select(UpscalerMode.None);
                 upscaler.HrcInput = false;
                 upscaler.UseGeometryGuidance = true;
                 ExpectedColor = null;
@@ -90,7 +90,7 @@ public sealed class UpscalingRegressionWindow : Window
             }
             else if (Case == Modes.Length * 3 + 4 * ImageColors.Length + 4)
             {
-                upscaler.Select(UpscalingMode.None);
+                upscaler.Select(UpscalerMode.None);
                 upscaler.Input = OriginalInput;
                 upscaler.HrcInput = OriginalHrcInput;
                 upscaler.UseGeometryGuidance = OriginalGuidance;
@@ -98,7 +98,7 @@ public sealed class UpscalingRegressionWindow : Window
                 TestingGuidance = false;
                 var lighting = Scene.ECS.GetSystem<HRCGI>();
                 if (lighting != null) lighting.Enabled = OriginalLightingEnabled;
-                upscaler.Select(UpscalingMode.UDR4);
+                upscaler.Select(UpscalerMode.UDR4);
                 UDRQuality.Set(1);
                 GraphicsDeviceManager.PreferredBackBufferWidth = 400;
                 GraphicsDeviceManager.PreferredBackBufferHeight = 240;
@@ -119,14 +119,14 @@ public sealed class UpscalingRegressionWindow : Window
 
         if (Frame % 5 != 0) return;
 
-        var upscaler = Scene.ECS.GetSystem<Upscaling>();
+        var upscaler = Scene.ECS.GetSystem<Upscaler>();
         var output = upscaler.GetOutput();
 
         if (output == null || output.IsDisposed) throw new Exception("Reconstruction has no live output.");
         if (TestingGuidance && Scene.ECS.GetSystem<HRCGI>() is { } lighting && lighting.OutputJitter != Vector2.Zero)
             throw new Exception("Geometry-only guidance must not jitter an unrelated lighting producer.");
 
-        bool bypass = upscaler.Mode == UpscalingMode.None || UDRQuality.ScaleFactor == 100;
+        bool bypass = upscaler.Mode == UpscalerMode.None || UDRQuality.ScaleFactor == 100;
 
         if (bypass && !ReferenceEquals(output, upscaler.Input())) throw new Exception("Native / off must return the source directly.");
         if (!bypass && (output.Width != Scene.Renderer.ScreenWidth || output.Height != Scene.Renderer.ScreenHeight))

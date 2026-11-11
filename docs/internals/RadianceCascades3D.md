@@ -37,7 +37,7 @@ inferred from it.
 ## Current pipeline
 
 1. `TraceSceneBuffer` uploads a packed `TraceBvh` on source/revision changes. The
-   buffer helper is reused by `PathTracer` and `RadianceCascades`; each system owns
+   buffer helper is reused by `PTGI` and `RCGI`; each system owns
    its own instance, so this is code reuse rather than a shared allocation cache.
 2. Cascade grids halve each axis and double each angular dimension per level.
    Directions use an equal-area spherical mapping. Probe tiles live in 2D
@@ -103,7 +103,7 @@ and evaluate sparse surface-driven probes before expanding to large scenes.
 
 Cornell's first activation of radiance cascades selects grid 16, UDR4 and Balanced
 (50% per axis). Later renderer switches preserve reconstruction choices. The
-standalone `RadianceCascades` stage keeps its grid-32 default. UDR operates after
+standalone `RCGI` stage keeps its grid-32 default. UDR operates after
 tone mapping and AA through the existing generic spatial path; it does not reduce
 the probe grid or add HRC temporal guidance. A 1920×1080 view therefore gathers
 at 960×540 and reconstructs to the display size.

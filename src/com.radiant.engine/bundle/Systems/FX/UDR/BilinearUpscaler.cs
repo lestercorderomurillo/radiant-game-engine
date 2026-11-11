@@ -4,7 +4,7 @@ using com.radiant.engine.core;
 namespace com.radiant.engine.bundle;
 
 /// <summary>Resizes the supplied image using bilinear filtering.</summary>
-public class Bilinear : core.System
+public class BilinearUpscaler : core.System
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
 

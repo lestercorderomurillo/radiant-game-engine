@@ -22,9 +22,9 @@ internal sealed class AARegressionWindow : Window
         (RasterAAMode.MSAA2x, PostAAMode.None), (RasterAAMode.MSAA4x, PostAAMode.None), (RasterAAMode.MSAA8x, PostAAMode.None),
         (RasterAAMode.SSAA2x, PostAAMode.None), (RasterAAMode.SSAA3x, PostAAMode.None), (RasterAAMode.MSAA4x, PostAAMode.SMAA), (RasterAAMode.SSAA2x, PostAAMode.TAA)
     };
-    private AntiAliasing AA => Scene is CornellBoxScene c ? c.AA : ((Rendering2DScene)Scene).AA;
-    private RasterSampling Sampling => Scene is CornellBoxScene c ? c.Sampling : ((Rendering2DScene)Scene).Sampling;
-    private ToneMapping Tone => Scene is CornellBoxScene c ? c.ToneMap : ((Rendering2DScene)Scene).ToneMap;
+    private AntiAliaser AA => Scene is CornellBoxScene c ? c.AA : ((Rendering2DScene)Scene).AA;
+    private RasterSampler Sampling => Scene is CornellBoxScene c ? c.Sampling : ((Rendering2DScene)Scene).Sampling;
+    private ToneMapper Tone => Scene is CornellBoxScene c ? c.ToneMap : ((Rendering2DScene)Scene).ToneMap;
     private Texture2D GeometryColor => Scene is CornellBoxScene c ? c.Geometry.ColorTexture : ((Rendering2DScene)Scene).Geometry.ColorTexture;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
@@ -62,7 +62,7 @@ internal sealed class AARegressionWindow : Window
         {
             Sampling.Mode = RasterAAMode.None;
             AA.Mode = PostAAMode.None;
-            Tone.Mapper = ToneMapper.None;
+            Tone.Operator = ToneMapOperator.None;
             Tone.Exposure = caseIndex == Cases.Length ? 0.5f : 2;
 
             if (caseIndex >= Cases.Length + 2)

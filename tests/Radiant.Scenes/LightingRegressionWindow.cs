@@ -227,7 +227,7 @@ sealed class LightingReferenceScene : Scene
     public const float Radius = 100;
 
     private HRCGI Lighting;
-    private Bilinear Upscaler;
+    private BilinearUpscaler Upscaler;
     private int Blocker;
 
     /// <summary>Selects the lighting calibration fixture and its reference settings.</summary>
@@ -269,7 +269,7 @@ sealed class LightingReferenceScene : Scene
         ECS.AddSystem<Geometry>();
         ECS.AddSystem<UniformLightingInput>();
         Lighting = ECS.AddSystem<HRCGI>();
-        Upscaler = ECS.AddSystem<Bilinear>();
+        Upscaler = ECS.AddSystem<BilinearUpscaler>();
     }
 
     /// <inheritdoc/>

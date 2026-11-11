@@ -15,7 +15,7 @@ public class ShapeGeometry2D : core.System, IRenderSource, ITraceGeometry, ICame
     public int CircleSegments = 48;
     public bool Rasterize = true;
     public Point? Resolution;
-    public RasterSampling Sampling;
+    public RasterSampler Sampling;
     public bool CaptureDepth;
     public RenderTarget2D DepthTexture { get; private set; }
 

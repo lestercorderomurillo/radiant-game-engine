@@ -68,11 +68,11 @@ radiant/
 │   │       ├── 2D/ Geometry, HRCGI, Tileset, WorldGen, PerlinNoise2D,
 │   │       │       MouseLight, PaintBrush
 │   │       ├── 3D/ Tileset3D
-│   │       ├── FX/ ColorManagement, UDR
+│   │       ├── FX/ HRCToneMapper, UDR
 │   │       └── UI/ Gizmos, UIWindow, Profiler
 │   ├── runtime/ (GameClient, GameLoop, GameServer, Window, WindowOptions)
 │   ├── mplay/ (NetworkClient, NetworkManager, NetworkMessage)
-│   └── tests/2D/ (SimpleLightScene, TilesetScene)
+│   └── tests/2D/ (RadianceScene, TilesetScene)
 │
 ├── AGENTS.md (index of agent skills to follow on every task)
 ├── skills/lester-skills/<skill>/SKILL.md (agent skills, e.g. communication-autonomy)
@@ -209,25 +209,25 @@ Topological sort (Kahn's) at `ECS.Initialize()`. Disabled systems (`Enabled = fa
 
 | Layer | Value | Systems |
 |-------|-------|---------|
-| World | 0 | Geometry, HRCGI, ColorManagement, Bilinear, UDR1-3 |
+| World | 0 | Geometry, HRCGI, HRCToneMapper, BilinearUpscaler, UDR1-3 |
 | Gameplay | 1 | *(default)* Game systems |
 | Overlay | 2 | GizmosRenderer, PerformanceMonitor |
 | UI | 3 | Inspector |
 
 ### SystemGroup
 
-Mutually exclusive systems (e.g., Bilinear vs UDR3). Supports "all disabled" state (ActiveIndex = -1).
+Mutually exclusive systems (e.g., BilinearUpscaler vs UDR3). Supports "all disabled" state (ActiveIndex = -1).
 
 ```csharp
-var group = new SystemGroup("Upscaling",
-    ("Bilinear", ECS.AddSystem<Bilinear>()),
+var group = new SystemGroup("Upscaler",
+    ("BilinearUpscaler", ECS.AddSystem<BilinearUpscaler>()),
     ("UDR3", ECS.AddSystem<UDR3>(enabled: false))
 );
 
 group.Toggle();              // Cycle: 0 → 1 → ... → N-1 → -1 (none) → 0
 group.ActiveName;            // Current system name, null when none active
 group.Active;                // Current System instance, null when none active
-group.Name;                  // Group name ("Upscaling")
+group.Name;                  // Group name ("Upscaler")
 group.DisableActive();       // Dispose + disable current, set ActiveIndex = -1
 group.ForEach(system => {}); // Iterate all systems in group
 ```
@@ -241,7 +241,7 @@ Tag systems for inspector display and filtering:
 public class ExampleSystem : System { }
 ```
 
-Tags appear in the Systems Inspector after `|`: "ExampleSystem  |  Gameplay". Group names also shown: "Bilinear  |  Upscaling".
+Tags appear in the Systems Inspector after `|`: "ExampleSystem  |  Gameplay". Group names also shown: "BilinearUpscaler  |  Upscaler".
 
 ## Renderer API
 
@@ -495,7 +495,7 @@ Quality: ProbeScale 4/3/2/1.
 | JFATexture1/2 | Vector4 | SDFScale=0.25 |
 | Cascade/Frustum RTs | HalfVector4 | Per-cascade/frustum |
 | FinalTexture (HRCGI) | HalfVector4 | World-sized, raw linear |
-| ColorManagement Output | Color | Tonemapped sRGB |
+| HRCToneMapper Output | Color | Tonemapped sRGB |
 
 **PreserveContents**: MonoGame discards RT on target switch by default. Use for any RT read later.
 
@@ -658,7 +658,7 @@ Audio, physics engine, particles, skeletal animation, save/load, logging, asset 
 
 ## Repository split and desktop hosting
 
-Pac-Man moved to the sibling `raytracing-pacman` repository, including its maze scene, generator, renderer, gameplay, HUD, textures, and PressStart2P font. The engine must not depend on game code. `radiant.csproj` is a library and excludes test scenes; the preserved lighting/tileset scenes run with `dotnet run --project tests/Radiant.Scenes -- lights` (or `tiles`).
+Pac-Man moved to the sibling `raytracing-pacman` repository, including its maze scene, generator, renderer, gameplay, HUD, textures, and PressStart2P font. The engine must not depend on game code. `radiant.csproj` is a library and excludes test scenes; the preserved radiance/tileset scenes run with `dotnet run --project tests/Radiant.Scenes -- radiance` (or `tiles`).
 
 `radiant.csproj` compiles only `src/com.radiant.engine/runtime/Backends/MonoGame` and project-references `src/Radiant.Core/Radiant.Core.csproj`, which compiles every other engine source (except demo scenes) and must not reference MonoGame or FontStashSharp. The renderer drives the portable `IGraphicsBackend`, `IGeometryBackend`, `IShapeBatchBackend` and font interfaces in `core/Graphics`; the MonoGame backend implements them. `tests/Radiant.Portable` (CI `portable` job, also run by `eng/check-consumers.py`) fails if a native graphics assembly is referenced or loaded.
 
@@ -670,31 +670,31 @@ Build: `dotnet build radiant.sln -c Release`. All shaders compile natively throu
 
 `tests/Radiant.Tests` checks generated tile components/spatial indexes, light initialization, and portable timers without a window. `tests/Shared/SmokeWindow.cs` drives real GPU rendering, pixel readback, window resize, screenshots, and disposal. Both scene runners accept `--smoke` after the scene name. Pac-Man imports the same test helper in its separate test executable.
 
-Acquire component refs only after all AddComponent calls: archetype migration invalidates earlier refs. WorldGen and SimpleLightScene now follow this rule. Tileset uses positive padding and rebuilds its lighting buffers on resize after joining the worker. Screen dimensions come from PresentationParameters, not an active render-target viewport. Device-reset/window-resize signals are processed before systems update.
+Acquire component refs only after all AddComponent calls: archetype migration invalidates earlier refs. WorldGen and RadianceScene now follow this rule. Tileset uses positive padding and rebuilds its lighting buffers on resize after joining the worker. Screen dimensions come from PresentationParameters, not an active render-target viewport. Device-reset/window-resize signals are processed before systems update.
 
 The shared desktop props restore MGCB immediately before content compilation, after building project references, avoiding concurrent first-install tool restores. Linux CI builds the library/scenes and runs headless checks; graphical smoke tests require a Vulkan display.
 
-VS Code: `.vscode/settings.json` selects `radiant.sln` and associates `.fx` with HLSL. The build task builds Debug, and launch configurations run the preserved lighting/tileset scenes. The sibling Pac-Man solution and multi-root workspace include the library and both engine test projects, allowing C# Dev Kit to resolve sources across repositories.
+VS Code: `.vscode/settings.json` selects `radiant.sln` and associates `.fx` with HLSL. The build task builds Debug, and launch configurations run the preserved radiance/tileset scenes. The sibling Pac-Man solution and multi-root workspace include the library and both engine test projects, allowing C# Dev Kit to resolve sources across repositories.
 
 ### Path lighting resolution
 
-Cornell Box and Rendering2D use `PathLighting` after `Denoising` and before tone mapping. `PathTracer.SeparateLighting` enables stable primary hits; its raw radiance and denoiser guides keep their original matching resolution. The Lighting resolution slider scales tracing only. `PathLighting` caches full-view pixel-center albedo, normal, depth and emission hits using the same BVH, reconstructs diffuse illumination with depth/normal weights, and reapplies full-resolution albedo/emission. Camera, scene, camera availability and view-size changes invalidate the surface cache. At scale 1 it forwards native-resolution radiance through the same stage without spatial reconstruction. Inactive tracing releases reconstruction targets. Fine lighting remains limited by trace resolution; surfaces with no matching low-resolution sample use environment illumination. Full-resolution surface buffers are exposed in the pipeline inspector and provide AA depth. `PathSurfaces.fx` and `PathTracer.fx` share BVH traversal through `TraceScene.fxh`.
+Cornell Box and Rendering2D use `LightingReconstructor` after `Denoiser` and before tone mapping. `PTGI.SeparateLighting` enables stable primary hits; its raw radiance and denoiser guides keep their original matching resolution. The Lighting resolution slider scales tracing only. `LightingReconstructor` caches full-view pixel-center albedo, normal, depth and emission hits using the same BVH, reconstructs diffuse illumination with depth/normal weights, and reapplies full-resolution albedo/emission. Camera, scene, camera availability and view-size changes invalidate the surface cache. At scale 1 it forwards native-resolution radiance through the same stage without spatial reconstruction. Inactive tracing releases reconstruction targets. Fine lighting remains limited by trace resolution; surfaces with no matching low-resolution sample use environment illumination. Full-resolution surface buffers are exposed in the pipeline inspector and provide AA depth. `PathSurfaces.fx` and `PathTracer.fx` share BVH traversal through `TraceScene.fxh`.
 
 ## Shared reconstruction in test demos
 
-`Upscaling` is an `ImageSystem` stage between `AntiAliasing` and `RenderInspector` / `RenderPresentation`. It owns only the selected UDR backend, runs reconstruction in Render after its input producers, and releases the previous backend on selection changes. `None` and Native bypass reconstruction. `AntiAliasingSettings.Upscaler` adds the common Image quality selector; sources without a camera omit TAA. UDR1–4 accept any color-image producer and preserve alpha in their image-only spatial paths. `UseGeometryGuidance` optionally connects matching 2D Geometry buffers independently of lighting; `HrcInput` additionally enables the legacy HRC jitter adapter. Missing guidance skips temporal work. The UI exposes all modes for every producer. UDR4 supports `Present`, `UseGeometryGuidance`, `UseHrcGeometry`, and `Temporal` integration flags; spatial mode preserves alpha and uses two targets and two passes. Its default standalone behavior remains the HRC Update-phase path.
+`Upscaler` is an `ImageSystem` stage between `AntiAliaser` and `RenderInspector` / `RenderPresenter`. It owns only the selected UDR backend, runs reconstruction in Render after its input producers, and releases the previous backend on selection changes. `None` and Native bypass reconstruction. `AntiAliaserSettings.Upscaler` adds the common Image quality selector; sources without a camera omit TAA. UDR1–4 accept any color-image producer and preserve alpha in their image-only spatial paths. `UseGeometryGuidance` optionally connects matching 2D Geometry buffers independently of lighting; `HrcInput` additionally enables the legacy HRC jitter adapter. Missing guidance skips temporal work. The UI exposes all modes for every producer. UDR4 supports `Present`, `UseGeometryGuidance`, `UseHrcGeometry`, and `Temporal` integration flags; spatial mode preserves alpha and uses two targets and two passes. Its default standalone behavior remains the HRC Update-phase path.
 
-All five interactive demos expose the same Image quality controls. `DemoRendering` shares the HRC / tiles image-stage wiring; SimpleLight and MegaLights default to UDR4. Rendering2D, CornellBox flat/raster/path tracing, and Tileset start with None and allow UDR1–4 selection. First selection of Cornell radiance cascades enables UDR4 Balanced; subsequent switches preserve the user’s reconstruction choice. Modern scenes call `Upscaling.ResolveViewSize` before rendering to reduce producer resolution and restore explicit resolutions on bypass. Tileset can set `Present = false` and expose its cropped viewport through `GetOutput`. MegaLights F11 cycles None / UDR1–4.
+All four interactive demos expose the same Image quality controls. `DemoRendering` shares the HRC / tiles image-stage wiring; Radiance defaults to UDR4. Rendering2D, CornellBox flat/raster/path tracing, and Tileset start with None and allow UDR1–4 selection. First selection of Cornell radiance cascades enables UDR4 Balanced; subsequent switches preserve the user’s reconstruction choice. Modern scenes call `Upscaler.ResolveViewSize` before rendering to reduce producer resolution and restore explicit resolutions on bypass. Tileset can set `Present = false` and expose its cropped viewport through `GetOutput`. Radiance F11 cycles None / UDR1–4.
 
-GPU selector regression: `tests/Radiant.Scenes <lights|triangles|tiles|rendering2d> --upscaling-regression` and `tests/Radiant.3D --upscaling-regression [--2d]`. These cover all modes for every producer and quality setting, arbitrary RGBA images with unrelated geometry present, optional guidance with HRC disabled or geometry absent, alpha preservation, AA composition, Native identity bypass, off/on, finite output and resize. See `docs/internals/RenderingPipeline.md` for integration and remaining per-view limitations.
+GPU selector regression: `tests/Radiant.Scenes <radiance|tiles|rendering2d> --upscaling-regression` and `tests/Radiant.3D --upscaling-regression [--2d]`. These cover all modes for every producer and quality setting, arbitrary RGBA images with unrelated geometry present, optional guidance with HRC disabled or geometry absent, alpha preservation, AA composition, Native identity bypass, off/on, finite output and resize. See `docs/internals/RenderingPipeline.md` for integration and remaining per-view limitations.
 
 ## Optional Vulkan hardware path tracing
 
-`PathTracer.Backend` selects Auto (default), Software (GPU shader BVH), or Vulkan (strict; throws if unavailable). `ActiveBackend`, `BackendStatus`, `HardwareBuildCount` and `TraceGpuMilliseconds` expose the selected path; timing covers only the last completed native ray-query dispatch. The Path tracing inspector has the same selector. `Renderer.SupportsVulkanPathTracing` checks the active device and runtime ABI. All native resource access stays behind `RendererRayTracing` and `VulkanPathTraceSession` in core rendering.
+`PTGI.Backend` selects Auto (default), Software (GPU shader BVH), or Vulkan (strict; throws if unavailable). `ActiveBackend`, `BackendStatus`, `HardwareBuildCount` and `TraceGpuMilliseconds` expose the selected path; timing covers only the last completed native ray-query dispatch. The Path tracing inspector has the same selector. `Renderer.SupportsVulkanPathTracing` checks the active device and runtime ABI. All native resource access stays behind `RendererRayTracing` and `VulkanPathTraceSession` in core rendering.
 
 Build the optional runtime with `python3 eng/build-vulkan-rt.py`, then use `-p:RadiantVulkanRT=true` when building/running/publishing. The script downloads pinned MonoGame 3.8.6, SDL, FAudio, Volk, VMA, Vulkan headers and stb into ignored `artifacts/native`; requires Python 3.12+, CMake, C/C++ tooling, .NET and glslangValidator. `Native/VulkanRT` contains the checked runtime patch, C ABI implementation and GLSL ray-query shader. The patch enables Vulkan 1.2 + KHR acceleration structures/ray queries only when supported, and fixes acquired-image semaphore consumption for mid-frame flushes. Normal builds restore the stock runtime. Native builds are platform/architecture specific; do not copy a Linux binary into Windows or an x64 binary into arm64 output. The optional runtime is pinned to MonoGame 3.8.6.
 
-Tracing builds one BLAS over the existing world-triangle adapter plus an identity TLAS, caches by source/revision, and writes an RGBA32F sample in MonoGame's command buffer. Its external texture feeds the existing accumulation/denoising/lighting/color pipeline without CPU image transfers. Flush before disposing external texture views; do not force-purge MonoGame's unrelated deferred resources. Native dispatch restores shader-read layout before raster consumers. Geometry changes, resizing and disposal synchronize; ordinary tracing frames do not wait for CPU readback. Guides/full-resolution PathLighting still use the existing software BVH. Material transport remains the existing diffuse integrator, and geometry changes currently rebuild rather than refit.
+Tracing builds one BLAS over the existing world-triangle adapter plus an identity TLAS, caches by source/revision, and writes an RGBA32F sample in MonoGame's command buffer. Its external texture feeds the existing accumulation/denoising/lighting/color pipeline without CPU image transfers. Flush before disposing external texture views; do not force-purge MonoGame's unrelated deferred resources. Native dispatch restores shader-read layout before raster consumers. Geometry changes, resizing and disposal synchronize; ordinary tracing frames do not wait for CPU readback. Guides/full-resolution LightingReconstructor still use the existing software BVH. Material transport remains the existing diffuse integrator, and geometry changes currently rebuild rather than refit.
 
 `tests/Radiant.3D --vulkan-rt-regression` requires real Vulkan RT and checks analytic transport, software parity away from shared-edge roundoff, clipping, cameras, empty geometry, revisions, accumulation, texture sharing, resizing, switching and disposal. With the stock runtime use `--vulkan-rt-regression --expect-software` to check Auto fallback and rejection of explicit Vulkan. `--pipeline-regression [--2d]` exercises full integration. Interactive Cornell accepts `--path-backend=auto|software|vulkan`. Windows build support is provided but requires validation on Windows hardware; development validation uses Linux/RADV on RX 9070 XT.
 
@@ -702,12 +702,12 @@ Tracing builds one BLAS over the existing world-triangle adapter plus an identit
 
 Introduced in the v0.5.0 source release; both engine project versions are 0.5.0.
 
-`RadianceCascades` is a separate world-space diffuse stage over `ITraceGeometry`,
+`RCGI` is a separate world-space diffuse stage over `ITraceGeometry`,
 with dense probe atlases, equal-area directions, visibility-aware cascade merging,
 irradiance gather, linear depth and optional previous-frame bounce feedback.
-`TraceSceneBuffer` factors the shader BVH upload/binding out of `PathTracer`; each
+`TraceSceneBuffer` factors the shader BVH upload/binding out of `PTGI`; each
 stage owns its buffer. All resources still use Renderer APIs. Cornell has renderer
-index 3, `--radiance-cascades` and `RadianceCascadesSettings`; 2D HRC is unchanged.
+index 3, `--radiance-cascades` and `RCGISettings`; 2D HRC is unchanged.
 Grid sizes are 8/16/32/64; direction rows 2/4/8 (64³ supports at most 4 rows).
 Scene revisions, lighting settings and layout changes reset feedback. Empty geometry
 or missing cameras clear output; switching renderers disposes resources. GPU regressions:
@@ -729,7 +729,7 @@ investigation and its validation commands.
 
 ## Native NRD diffuse reconstruction
 
-`python3 eng/build-vulkan-rt.py --nrd` adds pinned official NRD 4.18.0 to the optional runtime; the managed/native RT ABI is now 2. Build/run with `-p:RadiantVulkanRT=true`. `Denoising.TraceSource` connects current native signals; `NrdReblur` and `NrdRelax` / IDs `nrd.reblur` and `nrd.relax` use `NrdDenoiser`, `VulkanNrdSession`, and `Native/VulkanRT/nrd.inl`. Capability checks require the NRD runtime, ray queries and unformatted storage-image reads/writes. The native device enables supported features explicitly. Shader sources emit demodulated diffuse radiance, second-segment hit distance and primary guides; REBLUR packing differs from RELAX. Native reconstruction uses per-view resources, per-flight-frame constants/descriptors and GPU-only composition; software selection forwards raw input. `PathTracer.NativeDenoiserProvider` tracks disabled/changed denoisers before tracing. Scene revisions reset history; zero world motion is valid between revisions, with camera matrices handling camera motion. Only diffuse materials are supported. DLSS, OptiX and FSR RR remain unavailable; FSR RR currently requires Windows/DX12.
+`python3 eng/build-vulkan-rt.py --nrd` adds pinned official NRD 4.18.0 to the optional runtime; the managed/native RT ABI is now 2. Build/run with `-p:RadiantVulkanRT=true`. `Denoiser.TraceSource` connects current native signals; `NrdReblur` and `NrdRelax` / IDs `nrd.reblur` and `nrd.relax` use `NrdDenoiser`, `VulkanNrdSession`, and `Native/VulkanRT/nrd.inl`. Capability checks require the NRD runtime, ray queries and unformatted storage-image reads/writes. The native device enables supported features explicitly. Shader sources emit demodulated diffuse radiance, second-segment hit distance and primary guides; REBLUR packing differs from RELAX. Native reconstruction uses per-view resources, per-flight-frame constants/descriptors and GPU-only composition; software selection forwards raw input. `PTGI.NativeDenoiserProvider` tracks disabled/changed denoisers before tracing. Scene revisions reset history; zero world motion is valid between revisions, with camera matrices handling camera motion. Only diffuse materials are supported. DLSS, OptiX and FSR RR remain unavailable; FSR RR currently requires Windows/DX12.
 
 `--nrd-regression` validates actual REBLUR/RELAX analytic transport, lifecycle and noisy diffuse error; `--expect-unavailable` checks stock runtime rejection. Cornell accepts `--denoiser=nrd.reblur|nrd.relax|none|bilateral|atrous|svgf|oidn`, including `--capture`, which saves a backend-specific image for non-default modes. `--pipeline-regression --2d --denoiser=nrd.reblur` covers native NRD through the 2D lighting/composition stages. Native NRD requires CMake 3.30+ and downloads pinned ShaderMake/MathLib/compiler dependencies; published runtime licenses include NRD, MathLib and ShaderMake. See `docs/internals/Rendering.md` for limitations and verification.
 
@@ -781,7 +781,7 @@ dock widths and a letterboxed Game viewport. Floating bounds are preserved acros
 `IRenderer.ScenePresentationBounds` maps pointer coordinates into the preview; shape culling
 uses the corresponding scene bounds. F1 clears preview input mapping while hidden.
 `Radiant.Scenes --workspace-regression` covers menu selection, resize, restoring floating
-bounds, tab reordering and cross-dock moves. Both engine project versions are 0.8.0.
+bounds, tab reordering and cross-dock moves. Both engine project versions are 0.9.0.
 `InspectorDockStack.cs` distributes side panels vertically and merges adjacent panels into tabs
 only when their contents no longer fit. Internal dividers resize neighboring groups.
-`Radiant.Scenes --workspace-captures` captures the triangle scene and editor at 2560×1440.
+`Radiant.Scenes --workspace-captures` captures the radiance scene and editor at 2560×1440.

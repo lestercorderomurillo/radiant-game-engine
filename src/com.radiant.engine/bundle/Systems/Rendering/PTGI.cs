@@ -10,27 +10,27 @@ public enum TraceChannels { None = 0, Albedo = 1, Normals = 2, Depth = 4, Emissi
 /// <summary>Selects the path tracer's GPU execution backend, not its lighting model.</summary>
 /// <remarks>Auto uses Vulkan ray queries when installed and supported, otherwise shader BVH traversal.
 /// Software means shader traversal on the GPU, not CPU rendering.</remarks>
-public enum PathTracingBackend { Auto, Software, Vulkan }
+public enum PTGIBackend { Auto, Software, Vulkan }
 
-/// <summary>Accumulates diffuse global illumination from a 2D or 3D triangle adapter.</summary>
+/// <summary>Path-Traced Global Illumination (PTGI): accumulates diffuse lighting from a 2D or 3D triangle adapter.</summary>
 /// <remarks>Provide <see cref="ITraceGeometry"/> through <see cref="Geometry"/>. The image converges over successive samples;
 /// use denoising before tone mapping when needed. The current material model is diffuse, without glossy or transparent transport.
-/// <see cref="PathTracingBackend"/> selects how rays execute, independently of this lighting model.</remarks>
+/// <see cref="PTGIBackend"/> selects how rays execute, independently of this lighting model.</remarks>
 /// <seealso cref="RasterRenderer"/>
 /// <seealso cref="HRCGI"/>
 [SystemTag("Rendering", "Path tracing")]
-public class PathTracer : ImageSystem
+public class PTGI : ImageSystem
 {
     public ITraceGeometry Geometry;
-    public PathTracingBackend Backend = PathTracingBackend.Auto;
-    public PathTracingBackend ActiveBackend { get; private set; } = PathTracingBackend.Software;
+    public PTGIBackend Backend = PTGIBackend.Auto;
+    public PTGIBackend ActiveBackend { get; private set; } = PTGIBackend.Software;
     public string BackendStatus { get; private set; } = "Path tracing not initialized";
     /// <summary>Last completed ray-query dispatch time, or -1 when unavailable; excludes guides and post processing.</summary>
     public float TraceGpuMilliseconds => Hardware?.GpuMilliseconds ?? -1;
     public int HardwareBuildCount => Hardware?.BuildCount ?? 0;
     public int MaxBounces = 4;
     public float ResolutionScale = 0.5f;
-    /// <summary>Use stable primary hits for lighting reconstructed by PathLighting.</summary>
+    /// <summary>Use stable primary hits for lighting reconstructed by LightingReconstructor.</summary>
     public bool SeparateLighting;
     public Func<Point> ViewSize;
     public Vector3 Environment = new(0.15f);
@@ -52,7 +52,7 @@ public class PathTracer : ImageSystem
     internal Func<int> NativeDenoiserProvider;
 
     private int PreviousNativeDenoiser;
-    private PathTracingBackend ResolvedBackend = (PathTracingBackend)(-1);
+    private PTGIBackend ResolvedBackend = (PTGIBackend)(-1);
 
     public long RadianceRevision { get; private set; }
     public int BvhBuildCount => SceneBuffer.BuildCount;
@@ -67,7 +67,7 @@ public class PathTracer : ImageSystem
     private int Sequence;
 
     /// <summary>Registers the tracer's radiance and guide buffers for inspection.</summary>
-    public PathTracer()
+    public PTGI()
     {
         BufferProviders["Single sample"] = () => SampleTexture;
         BufferProviders["History"] = () => History;
@@ -84,7 +84,7 @@ public class PathTracer : ImageSystem
     /// <inheritdoc/>
     public override void Initialize()
     {
-        if (Geometry == null) throw new InvalidOperationException("PathTracer requires an ITraceGeometry source.");
+        if (Geometry == null) throw new InvalidOperationException("PTGI requires an ITraceGeometry source.");
     }
 
     /// <summary>Selects a supported tracing backend and records why a requested backend is unavailable.</summary>
@@ -94,22 +94,22 @@ public class PathTracer : ImageSystem
         if (ResolvedBackend == Backend && (Hardware == null || (Hardware.Sample.Width == Width && Hardware.Sample.Height == Height && Hardware.DenoisingSignals == (NativeDenoiser != 0)))) return;
 
         string reason = null;
-        bool useHardware = Backend != PathTracingBackend.Software && Renderer.SupportsPathTracing(out reason);
+        bool useHardware = Backend != PTGIBackend.Software && Renderer.SupportsPathTracing(out reason);
 
-        if (Backend == PathTracingBackend.Vulkan && !useHardware) throw new NotSupportedException(reason);
+        if (Backend == PTGIBackend.Vulkan && !useHardware) throw new NotSupportedException(reason);
 
         Renderer.SetTarget(null);
         Hardware?.Dispose();
         Hardware = null;
         SoftwareSample?.Dispose();
         SoftwareSample = null;
-        ActiveBackend = PathTracingBackend.Software;
+        ActiveBackend = PTGIBackend.Software;
         ResetAccumulation();
-        if (Backend == PathTracingBackend.Software) BackendStatus = "GPU shader BVH traversal";
+        if (Backend == PTGIBackend.Software) BackendStatus = "GPU shader BVH traversal";
         else if (useHardware)
         {
             Hardware = Renderer.CreatePathTracer(Width, Height, NativeDenoiser != 0);
-            ActiveBackend = PathTracingBackend.Vulkan;
+            ActiveBackend = PTGIBackend.Vulkan;
             BackendStatus = reason;
         }
         else BackendStatus = reason;
@@ -121,7 +121,7 @@ public class PathTracer : ImageSystem
     {
         NativeDenoiser = NativeDenoiserProvider?.Invoke() ?? 0;
 
-        if (Geometry == null) throw new InvalidOperationException("PathTracer requires geometry.");
+        if (Geometry == null) throw new InvalidOperationException("PTGI requires geometry.");
         if (MaxBounces < 1 || MaxBounces > 16) throw new ArgumentOutOfRangeException(nameof(MaxBounces), "Use 1 to 16 bounces.");
         if (!float.IsFinite(ResolutionScale) || ResolutionScale <= 0 || ResolutionScale > 1) throw new ArgumentOutOfRangeException(nameof(ResolutionScale));
 
@@ -259,8 +259,8 @@ public class PathTracer : ImageSystem
         SoftwareSample = null;
         Hardware?.Dispose();
         Hardware = null;
-        ResolvedBackend = (PathTracingBackend)(-1);
-        ActiveBackend = PathTracingBackend.Software;
+        ResolvedBackend = (PTGIBackend)(-1);
+        ActiveBackend = PTGIBackend.Software;
         SceneBuffer.Dispose();
 
         for (int i = 0; i < Surfaces.Length; i++) { Surfaces[i]?.Dispose(); Surfaces[i] = null; }

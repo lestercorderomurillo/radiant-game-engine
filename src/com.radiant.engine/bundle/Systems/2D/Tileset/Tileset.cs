@@ -8,7 +8,8 @@ using com.radiant.engine.input;
 namespace com.radiant.engine.bundle;
 
 /// <summary>Renders and edits a tiled world with viewport caching and propagated lighting.</summary>
-public class Tileset : core.System
+[RunAfter(typeof(Inspector))]
+public class Tileset : core.System, IViewportCamera2D
 {
     public override RenderLayer RenderLayer => RenderLayer.World;
     /// <summary>Use an explicit image pipeline instead of presenting the viewport directly.</summary>
@@ -26,6 +27,8 @@ public class Tileset : core.System
     private float LightFalloff = 1.0f / 10;
     private Vector3 MinLight = new Vector3(0.0f, 0.0f, 0.0f);
     private Vector3 SunColor = new Vector3(1.0f, 1.0f, 1.00f);
+
+    public string CameraName => "Tile viewport (2D)";
 
     public Vector2 CameraPosition { get; set; } = Vector2.Zero;
 
@@ -98,7 +101,7 @@ public class Tileset : core.System
     }
 
     /// <summary>Loads generated ECS tiles into the tileset's rendering and lighting caches.</summary>
-    public void LoadWorld(WorldGen worldGen)
+    public void LoadWorld(WorldGenerator worldGen)
     {
         WorldWidth = worldGen.WorldWidth;
         WorldHeight = worldGen.WorldHeight;
@@ -513,10 +516,11 @@ public class Tileset : core.System
         }
     }
 
-    /// <summary>Applies viewport movement and zoom from the current input state.</summary>
+    /// <summary>Applies viewport movement while respecting editor input and world bounds.</summary>
     private void HandleCameraInput()
     {
-        var ks = Controls.Keyboard;
+        var ks = Controls.IsFocused && !Inspector.IsEditingText && !Inspector.IsMouseOverUI() && !Inspector.IsCameraInputActive
+            ? Controls.Keyboard : default;
         Vector2 dir = Vector2.Zero;
 
         if (ks.IsKeyDown(Key.W)) dir.Y -= 1;
@@ -535,8 +539,8 @@ public class Tileset : core.System
         float maxY = (WorldHeight * TileSize) - ViewportHeight;
 
         CameraPosition = new Vector2(
-            global::System.Math.Clamp(CameraPosition.X, 0, maxX),
-            global::System.Math.Clamp(CameraPosition.Y, 0, maxY));
+            global::System.Math.Clamp(CameraPosition.X, 0, Math.Max(0, maxX)),
+            global::System.Math.Clamp(CameraPosition.Y, 0, Math.Max(0, maxY)));
     }
 
     /// <summary>Converts mouse input into world-space tile editing actions.</summary>
@@ -544,9 +548,16 @@ public class Tileset : core.System
     {
         CurrentMouseState = Controls.Mouse;
 
+        if (!Controls.IsFocused || Inspector.IsMouseOverUI() || Inspector.IsEditingText || Inspector.IsCameraInputActive) return;
+        var pointer = CurrentMouseState.Position;
+        if (Renderer.ScenePresentationBounds is Rectangle bounds)
+        {
+            if (!bounds.Contains((int)pointer.X, (int)pointer.Y) || bounds.Width <= 0 || bounds.Height <= 0) return;
+            pointer = (pointer - new Vector2(bounds.X, bounds.Y)) * new Vector2((float)ViewportWidth / bounds.Width, (float)ViewportHeight / bounds.Height);
+        }
         Point tp = new Point(
-            WorldToTile(CurrentMouseState.X + CameraPosition.X),
-            WorldToTile(CurrentMouseState.Y + CameraPosition.Y));
+            WorldToTile(pointer.X + CameraPosition.X),
+            WorldToTile(pointer.Y + CameraPosition.Y));
 
         bool leftPressed = CurrentMouseState.LeftButton == ButtonState.Pressed;
         bool rightPressed = CurrentMouseState.RightButton == ButtonState.Pressed;

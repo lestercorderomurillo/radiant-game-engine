@@ -25,7 +25,7 @@ internal sealed class CascadeReferenceWindow : Window
     protected override void Update(GameTime time)
     {
         base.Update(time);
-        Scene.Upscaler.Select(UpscalingMode.None);
+        Scene.Upscaler.Select(UpscalerMode.None);
         Scene.Cascades.MaxBounceUpdates = 64;
     }
 

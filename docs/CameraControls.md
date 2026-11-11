@@ -4,7 +4,9 @@ Fly through any scene while it runs: pick a camera, hold the right mouse button 
 
 ## Open the controller
 
-Press **F1**, then choose **ECS → Open Camera Controls** (or **View → Camera Controls**). From code:
+Register `ECS.AddSystemCollection(SystemCollections.Debugging)` to include the shared controller.
+It opens with the other debug panels by default. Choose **ECS → Camera Controls** (or **View → Camera Controls**)
+to reopen it; **F1** hides or restores the workspace. From code:
 
 ```csharp
 Inspector.OpenCameraControls();          // Browse the scene's cameras
@@ -31,6 +33,12 @@ inspector stops navigation.
 
 Scenes framed with `Renderer.FitWorld` show a **World view (fitted 2D)** entry. WASD pans it and the zoom
 buttons zoom around its center. Call `FitWorld` again from your scene to restore its original framing.
+
+Tileset exposes **Tile viewport (2D)** for panning; zoom and rotation are unavailable for that renderer.
+Renderer-owned viewports can implement `IViewportCamera2D` to join the same controls without creating
+a camera entity. Pixel-based viewports start at 500 units/second; entity cameras start at 5.
+Both speeds can be edited. Gameplay brushes should check `Inspector.IsCameraInputActive` so navigating
+does not also place or erase objects.
 
 ## Make your camera controllable
 

@@ -17,11 +17,11 @@ internal sealed class PipelineRegressionWindow : Window
     private Color[] FlatPixels;
     private int InitialBuilds;
     private readonly string Dimension;
-    private PathTracer Tracer => Scene is CornellBoxScene s ? s.Tracer : ((Rendering2DScene)Scene).Tracer;
+    private PTGI Tracer => Scene is CornellBoxScene s ? s.Tracer : ((Rendering2DScene)Scene).Tracer;
     private RasterRenderer Raster => Scene is CornellBoxScene s ? s.Raster : ((Rendering2DScene)Scene).Raster;
-    private AntiAliasing AA => Scene is CornellBoxScene s ? s.AA : ((Rendering2DScene)Scene).AA;
-    private ToneMapping ToneMap => Scene is CornellBoxScene s ? s.ToneMap : ((Rendering2DScene)Scene).ToneMap;
-    private PathLighting Lighting => Scene is CornellBoxScene s ? s.Lighting : ((Rendering2DScene)Scene).Lighting;
+    private AntiAliaser AA => Scene is CornellBoxScene s ? s.AA : ((Rendering2DScene)Scene).AA;
+    private ToneMapper ToneMap => Scene is CornellBoxScene s ? s.ToneMap : ((Rendering2DScene)Scene).ToneMap;
+    private LightingReconstructor Lighting => Scene is CornellBoxScene s ? s.Lighting : ((Rendering2DScene)Scene).Lighting;
     private Color[] SurfacePixels;
 
     /// <summary>Applies a renderer or denoiser selection through the test's inspector controls.</summary>
@@ -41,14 +41,14 @@ internal sealed class PipelineRegressionWindow : Window
     protected override void Update(GameTime time)
     {
         base.Update(time);
-        if (Frame == 0 && RequestedDenoiser.HasValue) Scene.ECS.GetSystem<Denoising>().Mode = RequestedDenoiser.Value;
+        if (Frame == 0 && RequestedDenoiser.HasValue) Scene.ECS.GetSystem<Denoiser>().Mode = RequestedDenoiser.Value;
         // Update after the scene so a controlled camera mutation lasts through this frame's render.
         if (Frame == 5) Select(1);
 
         if (Frame == 10) { AA.Enabled = true; AA.Mode = PostAAMode.FXAA; }
 
-        if (Frame == 15) ToneMap.Mapper = ToneMapper.Reinhard;
-        if (Frame == 20) ToneMap.Mapper = ToneMapper.ACES;
+        if (Frame == 15) ToneMap.Operator = ToneMapOperator.Reinhard;
+        if (Frame == 20) ToneMap.Operator = ToneMapOperator.ACES;
 
         if (Frame == 25) { Tracer.ResolutionScale = 0.25f; Select(2); }
 

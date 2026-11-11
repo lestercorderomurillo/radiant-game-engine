@@ -30,7 +30,8 @@ public partial class Inspector
     private void UpdateDebugger()
     {
         if (!Windows.TryGetValue("debugger", out var window) || !IsWindowDisplayed(window)) return;
-        if (EngineLog.TryRead(ref DebuggerRevision, out var entries))
+        bool newMessages = EngineLog.TryRead(ref DebuggerRevision, out var entries);
+        if (newMessages)
         { DebuggerEntries = entries; DebuggerFilterDirty = true; }
         if (DebuggerFilterDirty)
         {
@@ -44,7 +45,7 @@ public partial class Inspector
             logWidget.ListBoxEmptyText = DebuggerLevel != 0 || DebuggerSearch.Length > 0 ? "No matching log messages" : "No log messages";
             window.Widgets[logIndex] = logWidget;
         }
-        if (FollowLog)
+        if (FollowLog && newMessages)
         {
             int index = window.WidgetIndex["log"];
             var widget = window.Widgets[index];
@@ -61,7 +62,7 @@ public partial class Inspector
         window.TitleBarBounds = new Rectangle(x, y, width, WindowTitleHeight);
         window.CloseBounds = CurrentWorkspaceMode == WorkspaceMode.Panels ? default : DockTabCloseBounds(window.TitleBarBounds);
         window.WindowBounds = new Rectangle(x, y, width, height);
-        const int inset = 12, gap = 8, rowHeight = 40;
+        const int inset = Padding, gap = InlineGap, rowHeight = WidgetHeight;
         int innerWidth = Math.Max(1, width - inset * 2);
         int top = y + WindowTitleHeight + gap;
         void Place(string id, Rectangle bounds)
@@ -71,7 +72,7 @@ public partial class Inspector
             widget.Bounds = bounds;
             window.Widgets[index] = widget;
         }
-        int clearWidth = Math.Min(88, innerWidth);
+        int clearWidth = Math.Min((int)MathF.Ceiling(MeasureText("Clear").X) + Padding * 2, innerWidth);
         Place("clear", new Rectangle(x + inset, top, clearWidth, rowHeight));
         Place("follow", new Rectangle(x + inset + clearWidth + gap, top, Math.Max(1, innerWidth - clearWidth - gap), rowHeight));
         top += rowHeight + gap;
