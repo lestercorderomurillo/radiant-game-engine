@@ -271,6 +271,7 @@ public partial class Inspector : core.System
         SortRenderOrder();
         RebuildViewMenu();
         PlaceNewWindow(window);
+        if (CurrentWorkspaceMode == WorkspaceMode.Panels) ActivateDock(window);
     }
 
     /// <summary>Removes an inspector window and clears its input focus.</summary>
@@ -280,6 +281,11 @@ public partial class Inspector : core.System
 
         if (FocusedTextInputWindowId == Id) ClearTextInputFocus();
         Windows.Remove(Id);
+        FloatingLayout.Remove(Id);
+        DockScroll.Remove(Id);
+        DockTabOrder.Remove(Id);
+        DockAssignments.Remove(Id);
+        if (DragTabId == Id) CancelTabDrag();
         RenderOrder.Remove(window);
         RebuildViewMenu();
     }
@@ -295,7 +301,8 @@ public partial class Inspector : core.System
             if (Visible)
             {
                 BringToFront(window);
-                PlaceNewWindow(window);
+                if (CurrentWorkspaceMode == WorkspaceMode.Windows) PlaceNewWindow(window);
+                else ActivateDock(window);
             }
         }
     }
@@ -670,7 +677,7 @@ public partial class Inspector : core.System
     /// <summary> Processes F1 toggle, mouse input, window dragging, slider dragging, and dropdown interaction. </summary>
     public override void Update()
     {
-        if (!LayoutDone && !Dragging && !Resizing)
+        if (CurrentWorkspaceMode == WorkspaceMode.Windows && !LayoutDone && !Dragging && !Resizing)
         {
             AutoPositionAll();
             LayoutDone = true;
@@ -679,6 +686,8 @@ public partial class Inspector : core.System
         UpdateSystemsInspector();
         UpdateEntityInspector();
         UpdateProperties();
+        ComputeAllLayouts();
+        UpdatePresentationViewport();
         UpdateCameraNavigation();
 
         var keyboard = Controls.Keyboard;
@@ -686,18 +695,17 @@ public partial class Inspector : core.System
         if (keyboard.IsKeyDown(Key.F1) && PrevKeyState.IsKeyUp(Key.F1))
         {
             GlobalVisible = !GlobalVisible;
+            UpdatePresentationViewport();
 
-            if (!GlobalVisible) { CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
+            if (!GlobalVisible) { CancelTabDrag(); CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
         }
 
         if (!GlobalVisible)
-        { PrevKeyState = keyboard; return; }
+        { PrevKeyState = keyboard; PrevMouse = Controls.Mouse; return; }
 
         CursorBlinkTimer += Time.DeltaSeconds;
         foreach (char character in Controls.Text) OnTextInput(character);
         UpdateTextInputKeys(keyboard);
-        PrevKeyState = keyboard;
-
         var currentMouse = Controls.Mouse;
         var virtualMouse = ScreenToVirtual(new Vector2(currentMouse.X, currentMouse.Y));
 
@@ -705,13 +713,25 @@ public partial class Inspector : core.System
         bool leftHeld = currentMouse.LeftButton == ButtonState.Pressed;
         bool leftReleased = currentMouse.LeftButton == ButtonState.Released && PrevMouse.LeftButton == ButtonState.Pressed;
 
-        MouseOverUI = false;
+        MouseOverUI = CurrentWorkspaceMode == WorkspaceMode.Panels && !GameViewport.Contains(virtualMouse);
 
-        if (UpdateMenuBar(virtualMouse, leftPressed, keyboard))
+        if (UpdateDockTabDrag(virtualMouse, leftHeld))
+        {
+            PrevKeyState = keyboard;
+            PrevMouse = currentMouse;
+            return;
+        }
+
+        bool menuHandled = UpdateMenuBar(virtualMouse, leftPressed, keyboard);
+        PrevKeyState = keyboard;
+        if (menuHandled)
         {
             PrevMouse = currentMouse;
             return;
         }
+
+        if (UpdateDockInput(virtualMouse, leftPressed, currentMouse.ScrollWheelValue - PrevMouse.ScrollWheelValue))
+        { PrevMouse = currentMouse; return; }
 
         if (DraggingSlider && leftHeld)
         {
@@ -876,7 +896,7 @@ public partial class Inspector : core.System
             {
                 var window = RenderOrder[i];
 
-                if (!window.Visible) continue;
+                if (!IsWindowDisplayed(window)) continue;
                 if (!window.WindowBounds.Contains((int)virtualMouse.X, (int)virtualMouse.Y)) continue;
 
                 MouseOverUI = true;
@@ -889,7 +909,7 @@ public partial class Inspector : core.System
                         break;
                     }
 
-                    if (window.TitleBarBounds.Contains((int)virtualMouse.X, (int)virtualMouse.Y))
+                    if (CurrentWorkspaceMode == WorkspaceMode.Windows && window.TitleBarBounds.Contains((int)virtualMouse.X, (int)virtualMouse.Y))
                     {
                         Dragging = true;
                         DragWindowId = window.Id;
@@ -898,7 +918,7 @@ public partial class Inspector : core.System
                         break;
                     }
 
-                    if (window.Resizable)
+                    if (CurrentWorkspaceMode == WorkspaceMode.Windows && window.Resizable)
                     {
                         var resizeBounds = new Rectangle(
                             window.WindowBounds.Right - ResizeHandleSize,
@@ -992,6 +1012,7 @@ public partial class Inspector : core.System
     /// <summary>Dispatches a pointer press to the widget under the cursor.</summary>
     private void HandleWidgetPress(WindowData Window, Vector2 Mouse)
     {
+        if (CurrentWorkspaceMode == WorkspaceMode.Panels && Mouse.Y < Window.TitleBarBounds.Bottom) return;
         for (int i = 0; i < Window.Widgets.Count; i++)
         {
             var widget = Window.Widgets[i];
@@ -1170,7 +1191,8 @@ public partial class Inspector : core.System
         {
             var window = RenderOrder[i];
 
-            if (!window.Visible) continue;
+            if (!IsWindowDisplayed(window)) continue;
+            if (CurrentWorkspaceMode == WorkspaceMode.Panels && (!window.WindowBounds.Contains(Mouse) || Mouse.Y < window.TitleBarBounds.Bottom)) continue;
 
             for (int j = 0; j < window.Widgets.Count; j++)
             {
@@ -1257,6 +1279,9 @@ public partial class Inspector : core.System
     /// <summary> Disposes blur render targets and clears the singleton instance. </summary>
     public override void Dispose()
     {
+        WorkspaceSnapshot?.Dispose();
+        DockSurface?.Dispose();
+        if (Renderer != null) Renderer.ScenePresentationBounds = null;
         BlurRT_A?.Dispose();
         BlurRT_B?.Dispose();
         if (Instance == this) Instance = null;

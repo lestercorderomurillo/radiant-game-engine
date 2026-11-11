@@ -762,3 +762,13 @@ and Help → About Radiant reuse `StartupScreen` as a centered modal artwork pan
 small theme-colored X, version footer, paused simulation and Escape/click dismissal.
 `Window.IsAboutVisible` and `CloseAbout()` expose modal state; dismissing it resets timing
 and consumes Escape until release. The startup drawing implementation lives in the MonoGame backend; startup coordination remains portable.
+
+## Docked workspace (v0.6.0)
+
+`InspectorWorkspace.cs` implements View → Workspace Mode → Windows / Panels. Panels uses
+opaque tabbed docks, per-tab close buttons, drag reordering and cross-dock moves, resizable
+dock widths and a letterboxed Game viewport. Floating bounds are preserved across mode changes.
+`IRenderer.ScenePresentationBounds` maps pointer coordinates into the preview; shape culling
+uses the corresponding scene bounds. F1 clears preview input mapping while hidden.
+`Radiant.Scenes --workspace-regression` covers menu selection, resize, restoring floating
+bounds, tab reordering and cross-dock moves. Both engine project versions are 0.6.0.

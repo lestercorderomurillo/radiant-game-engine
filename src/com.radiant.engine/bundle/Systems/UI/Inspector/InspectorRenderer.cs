@@ -23,6 +23,7 @@ public partial class Inspector
         if (!GlobalVisible) return;
 
         ComputeAllLayouts();
+        if (CurrentWorkspaceMode == WorkspaceMode.Panels) { DrawPanelsWorkspace(); return; }
 
         var scale = Matrix.CreateScale(
             Renderer.ScreenWidth / Renderer.VirtualWidth * UIScale,
@@ -80,6 +81,7 @@ public partial class Inspector
         Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, transform: scale);
         DrawMenuBar(virtualMouse);
         DrawMenuDropdown(virtualMouse);
+        DrawWorkspaceSubmenu(virtualMouse);
         Renderer.EndDraw();
     }
 
@@ -112,26 +114,7 @@ public partial class Inspector
     /// <summary> Draws a complete window: background, title bar, close button, and all widgets. </summary>
     private void DrawWindow(WindowData Window, Vector2 Mouse, bool HoverBlocked)
     {
-        Renderer.DrawRoundedRect(Window.WindowBounds, BlurResult != null ? GlassTint(WindowBg) : WindowBg, CornerRadius);
-
-        bool titleHovered = !HoverBlocked && Window.TitleBarBounds.Contains((int)Mouse.X, (int)Mouse.Y);
-        Color titleBg = titleHovered ? TitleBarHover : TitleBarColor;
-        if (BlurResult != null) titleBg = GlassTint(titleBg);
-        Renderer.DrawRoundedRect(Window.TitleBarBounds, titleBg, CornerRadius, RoundedCorners.Top);
-
-        float titleTextHeight = Renderer.MeasureString("Inter-Bold", FontSize, Window.Title).Y;
-        var titlePos = new Vector2(Window.TitleBarBounds.X + Padding, Window.TitleBarBounds.Y + (TitleBarHeight - titleTextHeight) / 2);
-        DrawTextBold(Window.Title, titlePos, TextColor);
-
-        bool closeHovered = !HoverBlocked && Window.CloseBounds.Contains((int)Mouse.X, (int)Mouse.Y);
-        Renderer.DrawRoundedRect(Window.CloseBounds, closeHovered ? CloseHover : CloseColor, CornerRadius);
-
-        const float closeFontSize = FontSize * 0.8f;
-        var closeTextSize = Renderer.MeasureString("Inter-Bold", closeFontSize, "X");
-        var closeTextPos = new Vector2(
-            Window.CloseBounds.X + (Window.CloseBounds.Width - closeTextSize.X) / 2,
-            Window.CloseBounds.Y + (Window.CloseBounds.Height - closeTextSize.Y) / 2 - 2);
-        Renderer.DrawString("Inter-Bold", closeFontSize, "X", closeTextPos, CloseText, bold: true);
+        Renderer.DrawRoundedRect(Window.WindowBounds, CurrentWorkspaceMode == WorkspaceMode.Panels ? OpaqueWorkspaceColor(WindowBg) : BlurResult != null ? GlassTint(WindowBg) : WindowBg, CurrentWorkspaceMode == WorkspaceMode.Panels ? 0 : CornerRadius);
 
         for (int i = 0; i < Window.Widgets.Count; i++)
         {
@@ -158,7 +141,29 @@ public partial class Inspector
             }
         }
 
-        if (Window.Resizable)
+        if (CurrentWorkspaceMode == WorkspaceMode.Panels) return;
+
+        bool titleHovered = !HoverBlocked && Window.TitleBarBounds.Contains((int)Mouse.X, (int)Mouse.Y);
+        Color titleBg = titleHovered ? TitleBarHover : TitleBarColor;
+        if (CurrentWorkspaceMode == WorkspaceMode.Panels) titleBg = OpaqueWorkspaceColor(titleBg);
+        else if (BlurResult != null) titleBg = GlassTint(titleBg);
+        Renderer.DrawRoundedRect(Window.TitleBarBounds, titleBg, CurrentWorkspaceMode == WorkspaceMode.Panels ? 0 : CornerRadius, RoundedCorners.Top);
+
+        float titleTextHeight = Renderer.MeasureString("Inter-Bold", FontSize, Window.Title).Y;
+        var titlePos = new Vector2(Window.TitleBarBounds.X + Padding, Window.TitleBarBounds.Y + (TitleBarHeight - titleTextHeight) / 2);
+        DrawTextBold(TruncateText(Window.Title, Window.TitleBarBounds.Width - CloseButtonWidth - Padding * 2), titlePos, TextColor);
+
+        bool closeHovered = !HoverBlocked && Window.CloseBounds.Contains((int)Mouse.X, (int)Mouse.Y);
+        Renderer.DrawRoundedRect(Window.CloseBounds, closeHovered ? CloseHover : CloseColor, CornerRadius);
+
+        const float closeFontSize = FontSize * 0.8f;
+        var closeTextSize = Renderer.MeasureString("Inter-Bold", closeFontSize, "X");
+        var closeTextPos = new Vector2(
+            Window.CloseBounds.X + (Window.CloseBounds.Width - closeTextSize.X) / 2,
+            Window.CloseBounds.Y + (Window.CloseBounds.Height - closeTextSize.Y) / 2 - 2);
+        Renderer.DrawString("Inter-Bold", closeFontSize, "X", closeTextPos, CloseText, bold: true);
+
+        if (CurrentWorkspaceMode == WorkspaceMode.Windows && Window.Resizable)
         {
             var solid = Renderer.GetSolidTexture(Color.White);
             Color gripColor = new Color(TextColor.R, TextColor.G, TextColor.B, (byte)160);

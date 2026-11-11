@@ -84,6 +84,8 @@ public interface IRenderer : IDisposable, IGraphicsResourceFactory, IComputeRend
     void UpdateScreenInfo();
     /// <summary>Converts a pixel position, such as the mouse, into world coordinates.</summary>
     Vector2 ScreenToWorld(Vector2 screenPos);
+    /// <summary>Optional screen-pixel destination for the scene preview, used to map pointer input.</summary>
+    Rectangle? ScenePresentationBounds { get; set; }
     /// <summary>Converts a world position into window pixels, for example to place a label over an entity.</summary>
     Vector2 WorldToScreen(Vector2 worldPos);
     /// <summary>Converts a rectangle in virtual units into window pixels.</summary>

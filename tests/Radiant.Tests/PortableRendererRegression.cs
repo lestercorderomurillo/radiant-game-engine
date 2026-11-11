@@ -14,6 +14,12 @@ internal static class PortableRendererRegression
         using var loop = new GameLoop();
         using var renderer = new Renderer(backend, new TestWindow(), loop);
         Require(renderer.ScreenSize == new Vector2(640, 480), "Backend presentation metrics");
+        var worldCenter = renderer.ScreenToWorld(new Vector2(320, 240));
+        renderer.ScenePresentationBounds = new Rectangle(160, 120, 320, 240);
+        Require(Vector2.Distance(renderer.ScreenToWorld(new Vector2(320, 240)), worldCenter) < 0.001f, "Docked viewport center input mapping");
+        Require(Vector2.Distance(renderer.ScreenToWorld(new Vector2(160, 120)), Vector2.Zero) < 0.001f, "Docked viewport origin input mapping");
+        renderer.ScenePresentationBounds = null;
+        Require(Vector2.Distance(renderer.ScreenToWorld(new Vector2(320, 240)), worldCenter) < 0.001f, "Floating input mapping restoration");
         renderer.ClearBackBuffer(Color.Black);
         var sceneTarget = renderer.SceneRT;
         using var texture = renderer.CreateTexture(1, 1);

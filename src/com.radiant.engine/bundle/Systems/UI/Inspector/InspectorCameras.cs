@@ -174,7 +174,7 @@ public partial class Inspector
 
         var cursor = ScreenToVirtual(new Vector2(mouse.X, mouse.Y));
 
-        if (cursor.Y < MenuBarHeight || Windows.Values.Any(window => window.Visible && window.WindowBounds.Contains(cursor)) || OpenDropdownWindowId != null || OpenMenuId != null) return;
+        if ((CurrentWorkspaceMode == WorkspaceMode.Panels && !GameViewport.Contains(cursor)) || cursor.Y < MenuBarHeight || Windows.Values.Any(window => IsWindowDisplayed(window) && window.WindowBounds.Contains(cursor)) || OpenDropdownWindowId != null || OpenMenuId != null) return;
 
         var keyboard = Controls.Keyboard;
         float distance = NavigationSpeed * Math.Min(Scene.DeltaTime, 0.1f) * (keyboard.IsKeyDown(Key.LeftShift) || keyboard.IsKeyDown(Key.RightShift) ? 4 : 1);

@@ -5,6 +5,8 @@ namespace com.radiant.engine.bundle;
 
 public partial class Inspector
 {
+    private int WindowTitleHeight => CurrentWorkspaceMode == WorkspaceMode.Panels ? 0 : TitleBarHeight;
+
     /// <summary> Places a single new window in the first available spot without moving existing windows. </summary>
     private void PlaceNewWindow(WindowData NewWindow)
     {
@@ -181,7 +183,7 @@ public partial class Inspector
         if (Window.Resizable && Window.ResizedHeight > 0) return (int)Window.ResizedHeight;
 
         int contentWidth = (int)Window.Size.X - Padding * 2;
-        int height = TitleBarHeight + WidgetSpacing;
+        int height = WindowTitleHeight + WidgetSpacing;
         int inlineMaxH = 0;
         bool inRow = false;
 
@@ -238,7 +240,7 @@ public partial class Inspector
     private int ComputeDynamicListBoxHeight(WindowData Window)
     {
         int contentWidth = (int)Window.Size.X - Padding * 2;
-        int fixedHeight = TitleBarHeight + WidgetSpacing + Padding;
+        int fixedHeight = WindowTitleHeight + WidgetSpacing + Padding;
         int listBoxCount = 0;
         int inlineMaxH = 0;
         bool inRow = false;
@@ -305,6 +307,7 @@ public partial class Inspector
     /// <summary> Recomputes layout bounds for all visible windows in render order. </summary>
     private void ComputeAllLayouts()
     {
+        if (CurrentWorkspaceMode == WorkspaceMode.Panels) { ComputeDockLayout(); return; }
         foreach (var window in RenderOrder)
         {
             if (!window.Visible) continue;
@@ -323,11 +326,11 @@ public partial class Inspector
         int dynamicListBoxHeight = (Window.Resizable && Window.ResizedHeight > 0)
             ? ComputeDynamicListBoxHeight(Window) : -1;
 
-        Window.TitleBarBounds = new Rectangle(posX, posY, windowWidth, TitleBarHeight);
-        Window.CloseBounds = new Rectangle(posX + windowWidth - CloseButtonWidth - 6, posY + (TitleBarHeight - CloseButtonSize) / 2, CloseButtonWidth, CloseButtonSize);
+        Window.TitleBarBounds = new Rectangle(posX, posY, windowWidth, WindowTitleHeight);
+        Window.CloseBounds = CurrentWorkspaceMode == WorkspaceMode.Panels ? default : new Rectangle(posX + windowWidth - CloseButtonWidth - 6, posY + (TitleBarHeight - CloseButtonSize) / 2, CloseButtonWidth, CloseButtonSize);
 
         int contentWidth = windowWidth - Padding * 2;
-        int widgetY = posY + TitleBarHeight + WidgetSpacing;
+        int widgetY = posY + WindowTitleHeight + WidgetSpacing;
         int inlineX = posX + Padding;
         int inlineMaxH = 0;
         bool inRow = false;

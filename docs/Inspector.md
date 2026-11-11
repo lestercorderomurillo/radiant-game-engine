@@ -6,6 +6,16 @@ draggable windows. Press **F1** to show or hide them.
 Add the [`Inspector`](../src/com.radiant.engine/bundle/Systems/UI/Inspector/Inspector.cs) system to your scene.
 Use its static widget helpers to build panels, then keep diagnostic overlays in the Gizmos section below.
 
+## Workspace mode
+
+Choose **View → Workspace Mode → Panels** for docked tools around a framed Game viewport.
+Drag a tab to reorder it or move it to the other dock; the insertion marker shows its destination.
+Use the X inside a tab to close that panel, and reopen it from View. Drag a dock border to resize it,
+and scroll over its controls to reach content below the visible area.
+
+**Windows** restores your floating window positions and sizes. **F1** hides the inspector and
+returns the game to the full window; showing the inspector restores the selected workspace mode.
+
 ## Windows and widgets
 
 Create windows and widgets once (in `Initialize` or `SetupScene`), then update their values every frame.

@@ -148,7 +148,14 @@ public partial class Renderer : IRenderer
         ShapeBatch.ViewProjection = View.ViewProjection;
     }
 
-    public Vector2 ScreenToWorld(Vector2 screenPos) => View.ScreenToWorld(screenPos);
+    public Rectangle? ScenePresentationBounds { get; set; }
+
+    public Vector2 ScreenToWorld(Vector2 screenPos)
+    {
+        if (ScenePresentationBounds is Rectangle bounds && bounds.Width > 0 && bounds.Height > 0)
+            screenPos = (screenPos - new Vector2(bounds.X, bounds.Y)) * new Vector2((float)ScreenWidth / bounds.Width, (float)ScreenHeight / bounds.Height);
+        return View.ScreenToWorld(screenPos);
+    }
     public Vector2 WorldToScreen(Vector2 worldPos) => View.WorldToScreen(worldPos);
     public Rectangle VirtualToScreenRect(float x, float y, float width, float height) => View.VirtualToScreenRect(x, y, width, height);
 

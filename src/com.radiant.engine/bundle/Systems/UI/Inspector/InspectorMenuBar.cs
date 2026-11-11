@@ -21,6 +21,8 @@ public partial class Inspector
 
     private List<MenuData> Menus = new();
     private string OpenMenuId;
+    private bool WorkspaceSubmenuOpen;
+    private Rectangle WorkspaceSubmenuBounds;
     private Rectangle MenuBarBounds;
     private Rectangle OpenMenuDropdownBounds;
 
@@ -86,6 +88,9 @@ public partial class Inspector
         if (viewMenu == null) return;
 
         viewMenu.Items.Clear();
+        viewMenu.Items.Add(new MenuItem { Id = "workspace_mode", Label = "Workspace Mode  >", Type = MenuItemType.Action,
+            ActionCallback = () => WorkspaceSubmenuOpen = !WorkspaceSubmenuOpen });
+        viewMenu.Items.Add(new MenuItem { Id = "workspace_separator", Type = MenuItemType.Separator });
 
         viewMenu.Items.Add(new MenuItem
         {
@@ -225,6 +230,25 @@ public partial class Inspector
             return true;
         }
 
+        if (OpenMenuId == "view")
+        {
+            int x = OpenMenuDropdownBounds.Right;
+            if (x + MenuDropdownWidth > MenuBarBounds.Right) x = Math.Max(0, OpenMenuDropdownBounds.Left - MenuDropdownWidth);
+            WorkspaceSubmenuBounds = new Rectangle(x, OpenMenuDropdownBounds.Top, MenuDropdownWidth, MenuItemHeight * 2);
+            if (OpenMenuDropdownBounds.Contains(VirtualMouse) && VirtualMouse.Y < OpenMenuDropdownBounds.Top + MenuItemHeight)
+                WorkspaceSubmenuOpen = true;
+            if (WorkspaceSubmenuOpen && WorkspaceSubmenuBounds.Contains(VirtualMouse))
+            {
+                MouseOverUI = true;
+                if (LeftPressed)
+                {
+                    SetWorkspaceMode(VirtualMouse.Y < WorkspaceSubmenuBounds.Top + MenuItemHeight ? WorkspaceMode.Windows : WorkspaceMode.Panels);
+                    CloseMenuDropdown();
+                }
+                return true;
+            }
+        }
+
         bool overBar = MenuBarBounds.Contains((int)VirtualMouse.X, (int)VirtualMouse.Y);
         bool overDropdown = OpenMenuId != null && OpenMenuDropdownBounds.Contains((int)VirtualMouse.X, (int)VirtualMouse.Y);
 
@@ -280,6 +304,7 @@ public partial class Inspector
     /// <summary>Opens a top-level inspector menu.</summary>
     private void OpenMenuDropdown(string MenuId)
     {
+        WorkspaceSubmenuOpen = false;
         OpenMenuId = MenuId;
 
         if (MenuId == "view")
@@ -314,6 +339,7 @@ public partial class Inspector
     private void CloseMenuDropdown()
     {
         OpenMenuId = null;
+        WorkspaceSubmenuOpen = false;
     }
 
     /// <summary>Invokes the action or toggle associated with a menu row.</summary>
@@ -352,6 +378,7 @@ public partial class Inspector
         }
         else if (item.Type == MenuItemType.Action && item.ActionCallback != null)
         {
+            if (item.Id == "workspace_mode") { WorkspaceSubmenuOpen = true; return; }
             item.ActionCallback.Invoke();
             CloseMenuDropdown();
         }
@@ -361,7 +388,7 @@ public partial class Inspector
     private void DrawMenuBar(Vector2 VirtualMouse)
     {
         var solid = Renderer.GetSolidTexture(Color.White);
-        Color barBg = BlurResult != null ? GlassTint(TitleBarColor) : TitleBarColor;
+        Color barBg = CurrentWorkspaceMode == WorkspaceMode.Panels ? OpaqueWorkspaceColor(TitleBarColor) : BlurResult != null ? GlassTint(TitleBarColor) : TitleBarColor;
         Renderer.DrawSprite(solid, MenuBarBounds, barBg);
 
         foreach (var menu in Menus)
@@ -424,7 +451,7 @@ public partial class Inspector
         if (menu == null) return;
 
         bool glass = BlurResult != null;
-        Color dropdownBg = glass ? GlassTint(WindowBg) : WindowBg;
+        Color dropdownBg = CurrentWorkspaceMode == WorkspaceMode.Panels ? OpaqueWorkspaceColor(WindowBg) : glass ? GlassTint(WindowBg) : WindowBg;
         Renderer.DrawRoundedRect(OpenMenuDropdownBounds, dropdownBg, CornerRadius, RoundedCorners.Bottom);
 
         var solid = Renderer.GetSolidTexture(Color.White);
@@ -483,6 +510,20 @@ public partial class Inspector
                 var textPos = new Vector2(textStartX, itemRect.Y + (itemRect.Height - fitLineHeight) / 2);
                 Renderer.DrawString("Inter", fitSize, fitText, textPos, TextColor);
             }
+        }
+    }
+
+    private void DrawWorkspaceSubmenu(Vector2 mouse)
+    {
+        if (!WorkspaceSubmenuOpen || OpenMenuId != "view") return;
+        var solid = Renderer.GetSolidTexture(Color.White);
+        Renderer.DrawSprite(solid, WorkspaceSubmenuBounds, OpaqueWorkspaceColor(WindowBg));
+        for (int i = 0; i < 2; i++)
+        {
+            var row = new Rectangle(WorkspaceSubmenuBounds.X, WorkspaceSubmenuBounds.Y + i * MenuItemHeight, MenuDropdownWidth, MenuItemHeight);
+            if (row.Contains(mouse)) Renderer.DrawSprite(solid, row, ButtonHover);
+            string label = ((int)CurrentWorkspaceMode == i ? "✓  " : "    ") + (i == 0 ? "Windows" : "Panels");
+            Renderer.DrawString("Inter", MenuBarFontSize, label, new Vector2(row.X + Padding, row.Y + 8), TextColor);
         }
     }
 

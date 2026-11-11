@@ -83,8 +83,9 @@ public class ShapeGeometry2D : core.System, IRenderSource, ITraceGeometry, ICame
             PreviousSegments = CircleSegments;
         }
 
-        var start = Renderer.ScreenToWorld(Vector2.Zero);
-        var end = Renderer.ScreenToWorld(Renderer.ScreenSize);
+        var preview = Renderer.ScenePresentationBounds;
+        var start = Renderer.ScreenToWorld(preview.HasValue ? new Vector2(preview.Value.X, preview.Value.Y) : Vector2.Zero);
+        var end = Renderer.ScreenToWorld(preview.HasValue ? new Vector2(preview.Value.Right, preview.Value.Bottom) : Renderer.ScreenSize);
 
         if (Resolution.HasValue)
         {

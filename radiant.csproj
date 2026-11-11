@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="eng/Radiant.Desktop.props" />
   <PropertyGroup>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Keep field/property documentation optional; validate all XML comments. -->
     <NoWarn>$(NoWarn);1591</NoWarn>
