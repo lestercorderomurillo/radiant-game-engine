@@ -93,7 +93,7 @@ public partial class Inspector
             SliderTrack = new(28, 28, 32, 210), SliderFill = new(130, 135, 145, 255), SliderHandle = new(180, 184, 192, 255),
             ToggleOn = new(120, 125, 135, 255), ToggleOff = new(44, 44, 48, 220),
             CloseColor = new(195, 75, 70, 255), CloseHover = new(220, 90, 85, 255),
-            TextColor = new(210, 212, 218, 255), CloseText = new(210, 212, 218, 255), LabelDim = new(120, 122, 130, 255)
+            TextColor = new(230, 232, 238, 255), CloseText = new(230, 232, 238, 255), LabelDim = new(160, 164, 174, 255)
         });
 
         RegisterTheme("Midnight", new InspectorTheme

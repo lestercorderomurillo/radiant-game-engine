@@ -94,7 +94,11 @@ public partial class Inspector : core.System
         set
         {
             UIScaleBacking = value;
-            if (Instance?.Renderer != null) Instance.Renderer.FontRenderScale = MathF.Max(1f, value);
+            if (Instance?.Renderer != null)
+            {
+                Instance.Renderer.FontRenderScale = MathF.Max(1f, 2f * value * Instance.Renderer.ScreenHeight / Instance.Renderer.VirtualHeight);
+                Instance.LineHeight = Instance.Renderer.GetLineHeight("Inter", FontSize);
+            }
         }
     }
 
@@ -698,7 +702,7 @@ public partial class Inspector : core.System
             GlobalVisible = !GlobalVisible;
             UpdatePresentationViewport();
 
-            if (!GlobalVisible) { CancelTabDrag(); ClosePanelMenu(); CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
+            if (!GlobalVisible) { DragStack = null; CancelTabDrag(); ClosePanelMenu(); CloseMenuDropdown(); CloseDropdown(); ClearTextInputFocus(); MouseOverUI = false; }
         }
 
         if (!GlobalVisible)

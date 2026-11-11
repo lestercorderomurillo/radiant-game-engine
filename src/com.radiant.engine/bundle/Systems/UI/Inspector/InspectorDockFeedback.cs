@@ -23,7 +23,7 @@ public partial class Inspector
         bool Occupied(int dock) => target == dock || Windows.Values.Any(w => w.Visible && w.Id != DragTabId && DockFor(w) == dock);
         int left = Occupied(0) ? (int)(width * LeftDockFraction) : 0;
         int right = Occupied(1) ? (int)(width * RightDockFraction) : 0;
-        int bottom = Occupied(2) ? (int)((height - MenuBarHeight) * BottomDockFraction) : 0;
+        int bottom = Occupied(2) ? ComputeBottomDockHeight(height - MenuBarHeight) : 0;
         return target switch
         {
             0 => new Rectangle(0, MenuBarHeight, left, height - MenuBarHeight),

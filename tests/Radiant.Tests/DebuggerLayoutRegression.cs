@@ -21,6 +21,24 @@ internal static class DebuggerLayoutRegression
             object Call(string name, params object[] arguments) => typeof(Inspector).GetMethod(name, flags).Invoke(inspector, arguments);
             inspector.SetWorkspaceMode(WorkspaceMode.Panels);
             var windows = (Dictionary<string, WindowData>)Field("Windows");
+            var stack = new List<WindowData>();
+            foreach (string id in new[] { "stack_a", "stack_b", "stack_c" })
+            {
+                Inspector.CreateWindow(id, id);
+                Inspector.AddButton(id, "button", "Action", () => { });
+                stack.Add(windows[id]);
+            }
+            var displayed = (HashSet<string>)Field("DisplayedDockWindows");
+            displayed.Clear();
+            Call("LayoutDockStack", stack, 0, 44, 600, 900, 1);
+            if (stack.Count(w => displayed.Contains(w.Id)) != 3) throw new Exception("Panels were tabbed despite sufficient height.");
+            for (int i = 1; i < stack.Count; i++)
+                if (stack[i - 1].WindowBounds.Bottom > stack[i].WindowBounds.Top) throw new Exception("Stacked panel bodies overlap.");
+            displayed.Clear();
+            Call("LayoutDockStack", stack, 0, 44, 600, 450, 1);
+            if (stack.Count(w => displayed.Contains(w.Id)) != 2) throw new Exception("Overflow did not preserve an independent panel beside the tab group.");
+            foreach (var panel in stack) Inspector.DestroyWindow(panel.Id);
+            Call("ComputeDockLayout");
             var game = (Rectangle)Field("GamePane");
             var bottom = (Rectangle)Field("BottomPane");
             if (bottom.Height <= 0 || bottom.Y != game.Bottom || bottom.X != game.X || bottom.Width != game.Width)

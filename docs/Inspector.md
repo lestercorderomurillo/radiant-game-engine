@@ -10,7 +10,7 @@ Use its static widget helpers to build panels, then keep diagnostic overlays in 
 
 Press **F1** while the game is running, then choose **View → Workspace Mode → Panels**.
 Entity Inspector appears on the left, Game occupies the center, and Debugger opens below Game.
-Other tools share the side docks. Click a tab title to select its panel.
+Tools stack vertically within each side dock, so their controls stay visible together. When there is not enough height, only the panels that need it share a tab group. Click a tab title to select a panel in that group.
 
 ![Entity Inspector, Game, rendering controls and Debugger in the Panels workspace](images/inspector-workspace.png)
 
@@ -41,7 +41,7 @@ The title follows the pointer and the destination is outlined before you release
 
 ![Held Entity Inspector tab with the right dock outlined as its destination](images/inspector-drag-preview.png)
 
-Drag a divider's grip to change the space given to adjacent panels. The horizontal grip above Debugger
+Drag a divider's grip to change the space given to adjacent panels, including panels stacked in the same dock. The horizontal grip above Debugger
 changes its height. Scroll over a panel's controls when they do not all fit; scroll inside a list to browse its rows.
 
 The square **X** closes only its own panel. Choose its name from **View** to reopen it.

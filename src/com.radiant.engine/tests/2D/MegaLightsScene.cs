@@ -49,6 +49,7 @@ public class MegaLightsScene : Scene
 
         var lighting = ECS.AddSystem<HRCGI>();
         Upscaler = DemoRendering.AddHrc(ECS, lighting);
+        ECS.GetSystem<ToneMapping>().Exposure = 2f;
 
         ECS.AddSystem<GizmosRenderer>();
     }

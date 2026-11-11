@@ -25,6 +25,8 @@ public partial class Inspector
     private bool DropTabAfter;
     private int DropDock = -1;
     private Vector2 DragTabMouse;
+    private readonly HashSet<string> DisplayedDockWindows = new();
+    private readonly Dictionary<string, string> DockGroupSelection = new();
     private readonly string[] ActiveDock = new string[3];
     private float LeftDockFraction = 0.26f;
     private float RightDockFraction = 0.26f;
@@ -43,6 +45,7 @@ public partial class Inspector
         if (mode == CurrentWorkspaceMode) return;
         Dragging = Resizing = DraggingSlider = DraggingListBox = DraggingScrollbar = false;
         DraggingDock = -1;
+        DragStack = null;
         CancelTabDrag();
         ClosePanelMenu();
         CloseDropdown();
@@ -84,7 +87,7 @@ public partial class Inspector
         ClearTextInputFocus();
     }
     private bool IsWindowDisplayed(WindowData window) => window.Visible &&
-        (CurrentWorkspaceMode == WorkspaceMode.Windows || ActiveDock[DockFor(window)] == window.Id);
+        (CurrentWorkspaceMode == WorkspaceMode.Windows || DisplayedDockWindows.Contains(window.Id));
 
     private void ComputeDockLayout()
     {
@@ -97,12 +100,14 @@ public partial class Inspector
         int left = groups.ContainsKey(0) ? Math.Max(1, (int)(width * LeftDockFraction)) : 0;
         int right = groups.ContainsKey(1) ? Math.Max(1, (int)(width * RightDockFraction)) : 0;
         int availableHeight = height - MenuBarHeight;
-        int bottomHeight = groups.ContainsKey(2) ? Math.Max(1, (int)(availableHeight * BottomDockFraction)) : 0;
+        int bottomHeight = groups.ContainsKey(2) ? ComputeBottomDockHeight(availableHeight) : 0;
         GamePane = new Rectangle(left, MenuBarHeight, Math.Max(1, width - left - right), availableHeight - bottomHeight);
         BottomPane = new Rectangle(left, GamePane.Bottom, GamePane.Width, bottomHeight);
         var content = new Rectangle(GamePane.X + 2, GamePane.Y + DockHeaderHeight, Math.Max(1, GamePane.Width - 4), Math.Max(1, GamePane.Height - DockHeaderHeight - 2));
         GameViewport = FitPreview(content, Renderer.ScreenWidth, Renderer.ScreenHeight);
         DockTabs.Clear();
+        DisplayedDockWindows.Clear();
+        DockStackDividers.Clear();
         foreach (var pair in groups)
         {
             int dock = pair.Key;
@@ -111,29 +116,8 @@ public partial class Inspector
             int dockWidth = dock == 2 ? BottomPane.Width : dock == 0 ? left : right;
             int x = dock == 2 ? BottomPane.X : dock == 0 ? 0 : width - right;
             int dockTop = dock == 2 ? BottomPane.Y : MenuBarHeight;
-            int minTabWidth = Math.Max(230, ChromeButtonExtent * 2 + 180);
-            int columns = Math.Min(windows.Count, Math.Max(1, dockWidth / minTabWidth));
-            int rows = (windows.Count + columns - 1) / columns;
-            int top = dockTop + rows * DockHeaderHeight;
-            for (int i = 0; i < windows.Count; i++)
-            {
-                var window = windows[i];
-                SaveFloatingLayout(window);
-                int row = i / columns;
-                int column = i % columns;
-                int rowCount = Math.Min(columns, windows.Count - row * columns);
-                int tabLeft = x + column * dockWidth / rowCount;
-                int tabRight = x + (column + 1) * dockWidth / rowCount;
-                DockTabs.Add((window, new Rectangle(tabLeft, dockTop + row * DockHeaderHeight,
-                    tabRight - tabLeft, DockHeaderHeight)));
-                if (!IsWindowDisplayed(window)) continue;
-                window.Position = new Vector2(x, top);
-                window.Size = new Vector2(dockWidth, 0);
-                window.Resizable = true;
-                window.ResizedHeight = Math.Max(1, height - top);
-                ComputeLayout(window);
-                ApplyWindowScroll(window, height);
-            }
+            LayoutDockStack(windows, x, dockTop, dockWidth, height - dockTop, dock);
+
         }
     }
 
@@ -144,6 +128,9 @@ public partial class Inspector
         int height = Math.Max(1, (int)(sourceHeight * scale));
         return new Rectangle(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height);
     }
+
+    private int ComputeBottomDockHeight(int available) => Math.Min(Math.Max(1, (int)(available * 0.65f)),
+        Math.Max(DockHeaderHeight + 180, (int)(available * BottomDockFraction)));
 
     private Rectangle WorkspacePixels(Rectangle rect)
     {
@@ -160,6 +147,7 @@ public partial class Inspector
     {
         if (CurrentWorkspaceMode != WorkspaceMode.Panels) return false;
         if (OpenDropdownWindowId != null) return false;
+        if (UpdateDockStackInput(mouse, pressed)) return true;
         float width = Renderer.VirtualWidth / UIScale;
         if (DraggingDock >= 0)
         {
@@ -324,6 +312,7 @@ public partial class Inspector
                         (DropTabAfter ? tab.Bounds.Right : tab.Bounds.Left) - 2,
                         tab.Bounds.Top + 3, 4, tab.Bounds.Height - 6), TextColor);
         DrawDockDividers(mouse);
+        DrawDockStackDividers(mouse);
         DrawDockDragPreview();
         DrawDropdownPopup(mouse);
         DrawMenuBar(mouse);

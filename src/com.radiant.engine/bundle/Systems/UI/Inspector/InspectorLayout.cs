@@ -435,11 +435,6 @@ public partial class Inspector
             ScreenPos.Y * (Renderer.VirtualHeight / Renderer.ScreenHeight) / UIScale);
     }
 
-    /// <summary> Calculates the UI scale factor based on screen height, snapped to 0.5 increments. </summary>
-    private float ComputeAutoScale()
-    {
-        float scale = 0.5f + 1080f / Renderer.ScreenHeight;
-        scale = MathF.Round(scale * 2f) / 2f;
-        return global::System.Math.Clamp(scale, 0.5f, 2.5f);
-    }
+    /// <summary>Keeps body text at 20 screen pixels instead of changing size in half-step jumps.</summary>
+    private float ComputeAutoScale() => Math.Clamp(20f / FontSize * Renderer.VirtualHeight / Renderer.ScreenHeight, 0.5f, 3f);
 }

@@ -24,26 +24,45 @@ const features: Feature[] = [
 ]
 
 /** Shown verbatim on the home page; kept in sync with the README quick start. */
-const firstScene = `using com.radiant.engine.bundle;
+const firstScene = `using System.Numerics;
+using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 using com.radiant.engine.math;
 using com.radiant.engine.runtime;
 
-new GameClient().Run(new Campfire(), new WindowOptions { Title = "Campfire" });
+new GameClient().Run(new TriangleScene(), new WindowOptions { Title = "Triangles" });
 
-public class Campfire : Scene
+public class TriangleScene : Scene
 {
     public override void SetupECS()
     {
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<Geometry>();
-        ECS.AddSystem<HRCGI>();
+        var light = ECS.AddSystem<HRCGI>();
+        var color = ECS.AddSystem(new ToneMapping
+        {
+            Input = light.GetOutput, Exposure = 2f,
+            Mapper = ToneMapper.None, After = [light]
+        });
+        ECS.AddSystem(new RenderPresentation { Input = color.GetOutput, After = [color] });
     }
 
     public override void SetupScene()
     {
-        var warm = new Color(255, 180, 100);
-        LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 100f, warm, warm);
+        var center = Renderer.VirtualSize / 2;
+        Renderer.FitWorld(center, Renderer.VirtualSize);
+        int triangle = ECS.CreateEntity();
+        ECS.AddComponent<Transform2D>(triangle) = new()
+        {
+            Position = center - new Vector2(180), Scale = Vector2.One
+        };
+        ECS.AddComponent<Triangle2D>(triangle) = new() { Size = new Vector2(360), Bordered = true };
+        ECS.AddComponent<Material>(triangle) = new()
+        {
+            Albedo = Color.Black, Emissive = new Color(220, 80, 255)
+        };
+        LightFactory.CreateLight(ECS, center + new Vector2(-400, 100), 50, new Color(0, 220, 255), new Color(0, 220, 255));
+        LightFactory.CreateLight(ECS, center + new Vector2(400, 100), 50, Color.Orange, Color.Orange);
     }
 }`
 

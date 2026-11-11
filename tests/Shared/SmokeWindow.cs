@@ -17,15 +17,18 @@ public sealed class SmokeWindow : Window
     private readonly Action<Scene, int> Step;
     private readonly Action<Scene, int> BeforeDraw;
     private int Frame;
+    private readonly int ResizeWidth, ResizeHeight;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public SmokeWindow(Scene Scene, string Output, Action<Scene, int> Step = null, Action<Scene, int> BeforeDraw = null)
-        : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant smoke test", Width = 960, Height = 540 })
+    public SmokeWindow(Scene Scene, string Output, Action<Scene, int> Step = null, Action<Scene, int> BeforeDraw = null, int Width = 960, int Height = 540, int ResizeWidth = 1024, int ResizeHeight = 640)
+        : base(new GameLoop(), new() { ShowLoader = false, Title = "Radiant smoke test", Width = Width, Height = Height })
     {
         this.Scene = Scene;
         this.Output = Output;
         this.Step = Step;
         this.BeforeDraw = BeforeDraw;
+        this.ResizeWidth = ResizeWidth;
+        this.ResizeHeight = ResizeHeight;
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;
     }
@@ -52,8 +55,8 @@ public sealed class SmokeWindow : Window
 
         if (Frame == 15)
         {
-            GraphicsDeviceManager.PreferredBackBufferWidth = 1024;
-            GraphicsDeviceManager.PreferredBackBufferHeight = 640;
+            GraphicsDeviceManager.PreferredBackBufferWidth = ResizeWidth;
+            GraphicsDeviceManager.PreferredBackBufferHeight = ResizeHeight;
             GraphicsDeviceManager.ApplyChanges();
         }
 
@@ -61,7 +64,7 @@ public sealed class SmokeWindow : Window
         {
             Capture("resized");
 
-            if (Scene.Renderer.ScreenWidth != 1024 || Scene.Renderer.ScreenHeight != 640)
+            if (Scene.Renderer.ScreenWidth != ResizeWidth || Scene.Renderer.ScreenHeight != ResizeHeight)
                 throw new Exception($"Resize failed: {Scene.Renderer.ScreenSize}");
 
             Console.WriteLine($"PASS: {Scene.GetType().Name}, {Frame} Vulkan frames, {Scene.ECS.EntityCount} entities, resize and content loading.");

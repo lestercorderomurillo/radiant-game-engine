@@ -5,8 +5,9 @@ using com.radiant.engine.runtime;
 using Radiant.Testing;
 using Microsoft.Xna.Framework;
 
-if (Array.IndexOf(args, "--workspace-regression") >= 0)
+if (Array.IndexOf(args, "--workspace-regression") >= 0 || Array.IndexOf(args, "--workspace-captures") >= 0)
 {
+    bool highResolution = Array.IndexOf(args, "--workspace-captures") >= 0;
     const global::System.Reflection.BindingFlags privateInstance = global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance;
     object Field(Inspector inspector, string name) => typeof(Inspector).GetField(name, privateInstance).GetValue(inspector);
     object Invoke(Inspector inspector, string name, params object[] values) => typeof(Inspector).GetMethod(name, privateInstance).Invoke(inspector, values);
@@ -20,7 +21,7 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0)
         Invoke(inspector, "UpdateMenuBar", new Vector2(submenu.X + 20, submenu.Y + 24 + (int)mode * 48), true, default(com.radiant.engine.input.KeyboardState));
         if (inspector.CurrentWorkspaceMode != mode || Field(inspector, "OpenMenuId") != null) throw new Exception("Workspace submenu selection failed.");
     }
-    using var window = new SmokeWindow(new SimpleLightScene(), "artifacts/workspace", (scene, frame) =>
+    using var window = new SmokeWindow(highResolution ? new MegaLightsScene() : new SimpleLightScene(), "artifacts/workspace", (scene, frame) =>
     {
         var inspector = scene.ECS.GetSystem<Inspector>();
         var windows = (global::System.Collections.Generic.Dictionary<string, WindowData>)Field(inspector, "Windows");
@@ -126,11 +127,18 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0)
         if (frame == 66)
         {
             var host = (com.radiant.engine.backends.monogame.MonoGameWindow)scene.Renderer.Window;
-            host.GraphicsDeviceManager.PreferredBackBufferWidth = 1440;
-            host.GraphicsDeviceManager.PreferredBackBufferHeight = 900;
+            host.GraphicsDeviceManager.PreferredBackBufferWidth = highResolution ? 2560 : 1440;
+            host.GraphicsDeviceManager.PreferredBackBufferHeight = highResolution ? 1440 : 900;
             host.GraphicsDeviceManager.ApplyChanges();
         }
-        if (frame == 70) CaptureReview("large");
+        if (frame == 70)
+        {
+            if (highResolution)
+                foreach (string id in new[] { "inspector", "perf", "rendering" })
+                    if (!windows.TryGetValue(id, out var panel) || !panel.Visible || !(bool)Invoke(inspector, "IsWindowDisplayed", panel))
+                        throw new Exception("A side panel is hidden behind tabs at 2560 × 1440.");
+            CaptureReview("large");
+        }
         if (frame == 71)
         {
             CaptureReview("debugger-controls");
@@ -139,8 +147,8 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0)
         if (frame == 72)
         {
             var host = (com.radiant.engine.backends.monogame.MonoGameWindow)scene.Renderer.Window;
-            host.GraphicsDeviceManager.PreferredBackBufferWidth = 1024;
-            host.GraphicsDeviceManager.PreferredBackBufferHeight = 640;
+            host.GraphicsDeviceManager.PreferredBackBufferWidth = highResolution ? 2560 : 1024;
+            host.GraphicsDeviceManager.PreferredBackBufferHeight = highResolution ? 1440 : 640;
             host.GraphicsDeviceManager.ApplyChanges();
             EngineLog.Write("Workspace regression: warning filter check", LogLevel.Warning, "UI test");
             EngineLog.Write("Workspace regression: error filter check", LogLevel.Error, "UI test");
@@ -195,7 +203,8 @@ if (Array.IndexOf(args, "--workspace-regression") >= 0)
         var end = new Vector2(game.Right + 30, game.Y + 250);
         Invoke(inspector, "UpdateDockInput", new Vector2(tab.Bounds.X + 15, tab.Bounds.Y + 20), true, 0);
         Invoke(inspector, "UpdateDockTabDrag", end, true);
-    });
+    }, Width: highResolution ? 2560 : 960, Height: highResolution ? 1440 : 540,
+        ResizeWidth: highResolution ? 2560 : 1024, ResizeHeight: highResolution ? 1440 : 640);
     window.Run();
     return;
 }
@@ -245,7 +254,8 @@ Scene Scene = args.Length == 0 || args[0] == "lights" ? new SimpleLightScene()
     : args[0] == "rendering2d" ? new Rendering2DScene()
     : args[0] == "tiles" ? new TilesetScene()
     : args[0] == "triangles" ? new MegaLightsScene()
-    : throw new ArgumentException("Choose a test scene: lights, tiles, triangles, or rendering2d.");
+    : args[0] == "triangle-example" ? new TriangleScene()
+    : throw new ArgumentException("Choose a test scene: lights, tiles, triangles, triangle-example, or rendering2d.");
 
 if (Array.IndexOf(args, "--upscaling-regression") >= 0)
 {

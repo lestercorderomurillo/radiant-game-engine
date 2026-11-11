@@ -94,6 +94,7 @@ public partial class Inspector
         {
             LeftDockFraction = RightDockFraction = 0.26f;
             BottomDockFraction = 0.30f;
+            DockStackHeights.Clear();
         }
         else if (action == 4) SetWindowVisible(window.Id, false);
         ComputeDockLayout();
@@ -103,6 +104,7 @@ public partial class Inspector
 
     private void MovePanel(WindowData window, int dock)
     {
+        DockStackHeights.Clear();
         DockAssignments[window.Id] = dock;
         ActivateDock(window);
         DockScroll[window.Id] = 0;

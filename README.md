@@ -1,12 +1,12 @@
 <h1 align="center">Radiant</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.7.0"><img src="https://img.shields.io/badge/release-v0.7.0-E73C00?style=flat-square" alt="Release v0.7.0"></a>
+  <a href="https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.8.0"><img src="https://img.shields.io/badge/release-v0.8.0-E73C00?style=flat-square" alt="Release v0.8.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8.0">
 </p>
 
-[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.7.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.7.0)
+[![Radiant — Create something amazing.](https://raw.githubusercontent.com/lestercorderomurillo/radiant-game-engine/v0.8.0/Content/branding/radiant-splash.png)](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.8.0)
 
 A C# engine for 2D and 3D games, with an entity-component system, composable rendering pipelines,
 global illumination and live inspection tools.
@@ -37,7 +37,7 @@ The tools can float over the game or dock beside it.
 
 ## Get Radiant
 
-**[Download v0.7.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.7.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.7.0)
+**[Download v0.8.0 source](https://github.com/lestercorderomurillo/radiant-game-engine/archive/refs/tags/v0.8.0.zip)** · [Release notes](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.8.0)
 
 You need the .NET 8 SDK or newer and a Vulkan-capable GPU. On Linux, also install the Vulkan loader and SDL2.
 
@@ -55,29 +55,55 @@ Add Radiant to your game project:
 </Project>
 ```
 
-Then write a scene and run it. The following example opens a window with one warm light:
+Run the triangle demo from this repository:
+
+```bash
+dotnet run --project tests/Radiant.Scenes -- triangles
+```
+
+The demo combines an emissive triangle, orbiting lights and occluders. Its exposure is set to **2×**.
+For a smaller scene in your own project:
 
 ```csharp
+using System.Numerics;
 using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 using com.radiant.engine.math;
 using com.radiant.engine.runtime;
 
-new GameClient().Run(new Campfire(), new WindowOptions { Title = "Campfire" });
+new GameClient().Run(new TriangleScene(), new WindowOptions { Title = "Triangles" });
 
-public class Campfire : Scene
+public class TriangleScene : Scene
 {
     public override void SetupECS()
     {
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<Geometry>();
-        ECS.AddSystem<HRCGI>();
+        var light = ECS.AddSystem<HRCGI>();
+        var color = ECS.AddSystem(new ToneMapping
+        {
+            Input = light.GetOutput, Exposure = 2f,
+            Mapper = ToneMapper.None, After = [light]
+        });
+        ECS.AddSystem(new RenderPresentation { Input = color.GetOutput, After = [color] });
     }
 
     public override void SetupScene()
     {
-        var warm = new Color(255, 180, 100);
-        LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 100f, warm, warm);
+        var center = Renderer.VirtualSize / 2;
+        Renderer.FitWorld(center, Renderer.VirtualSize);
+        int triangle = ECS.CreateEntity();
+        ECS.AddComponent<Transform2D>(triangle) = new()
+        {
+            Position = center - new Vector2(180), Scale = Vector2.One
+        };
+        ECS.AddComponent<Triangle2D>(triangle) = new() { Size = new Vector2(360), Bordered = true };
+        ECS.AddComponent<Material>(triangle) = new()
+        {
+            Albedo = Color.Black, Emissive = new Color(220, 80, 255)
+        };
+        LightFactory.CreateLight(ECS, center + new Vector2(-400, 100), 50, new Color(0, 220, 255), new Color(0, 220, 255));
+        LightFactory.CreateLight(ECS, center + new Vector2(400, 100), 50, Color.Orange, Color.Orange);
     }
 }
 ```
@@ -85,7 +111,8 @@ public class Campfire : Scene
 ## Work with the Inspector
 
 Press **F1**, then choose **View → Workspace Mode → Panels**. Entity Inspector opens on the left,
-the game stays in the center, and Debugger shows diagnostics below it.
+the game stays in the center, and Debugger shows diagnostics below it. Side panels stack vertically
+so you can use them together. When space runs out, only the panels that need it share tabs.
 
 ![Radiant Inspector with Entity Inspector beside Game and searchable diagnostics below it](docs/images/inspector-workspace.png)
 

@@ -419,21 +419,14 @@ public partial class Inspector
 
         if (size.X <= maxWidth) return (label, MenuBarFontSize);
 
-        size = Renderer.MeasureString("Inter", MenuBarSmallFontSize, label);
-
-        if (size.X <= maxWidth) return (label, MenuBarSmallFontSize);
-
-        var ellipsis = "...";
-
+        const string ellipsis = "…";
         for (int length = label.Length - 1; length > 0; length--)
         {
             var truncated = label[..length] + ellipsis;
-            size = Renderer.MeasureString("Inter", MenuBarSmallFontSize, truncated);
-
-            if (size.X <= maxWidth) return (truncated, MenuBarSmallFontSize);
+            if (Renderer.MeasureString("Inter", MenuBarFontSize, truncated).X <= maxWidth)
+                return (truncated, MenuBarFontSize);
         }
-
-        return (ellipsis, MenuBarSmallFontSize);
+        return (ellipsis, MenuBarFontSize);
     }
 
     /// <summary>Draws the active menu popup and its item states.</summary>

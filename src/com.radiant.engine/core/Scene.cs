@@ -7,27 +7,6 @@ namespace com.radiant.engine.core;
 /// A level, menu or demo: one set of systems and entities with its own lifecycle. Subclass it, register
 /// systems in <c>SetupECS</c>, create entities in <c>SetupScene</c>, and hand it to <c>GameClient.Run</c>.
 /// </summary>
-/// <example>
-/// The following example shows how to build a lit scene with one warm light:
-/// <code>
-/// public class Campfire : Scene
-/// {
-///     public override void SetupECS()
-///     {
-///         ECS.AddSystem&lt;Geometry&gt;();
-///         ECS.AddSystem&lt;HRCGI&gt;();
-///     }
-///
-///     public override void SetupScene()
-///     {
-///         var warm = new Color(255, 170, 90);
-///         LightFactory.CreateLight(ECS, Renderer.VirtualSize / 2, 80f, warm, warm);
-///     }
-/// }
-///
-/// new GameClient().Run(new Campfire());
-/// </code>
-/// </example>
 public class Scene : IGameObject
 {
     /// <summary>Index of this scene in the game loop.</summary>

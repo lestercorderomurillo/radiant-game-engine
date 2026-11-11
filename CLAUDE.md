@@ -781,4 +781,7 @@ dock widths and a letterboxed Game viewport. Floating bounds are preserved acros
 `IRenderer.ScenePresentationBounds` maps pointer coordinates into the preview; shape culling
 uses the corresponding scene bounds. F1 clears preview input mapping while hidden.
 `Radiant.Scenes --workspace-regression` covers menu selection, resize, restoring floating
-bounds, tab reordering and cross-dock moves. Both engine project versions are 0.7.0.
+bounds, tab reordering and cross-dock moves. Both engine project versions are 0.8.0.
+`InspectorDockStack.cs` distributes side panels vertically and merges adjacent panels into tabs
+only when their contents no longer fit. Internal dividers resize neighboring groups.
+`Radiant.Scenes --workspace-captures` captures the triangle scene and editor at 2560×1440.

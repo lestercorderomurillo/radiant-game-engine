@@ -103,11 +103,18 @@ public partial class Inspector
 
     /// <summary> Draws text using the Inter regular font at the default size. </summary>
     private void DrawText(string text, Vector2 position, Color color)
-        => Renderer.DrawString("Inter", FontSize, text, position, color);
+        => Renderer.DrawString("Inter", FontSize, text, SnapTextPosition(position), color);
 
     /// <summary> Draws text using the Inter bold font at the default size. </summary>
     private void DrawTextBold(string text, Vector2 position, Color color)
-        => Renderer.DrawString("Inter-Bold", FontSize, text, position, color);
+        => Renderer.DrawString("Inter-Bold", FontSize, text, SnapTextPosition(position), color);
+
+    private Vector2 SnapTextPosition(Vector2 position)
+    {
+        float x = UIScale * Renderer.ScreenWidth / Renderer.VirtualWidth;
+        float y = UIScale * Renderer.ScreenHeight / Renderer.VirtualHeight;
+        return new Vector2(MathF.Round(position.X * x) / x, MathF.Round(position.Y * y) / y);
+    }
 
     /// <summary> Draws a complete window: background, title bar, close button, and all widgets. </summary>
     private void DrawWindow(WindowData Window, Vector2 Mouse, bool HoverBlocked)

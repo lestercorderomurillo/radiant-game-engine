@@ -49,7 +49,7 @@ export const en = {
   "home.feature.runtime.title": "Runtime",
   "home.feature.runtime.body": "Open a window, read input, keep time and simulate without a window for tests.",
   "home.firstScene.title": "Your first scene",
-  "home.firstScene.body": "Register systems, create an entity, run. This is a complete program that opens a window with one warm light.",
+  "home.firstScene.body": "Light a purple triangle with cyan and orange emitters. The scene includes the Inspector and a 2× exposure setting.",
   "home.firstScene.more": "Read the getting started guide",
   "home.noData": "API data has not been generated yet. Run eng/docs.sh from the repository root (requires the .NET SDK).",
   "footer.label": "Site footer",
